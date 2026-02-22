@@ -5,7 +5,7 @@
 
 export type CasterMotion = 'lunge' | 'cast' | 'none'
 export type ProjectileType = 'straight' | 'arc' | null
-export type ImpactStyle = 'slash' | 'punch' | 'arrow' | 'bolt' | 'generic'
+export type ImpactStyle = 'slash' | 'punch' | 'flail' | 'arrow' | 'bolt' | 'generic'
 
 export interface AttackAnimation {
   /** How the attacker moves: lunge forward, cast-in-place, or stay still */
@@ -30,6 +30,14 @@ export const STYLE_ANIMATIONS: Record<string, AttackAnimation> = {
     impactColor: '#ef5350',
     lungeDistance: 60,
     sequenceDurationMs: 900,
+  },
+  melee_flail: {
+    casterMotion: 'lunge',
+    projectile: null,
+    impactStyle: 'flail',
+    impactColor: '#b0bec5',
+    lungeDistance: 50,
+    sequenceDurationMs: 1000,
   },
   melee_punch: {
     casterMotion: 'lunge',

@@ -10,7 +10,7 @@ import type { CombatResult, CombatTurnEvent } from '../../../../../../services/a
 import { getAttackAnimation, type AttackAnimation } from './vfx/animationConfig'
 import DamageNumber from './vfx/DamageNumber'
 import ImpactEffect from './vfx/ImpactEffect'
-import Projectile from './vfx/Projectile'
+import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from './vfx/Projectile'
 
 interface CombatantInfo {
   name: string
@@ -20,6 +20,7 @@ interface CombatantInfo {
   arm: number
   portraitUrl?: string | null
   styleId?: string
+  weaponUrl?: string | null
 }
 
 interface Props {
@@ -40,27 +41,49 @@ const STAT_LABELS: { key: keyof Pick<CombatantInfo, 'ap' | 'arm'>; label: string
   { key: 'arm', label: 'Armor' },
 ]
 
-function Portrait({ url }: { url?: string | null }) {
+function Portrait({ url, weaponUrl }: { url?: string | null; weaponUrl?: string | null }) {
   return (
-    <Box
-      sx={{
-        width: 110,
-        height: 110,
-        borderRadius: 1.5,
-        overflow: 'hidden',
-        bgcolor: 'rgba(0,0,0,0.15)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: '2px solid',
-        borderColor: 'divider',
-        flexShrink: 0,
-      }}
-    >
-      {url ? (
-        <Box component="img" src={url} alt="portrait" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : (
-        <PersonIcon sx={{ fontSize: 52, color: 'rgba(255,255,255,0.3)' }} />
+    <Box sx={{ position: 'relative', width: 110, height: 110, flexShrink: 0 }}>
+      <Box
+        sx={{
+          width: 110,
+          height: 110,
+          borderRadius: 1.5,
+          overflow: 'hidden',
+          bgcolor: 'rgba(0,0,0,0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '2px solid',
+          borderColor: 'divider',
+        }}
+      >
+        {url ? (
+          <Box component="img" src={url} alt="portrait" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <PersonIcon sx={{ fontSize: 52, color: 'rgba(255,255,255,0.3)' }} />
+        )}
+      </Box>
+      {weaponUrl && (
+        <Box
+          component="img"
+          src={weaponUrl}
+          alt="weapon"
+          sx={{
+            position: 'absolute',
+            bottom: -16,
+            right: -16,
+            width: 40,
+            height: 40,
+            objectFit: 'contain',
+            borderRadius: '50%',
+            border: '2px solid',
+            borderColor: 'warning.main',
+            bgcolor: 'background.paper',
+            boxShadow: 2,
+            zIndex: 5,
+          }}
+        />
       )}
     </Box>
   )
@@ -109,6 +132,9 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const [currentTurn, setCurrentTurn] = useState(-1)
   const logRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef(false)
+  const arenaRef = useRef<HTMLDivElement>(null)
+  const playerPortraitRef = useRef<HTMLDivElement>(null)
+  const creaturePortraitRef = useRef<HTMLDivElement>(null)
 
   const playerId = combat.turns[0]?.events[0]?.sourceId ?? 'player'
   const nameOf = useCallback(
@@ -122,6 +148,9 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const [showPlayerImpact, setShowPlayerImpact] = useState(false)
   const [showCreatureImpact, setShowCreatureImpact] = useState(false)
   const [showProjectile, setShowProjectile] = useState<'left-to-right' | 'right-to-left' | null>(null)
+  const [projectileAttacker, setProjectileAttacker] = useState<'player' | 'creature'>('player')
+  const [projFrom, setProjFrom] = useState<ProjectilePos>({ x: 0, y: 0 })
+  const [projTo, setProjTo] = useState<ProjectilePos>({ x: 0, y: 0 })
   const [playerDmg, setPlayerDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
   const [creatureDmg, setCreatureDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
   const dmgKeyRef = useRef(0)
@@ -130,6 +159,18 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const creatureAnim = getAttackAnimation(creature.styleId)
   const playerVariants = getMotionVariants(playerAnim, 'left')
   const creatureVariants = getMotionVariants(creatureAnim, 'right')
+
+  const getPortraitPos = useCallback((ref: React.RefObject<HTMLDivElement | null>): ProjectilePos => {
+    const arena = arenaRef.current
+    const el = ref.current
+    if (!arena || !el) return { x: 0, y: 0 }
+    const aRect = arena.getBoundingClientRect()
+    const eRect = el.getBoundingClientRect()
+    return {
+      x: eRect.left + eRect.width / 2 - aRect.left,
+      y: eRect.top + eRect.height / 2 - aRect.top,
+    }
+  }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
@@ -157,8 +198,14 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     // 2. Projectile (if applicable)
     if (anim.projectile) {
       const dir = attackerSide === 'player' ? 'left-to-right' : 'right-to-left'
+      const srcRef = attackerSide === 'player' ? playerPortraitRef : creaturePortraitRef
+      const tgtRef = attackerSide === 'player' ? creaturePortraitRef : playerPortraitRef
+      setProjFrom(getPortraitPos(srcRef))
+      setProjTo(getPortraitPos(tgtRef))
+      setProjectileAttacker(attackerSide)
       setShowProjectile(dir)
-      await sleep(350)
+      const flightMs = (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
+      await sleep(flightMs)
       setShowProjectile(null)
     }
 
@@ -234,6 +281,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     setShowPlayerImpact(false)
     setShowCreatureImpact(false)
     setShowProjectile(null)
+    setProjectileAttacker('player')
     setPlayerDmg(null)
     setCreatureDmg(null)
 
@@ -267,7 +315,23 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
       )}
 
       {/* Arena */}
-      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', alignItems: 'flex-start', position: 'relative' }}>
+      <Box ref={arenaRef} sx={{ display: 'flex', gap: 2, justifyContent: 'center', alignItems: 'flex-start', position: 'relative' }}>
+
+        {/* Projectile layer (rendered at arena level so it can fly across cards) */}
+        <AnimatePresence>
+          {showProjectile && (
+            <Projectile
+              show
+              color={showProjectile === 'left-to-right' ? playerAnim.impactColor : creatureAnim.impactColor}
+              direction={showProjectile}
+              id={`proj-${dmgKeyRef.current}`}
+              weaponUrl={projectileAttacker === 'player' ? player.weaponUrl : creature.weaponUrl}
+              trajectory={projectileAttacker === 'player' ? playerAnim.projectile : creatureAnim.projectile}
+              from={projFrom}
+              to={projTo}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Player card */}
         <motion.div
@@ -283,8 +347,8 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               background: 'linear-gradient(135deg, rgba(33,150,243,0.06) 0%, rgba(33,150,243,0.02) 100%)',
             }}
           >
-            <Box sx={{ position: 'relative' }}>
-              <Portrait url={player.portraitUrl} />
+            <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
+              <Portrait url={player.portraitUrl} weaponUrl={player.weaponUrl} />
               <ImpactEffect
                 show={showPlayerImpact}
                 style={creatureAnim.impactStyle}
@@ -313,21 +377,11 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           </Paper>
         </motion.div>
 
-        {/* Center: VS + projectile zone */}
+        {/* Center: VS label */}
         <Box sx={{ alignSelf: 'center', position: 'relative', width: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Typography variant="h4" fontWeight={900} color="text.disabled" sx={{ userSelect: 'none' }}>
             VS
           </Typography>
-          <AnimatePresence>
-            {showProjectile && (
-              <Projectile
-                show
-                color={showProjectile === 'left-to-right' ? playerAnim.impactColor : creatureAnim.impactColor}
-                direction={showProjectile}
-                id={`proj-${dmgKeyRef.current}`}
-              />
-            )}
-          </AnimatePresence>
         </Box>
 
         {/* Creature card */}
@@ -344,8 +398,8 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               background: 'linear-gradient(135deg, rgba(244,67,54,0.06) 0%, rgba(244,67,54,0.02) 100%)',
             }}
           >
-            <Box sx={{ position: 'relative' }}>
-              <Portrait url={creature.portraitUrl} />
+            <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
+              <Portrait url={creature.portraitUrl} weaponUrl={creature.weaponUrl} />
               <ImpactEffect
                 show={showCreatureImpact}
                 style={playerAnim.impactStyle}

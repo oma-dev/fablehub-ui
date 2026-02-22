@@ -190,6 +190,8 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
       {phase === 'combat' && combatData && (() => {
         const creatureDef = creatureForQuest(combatData.quest)
         const cls = pack.classes.find((c) => c.id === character.classId)
+        const weaponItemId = character.equipment?.['attack_source']
+        const weaponDef = weaponItemId ? pack.items.find((i) => i.id === weaponItemId) : undefined
         return (
           <Box sx={{ flex: 1 }}>
             <CombatReplay
@@ -202,6 +204,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                 arm: character.arm,
                 portraitUrl: character.portraitUrl,
                 styleId: cls?.primaryAttack?.styleId,
+                weaponUrl: weaponDef?.iconUrl,
               }}
               creature={{
                 name: creatureDef?.name ?? 'Creature',

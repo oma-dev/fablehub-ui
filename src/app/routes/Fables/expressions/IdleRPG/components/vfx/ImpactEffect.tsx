@@ -55,6 +55,56 @@ function PunchSvg({ color }: { color: string }) {
   )
 }
 
+function FlailSvg({ color }: { color: string }) {
+  return (
+    <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+      {/* Downward smash arcs */}
+      {[0, 1, 2].map((i) => (
+        <motion.path
+          key={`arc-${i}`}
+          d={`M${16 - i * 6},${32 + i * 6} Q32,${20 + i * 4} ${48 + i * 6},${32 + i * 6}`}
+          stroke={color}
+          strokeWidth={3 - i * 0.5}
+          strokeLinecap="round"
+          fill="none"
+          initial={{ pathLength: 0, opacity: 0.9 }}
+          animate={{ pathLength: 1, opacity: 0 }}
+          transition={{ duration: 0.3, delay: i * 0.06 }}
+        />
+      ))}
+      {/* Central crush dot */}
+      <motion.circle
+        cx="32"
+        cy="28"
+        r="5"
+        fill={color}
+        initial={{ scale: 0.2, opacity: 1 }}
+        animate={{ scale: 1.6, opacity: 0 }}
+        transition={{ duration: 0.35 }}
+      />
+      {/* Debris lines radiating outward */}
+      {[-40, -20, 0, 20, 40].map((angle) => {
+        const rad = ((angle - 90) * Math.PI) / 180
+        return (
+          <motion.line
+            key={`debris-${angle}`}
+            x1={32 + 6 * Math.cos(rad)}
+            y1={28 + 6 * Math.sin(rad)}
+            x2={32 + 22 * Math.cos(rad)}
+            y2={28 + 22 * Math.sin(rad)}
+            stroke={color}
+            strokeWidth="2"
+            strokeLinecap="round"
+            initial={{ pathLength: 0, opacity: 0.8 }}
+            animate={{ pathLength: 1, opacity: 0 }}
+            transition={{ duration: 0.25, delay: 0.1 }}
+          />
+        )
+      })}
+    </svg>
+  )
+}
+
 function ArrowSvg({ color }: { color: string }) {
   return (
     <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
@@ -104,6 +154,7 @@ function GenericSvg({ color }: { color: string }) {
 const IMPACT_MAP: Record<ImpactStyle, React.FC<{ color: string }>> = {
   slash: SlashSvg,
   punch: PunchSvg,
+  flail: FlailSvg,
   arrow: ArrowSvg,
   bolt: BoltSvg,
   generic: GenericSvg,
