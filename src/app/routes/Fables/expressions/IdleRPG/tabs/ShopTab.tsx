@@ -19,23 +19,29 @@ interface Props {
 }
 
 const RARITY_COLORS: Record<string, string> = {
-  common: '#9e9e9e',
-  rare: '#1976d2',
-  legendary: '#e65100',
+  common: '#78748a',
+  rare: '#818cf8',
+  legendary: '#fbbf24',
 }
 
 function StatBonuses({ stats }: { stats: Partial<Record<string, number>> }) {
   const entries = Object.entries(stats).filter(([, v]) => v && v !== 0)
   if (!entries.length) return <Typography variant="caption" color="text.disabled">—</Typography>
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.25 }}>
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
       {entries.map(([k, v]) => (
         <Chip
           key={k}
           label={`${k} ${(v ?? 0) > 0 ? '+' : ''}${v}`}
           size="small"
           variant="outlined"
-          sx={{ fontSize: 10, height: 18, borderColor: (v ?? 0) > 0 ? 'success.main' : 'error.main', color: (v ?? 0) > 0 ? 'success.dark' : 'error.dark' }}
+          sx={{
+            fontSize: 11,
+            height: 22,
+            fontWeight: 600,
+            borderColor: (v ?? 0) > 0 ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)',
+            color: (v ?? 0) > 0 ? '#4ade80' : '#f87171',
+          }}
         />
       ))}
     </Box>
@@ -47,7 +53,14 @@ function RarityChip({ rarity }: { rarity: string }) {
     <Chip
       label={rarity}
       size="small"
-      sx={{ fontSize: 10, height: 18, bgcolor: RARITY_COLORS[rarity] ?? '#9e9e9e', color: '#fff', fontWeight: 600 }}
+      sx={{
+        fontSize: 11,
+        height: 22,
+        fontWeight: 700,
+        bgcolor: `${RARITY_COLORS[rarity] ?? '#78748a'}25`,
+        color: RARITY_COLORS[rarity] ?? '#78748a',
+        border: `1px solid ${RARITY_COLORS[rarity] ?? '#78748a'}40`,
+      }}
     />
   )
 }
@@ -96,25 +109,26 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
     }
   }
 
-  // Inventory: enrich with item data
   const inventoryItems = character.inventory
     .map((inv) => ({ inv, item: itemMap.get(inv.itemId) }))
     .filter((x): x is { inv: { itemId: string; qty: number }; item: ItemTemplate } => !!x.item)
 
   return (
-    <Box sx={{ display: 'flex', gap: 2.5, height: '100%', overflow: 'hidden' }}>
+    <Box sx={{ display: 'flex', gap: 3, flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-      {/* ── LEFT: Character Panel ── */}
+      {/* LEFT: Character Panel */}
       <Paper
         variant="outlined"
         sx={{
           width: 600,
           flexShrink: 0,
-          p: 2,
+          p: 2.5,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           overflow: 'auto',
+          background: 'linear-gradient(180deg, rgba(168,85,247,0.05) 0%, rgba(20,18,31,0.9) 100%)',
+          borderColor: 'rgba(168,85,247,0.15)',
         }}
       >
         <CharacterPanel
@@ -126,17 +140,32 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
         />
       </Paper>
 
-      {/* ── RIGHT: Shop + Inventory ── */}
+      {/* RIGHT: Shop + Inventory */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, overflow: 'hidden', minWidth: 0 }}>
 
         {error && (
-          <Typography color="error" variant="body2" sx={{ px: 1, pt: 1 }}>{error}</Typography>
+          <Typography color="error" variant="body2" sx={{ px: 1.5, pt: 1.5 }}>{error}</Typography>
         )}
 
         {/* Merchant Shop */}
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <Typography variant="h6" fontWeight={700} sx={{ px: 1, pt: 1, pb: 0.5, flexShrink: 0 }}>Merchant</Typography>
-          <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 1, pb: 1 }}>
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            sx={{
+              px: 1.5,
+              pt: 1.5,
+              pb: 1,
+              flexShrink: 0,
+              background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              fontSize: '1.2rem',
+            }}
+          >
+            Merchant
+          </Typography>
+          <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 1.5, pb: 1.5 }}>
             {pack.merchant.listings.length === 0 ? (
               <Typography color="text.secondary" variant="body2">No items for sale.</Typography>
             ) : (
@@ -147,31 +176,46 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
                   const canAfford = gold >= listing.price
                   const ownedQty = character.inventory.find((i) => i.itemId === listing.itemId)?.qty ?? 0
                   return (
-                    <Paper key={listing.itemId} variant="outlined" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1 }}>
+                    <Paper
+                      key={listing.itemId}
+                      variant="outlined"
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        px: 2.5,
+                        py: 1.5,
+                        transition: 'border-color 0.2s, box-shadow 0.2s',
+                        '&:hover': {
+                          borderColor: 'rgba(168,85,247,0.35)',
+                          boxShadow: '0 0 12px rgba(168,85,247,0.1)',
+                        },
+                      }}
+                    >
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                          <Typography variant="body2" fontWeight={600}>{item.name}</Typography>
+                          <Typography variant="body1" fontWeight={700}>{item.name}</Typography>
                           <RarityChip rarity={item.rarity} />
-                          <Chip label={item.slot.replace('_', ' ')} size="small" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
+                          <Chip label={item.slot.replace('_', ' ')} size="small" variant="outlined" sx={{ fontSize: 11, height: 22 }} />
                           {ownedQty > 0 && (
-                            <Chip label={`Owned: ${ownedQty}`} size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
+                            <Chip label={`Owned: ${ownedQty}`} size="small" variant="outlined" sx={{ fontSize: 11, height: 22, borderColor: 'rgba(34,197,94,0.4)', color: '#4ade80' }} />
                           )}
                         </Box>
-                        <Box sx={{ mt: 0.5 }}>
+                        <Box sx={{ mt: 0.75 }}>
                           <StatBonuses stats={item.stats} />
                         </Box>
                       </Box>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, flexShrink: 0 }}>
-                        <Typography variant="body2" fontWeight={600} color={canAfford ? 'warning.dark' : 'error.main'}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.75, flexShrink: 0 }}>
+                        <Typography variant="body1" fontWeight={700} sx={{ color: canAfford ? '#fbbf24' : '#f87171' }}>
                           {listing.price} {listing.currencyId}
                         </Typography>
                         <Button
-                          size="small"
+                          size="medium"
                           variant="contained"
                           color="warning"
                           disabled={!canAfford || buyingId === listing.itemId}
                           onClick={() => handleBuy(listing.itemId)}
-                          sx={{ minWidth: 64 }}
+                          sx={{ minWidth: 80 }}
                         >
                           {buyingId === listing.itemId ? '…' : 'Buy'}
                         </Button>
@@ -188,8 +232,23 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
 
         {/* Inventory */}
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <Typography variant="h6" fontWeight={700} sx={{ px: 1, pt: 1, pb: 0.5, flexShrink: 0 }}>Inventory</Typography>
-          <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 1, pb: 1 }}>
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            sx={{
+              px: 1.5,
+              pt: 1.5,
+              pb: 1,
+              flexShrink: 0,
+              background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              fontSize: '1.2rem',
+            }}
+          >
+            Inventory
+          </Typography>
+          <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 1.5, pb: 1.5 }}>
             {inventoryItems.length === 0 ? (
               <Typography color="text.secondary" variant="body2">Your bag is empty.</Typography>
             ) : (
@@ -205,42 +264,68 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
                       sx={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 1.5,
-                        px: 2,
-                        py: 1,
-                        borderColor: isEquipped ? 'primary.main' : 'divider',
-                        bgcolor: isEquipped ? 'action.selected' : 'background.paper',
+                        gap: 2,
+                        px: 2.5,
+                        py: 1.5,
+                        borderColor: isEquipped ? 'rgba(168,85,247,0.4)' : undefined,
+                        bgcolor: isEquipped ? 'rgba(168,85,247,0.08)' : undefined,
+                        boxShadow: isEquipped ? '0 0 12px rgba(168,85,247,0.12)' : undefined,
+                        transition: 'border-color 0.2s, box-shadow 0.2s',
+                        '&:hover': {
+                          borderColor: 'rgba(168,85,247,0.35)',
+                          boxShadow: '0 0 12px rgba(168,85,247,0.1)',
+                        },
                       }}
                     >
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                          <Typography variant="body2" fontWeight={600}>{item.name}</Typography>
+                          <Typography variant="body1" fontWeight={700}>{item.name}</Typography>
                           <RarityChip rarity={item.rarity} />
-                          <Chip label={item.slot.replace('_', ' ')} size="small" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
+                          <Chip label={item.slot.replace('_', ' ')} size="small" variant="outlined" sx={{ fontSize: 11, height: 22 }} />
                           {inv.qty > 1 && (
-                            <Chip label={`×${inv.qty}`} size="small" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
+                            <Chip label={`×${inv.qty}`} size="small" variant="outlined" sx={{ fontSize: 11, height: 22 }} />
                           )}
                           {isEquipped && (
-                            <Chip label="Equipped" size="small" color="primary" sx={{ fontSize: 10, height: 18 }} />
+                            <Chip
+                              label="Equipped"
+                              size="small"
+                              sx={{
+                                fontSize: 11,
+                                height: 22,
+                                fontWeight: 700,
+                                bgcolor: 'rgba(168,85,247,0.2)',
+                                color: '#c084fc',
+                                border: '1px solid rgba(168,85,247,0.3)',
+                              }}
+                            />
                           )}
                         </Box>
-                        <Box sx={{ mt: 0.5 }}>
+                        <Box sx={{ mt: 0.75 }}>
                           <StatBonuses stats={item.stats} />
                         </Box>
                       </Box>
                       <Box sx={{ flexShrink: 0 }}>
                         {equippedInSlot ? (
-                          <Chip label="Equipped" color="primary" size="small" />
+                          <Chip
+                            label="Equipped"
+                            size="small"
+                            sx={{
+                              fontWeight: 700,
+                              bgcolor: 'rgba(168,85,247,0.2)',
+                              color: '#c084fc',
+                              border: '1px solid rgba(168,85,247,0.3)',
+                            }}
+                          />
                         ) : classCanEquip ? (
                           <Tooltip title={`Equip to ${item.slot.replace('_', ' ')} slot`} arrow>
                             <span>
                               <Button
-                                size="small"
+                                size="medium"
                                 variant="outlined"
                                 color="primary"
                                 disabled={equippingId === inv.itemId}
                                 onClick={() => handleEquip(inv.itemId, item.slot)}
-                                sx={{ minWidth: 64 }}
+                                sx={{ minWidth: 80 }}
                               >
                                 {equippingId === inv.itemId ? '…' : 'Equip'}
                               </Button>
@@ -249,7 +334,7 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
                         ) : (
                           <Tooltip title="Your class cannot equip this item" arrow>
                             <span>
-                              <Button size="small" variant="outlined" disabled>Can't equip</Button>
+                              <Button size="medium" variant="outlined" disabled>Can't equip</Button>
                             </span>
                           </Tooltip>
                         )}

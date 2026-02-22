@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet, Link, useNavigate } from 'react-router-dom'
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import AppBar from '@mui/material/AppBar'
 import Avatar from '@mui/material/Avatar'
 import Box from '@mui/material/Box'
@@ -14,7 +14,10 @@ import { useAuth } from '../contexts/AuthContext'
 const Layout = () => {
   const { user, loading, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+
+  const isIdleRpgPlay = /^\/fables\/[^/]+\/idle-rpg\/?$/.test(location.pathname)
 
   const handleLogout = async () => {
     setAnchorEl(null)
@@ -28,6 +31,7 @@ const Layout = () => {
 
   return (
     <>
+      {!isIdleRpgPlay && (
       <AppBar position="static" elevation={0} sx={{ bgcolor: 'primary.dark' }}>
         <Toolbar>
           <Typography
@@ -94,6 +98,7 @@ const Layout = () => {
           )}
         </Toolbar>
       </AppBar>
+      )}
       <Outlet />
     </>
   )

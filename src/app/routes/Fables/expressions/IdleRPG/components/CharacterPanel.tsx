@@ -36,9 +36,9 @@ const STAT_INFO: Record<StatId, { label: string; description: string }> = {
 }
 
 const RARITY_COLORS: Record<string, string> = {
-  common: '#9e9e9e',
-  rare: '#1565c0',
-  legendary: '#e65100',
+  common: '#78748a',
+  rare: '#818cf8',
+  legendary: '#fbbf24',
 }
 
 function computeTotalStats(
@@ -48,11 +48,9 @@ function computeTotalStats(
   const cls = pack.classes.find((c) => c.id === character.classId)
   const base: Record<StatId, number> = { STR: 0, DEX: 0, INT: 0, LCK: 0, HP: 0, ARM: 0 }
 
-  // Class starting stats
   if (cls?.starting?.stats) {
     for (const [k, v] of Object.entries(cls.starting.stats)) base[k as StatId] = (base[k as StatId] ?? 0) + (v ?? 0)
   }
-  // Equipment bonuses
   const itemMap = new Map(pack.items.map((it) => [it.id, it]))
   for (const itemId of Object.values(character.equipment)) {
     if (!itemId) continue
@@ -60,7 +58,6 @@ function computeTotalStats(
     if (!item?.stats) continue
     for (const [k, v] of Object.entries(item.stats)) base[k as StatId] = (base[k as StatId] ?? 0) + (v ?? 0)
   }
-  // Allocated stats
   for (const [k, v] of Object.entries(character.allocatedStats ?? {})) {
     base[k as StatId] = (base[k as StatId] ?? 0) + (v ?? 0)
   }
@@ -71,17 +68,31 @@ function XpBar({ xp, level, xpTable, maxLevel }: { xp: number; level: number; xp
   const nextLevel = level + 1
   const nextXp = xpTable[String(nextLevel)] ?? null
   if (level >= maxLevel || nextXp === null) {
-    return <Typography variant="caption" color="text.secondary">Max level</Typography>
+    return <Typography variant="caption" color="text.secondary" fontWeight={600}>Max level</Typography>
   }
   const prevXp = xpTable[String(level)] ?? 0
   const progress = Math.min(100, ((xp - prevXp) / (nextXp - prevXp)) * 100)
   return (
     <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
-        <Typography variant="caption" color="text.secondary">XP</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+        <Typography variant="caption" color="text.secondary" fontWeight={700}>XP</Typography>
         <Typography variant="caption" color="text.secondary">{xp} / {nextXp}</Typography>
       </Box>
-      <LinearProgress variant="determinate" value={progress} sx={{ borderRadius: 4, height: 6 }} />
+      <LinearProgress
+        variant="determinate"
+        value={progress}
+        sx={{
+          borderRadius: 5,
+          height: 10,
+          bgcolor: 'rgba(168,85,247,0.1)',
+          border: '1px solid rgba(168,85,247,0.12)',
+          '& .MuiLinearProgress-bar': {
+            borderRadius: 5,
+            background: 'linear-gradient(90deg, #c084fc, #a855f7)',
+            boxShadow: '0 0 8px rgba(168,85,247,0.3)',
+          },
+        }}
+      />
     </Box>
   )
 }
@@ -102,6 +113,7 @@ function EquipmentSlot({
   unequipping: string | null
 }) {
   const isEmpty = !equippedItem
+  const rarityColor = equippedItem ? RARITY_COLORS[equippedItem.rarity] ?? '#78748a' : undefined
   return (
     <Tooltip
       title={equippedItem
@@ -113,34 +125,39 @@ function EquipmentSlot({
         variant="outlined"
         onClick={() => { if (equippedItem) onUnequip(slot) }}
         sx={{
-          width: 72,
-          height: 72,
+          width: 84,
+          height: 84,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 0.25,
+          gap: 0.5,
           cursor: equippedItem ? 'pointer' : 'default',
-          bgcolor: isEmpty ? 'action.hover' : 'background.paper',
-          borderStyle: 'dashed',
-          borderColor: isEmpty ? 'divider' : 'primary.main',
-          transition: 'all 0.15s',
+          bgcolor: isEmpty ? 'rgba(168,85,247,0.04)' : `${rarityColor}0D`,
+          borderStyle: isEmpty ? 'dashed' : 'solid',
+          borderColor: isEmpty ? 'rgba(168,85,247,0.15)' : `${rarityColor}40`,
+          borderWidth: 2,
+          transition: 'all 0.2s',
           opacity: unequipping === slot ? 0.5 : 1,
-          '&:hover': equippedItem ? { borderColor: 'error.main', bgcolor: 'error.light' } : {},
+          '&:hover': equippedItem ? {
+            borderColor: 'rgba(239,68,68,0.5)',
+            bgcolor: 'rgba(239,68,68,0.08)',
+            boxShadow: '0 0 12px rgba(239,68,68,0.15)',
+          } : {},
           position: 'relative',
         }}
       >
         {equippedItem ? (
           <>
-            <Box sx={{ color: RARITY_COLORS[equippedItem.rarity] ?? 'text.primary' }}>{icon}</Box>
-            <Typography variant="caption" align="center" sx={{ fontSize: 9, lineHeight: 1.2, px: 0.5 }} noWrap>
+            <Box sx={{ color: rarityColor }}>{icon}</Box>
+            <Typography variant="caption" align="center" sx={{ fontSize: 10, lineHeight: 1.2, px: 0.5, color: rarityColor, fontWeight: 600 }} noWrap>
               {equippedItem.name}
             </Typography>
           </>
         ) : (
           <>
-            <Box sx={{ color: 'action.disabled', opacity: 0.4 }}>{icon}</Box>
-            <Typography variant="caption" sx={{ fontSize: 9, color: 'text.disabled' }}>{label}</Typography>
+            <Box sx={{ color: 'rgba(168,85,247,0.25)', opacity: 0.6 }}>{icon}</Box>
+            <Typography variant="caption" sx={{ fontSize: 10, color: 'text.disabled' }}>{label}</Typography>
           </>
         )}
       </Paper>
@@ -185,16 +202,15 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
     }
   }
 
-  // Compute derived combat stats for display
   const baseHp = 50 + character.level * 10 + (totalStats.HP ?? 0)
   const baseAp = character.level * 2 + (totalStats[mainStat as StatId] ?? 0)
   const baseArm = totalStats.ARM ?? 0
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, width: '100%' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%' }}>
 
       {/* Portrait + equipment slots */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <EquipmentSlot
           slot="attack_source"
           label="Weapon"
@@ -207,23 +223,24 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
         {/* Portrait */}
         <Box
           sx={{
-            width: 96,
-            height: 96,
+            width: 110,
+            height: 110,
             borderRadius: '50%',
             overflow: 'hidden',
-            border: '3px solid',
-            borderColor: 'primary.main',
+            border: '3px solid transparent',
+            background: 'linear-gradient(135deg, #a855f7, #6366f1, #a855f7) border-box',
+            boxShadow: '0 0 24px 4px rgba(168,85,247,0.25), inset 0 0 16px rgba(0,0,0,0.4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'action.hover',
+            bgcolor: '#0c0a14',
             flexShrink: 0,
           }}
         >
           {character.portraitUrl ? (
             <Box component="img" src={character.portraitUrl} alt={character.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
-            <PersonIcon sx={{ fontSize: 56, color: 'text.disabled' }} />
+            <PersonIcon sx={{ fontSize: 60, color: 'rgba(168,85,247,0.3)' }} />
           )}
         </Box>
 
@@ -239,8 +256,21 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
 
       {/* Name, class, level */}
       <Box sx={{ textAlign: 'center' }}>
-        <Typography variant="h6" fontWeight={700} lineHeight={1.2}>{character.name}</Typography>
-        <Typography variant="body2" color="text.secondary">{cls?.name ?? character.classId} · Lv {character.level}</Typography>
+        <Typography
+          variant="h5"
+          fontWeight={800}
+          lineHeight={1.2}
+          sx={{
+            background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
+          {character.name}
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mt: 0.25, fontWeight: 500 }}>
+          {cls?.name ?? character.classId} · Lv {character.level}
+        </Typography>
       </Box>
 
       {/* XP bar */}
@@ -252,28 +282,72 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
       {(character.statPoints ?? 0) > 0 && (
         <Chip
           label={`${character.statPoints} unspent stat point${character.statPoints !== 1 ? 's' : ''}!`}
-          color="warning"
           size="small"
-          sx={{ fontWeight: 600, animation: 'pulse 1.5s infinite', '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.6 } } }}
+          sx={{
+            fontWeight: 700,
+            fontSize: 13,
+            height: 28,
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            color: '#000',
+            boxShadow: '0 0 14px rgba(245,158,11,0.4)',
+            animation: 'glow-pulse 2s infinite',
+            '@keyframes glow-pulse': {
+              '0%,100%': { boxShadow: '0 0 14px rgba(245,158,11,0.4)' },
+              '50%': { boxShadow: '0 0 22px rgba(245,158,11,0.7)' },
+            },
+          }}
         />
       )}
 
-      <Divider sx={{ width: '100%' }} />
+      <Divider sx={{ width: '100%', borderColor: 'rgba(168,85,247,0.12)' }} />
 
       {/* Combat stats summary */}
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
+      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', justifyContent: 'center' }}>
         <Tooltip title="Max hit points in combat" arrow>
-          <Chip label={`HP ${baseHp}`} size="small" color="error" variant="outlined" />
+          <Chip
+            label={`HP ${baseHp}`}
+            size="small"
+            sx={{
+              fontWeight: 700,
+              fontSize: 13,
+              height: 28,
+              bgcolor: 'rgba(239,68,68,0.12)',
+              color: '#f87171',
+              border: '1px solid rgba(239,68,68,0.3)',
+            }}
+          />
         </Tooltip>
         <Tooltip title="Attack power (damage per hit)" arrow>
-          <Chip label={`AP ${Math.max(1, baseAp)}`} size="small" color="warning" variant="outlined" />
+          <Chip
+            label={`AP ${Math.max(1, baseAp)}`}
+            size="small"
+            sx={{
+              fontWeight: 700,
+              fontSize: 13,
+              height: 28,
+              bgcolor: 'rgba(245,158,11,0.12)',
+              color: '#fbbf24',
+              border: '1px solid rgba(245,158,11,0.3)',
+            }}
+          />
         </Tooltip>
         <Tooltip title="Armor (damage reduction)" arrow>
-          <Chip label={`ARM ${Math.max(0, baseArm)}`} size="small" color="info" variant="outlined" />
+          <Chip
+            label={`ARM ${Math.max(0, baseArm)}`}
+            size="small"
+            sx={{
+              fontWeight: 700,
+              fontSize: 13,
+              height: 28,
+              bgcolor: 'rgba(99,102,241,0.12)',
+              color: '#818cf8',
+              border: '1px solid rgba(99,102,241,0.3)',
+            }}
+          />
         </Tooltip>
       </Box>
 
-      <Divider sx={{ width: '100%' }} />
+      <Divider sx={{ width: '100%', borderColor: 'rgba(168,85,247,0.12)' }} />
 
       {/* Stat rows */}
       <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -289,33 +363,37 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 0.75,
-                px: 0.5,
-                py: 0.25,
-                borderRadius: 1,
-                bgcolor: isMainStat ? 'warning.light' : 'transparent',
-                opacity: isMainStat ? 1 : undefined,
+                gap: 1,
+                px: 1,
+                py: 0.5,
+                borderRadius: 1.5,
+                bgcolor: isMainStat ? 'rgba(245,158,11,0.08)' : 'transparent',
+                border: isMainStat ? '1px solid rgba(245,158,11,0.15)' : '1px solid transparent',
               }}
             >
               <Tooltip title={info.description} arrow placement="left">
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, cursor: 'help' }}>
-                  <Typography variant="body2" fontWeight={isMainStat ? 700 : 400} sx={{ width: 32, color: isMainStat ? 'warning.dark' : 'text.primary' }}>
+                  <Typography
+                    variant="body2"
+                    fontWeight={isMainStat ? 800 : 500}
+                    sx={{ width: 36, color: isMainStat ? '#fbbf24' : 'text.primary', fontSize: '0.9rem' }}
+                  >
                     {stat}
                   </Typography>
                   {isMainStat && (
-                    <Typography variant="caption" sx={{ color: 'warning.dark', fontSize: 10 }}>★</Typography>
+                    <Typography variant="caption" sx={{ color: '#fbbf24', fontSize: 12 }}>★</Typography>
                   )}
                 </Box>
               </Tooltip>
-              <Typography variant="body2" fontWeight={600} sx={{ width: 28, textAlign: 'right' }}>
+              <Typography variant="body1" fontWeight={700} sx={{ width: 32, textAlign: 'right' }}>
                 {total}
               </Typography>
               {allocated > 0 && (
-                <Typography variant="caption" color="success.main" sx={{ fontSize: 10 }}>
+                <Typography variant="caption" sx={{ fontSize: 11, color: '#4ade80', fontWeight: 700 }}>
                   +{allocated}
                 </Typography>
               )}
-              <Box sx={{ width: 28, display: 'flex', justifyContent: 'center' }}>
+              <Box sx={{ width: 32, display: 'flex', justifyContent: 'center' }}>
                 {canAllocate && (
                   <Tooltip title={`Spend 1 point on ${info.label}`} arrow>
                     <span>
@@ -323,7 +401,11 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
                         size="small"
                         onClick={() => handleAllocate(stat)}
                         disabled={!!allocating}
-                        sx={{ p: 0.25, color: 'success.main' }}
+                        sx={{
+                          p: 0.25,
+                          color: '#4ade80',
+                          '&:hover': { bgcolor: 'rgba(34,197,94,0.12)' },
+                        }}
                       >
                         <AddCircleOutlineIcon fontSize="small" />
                       </IconButton>
@@ -337,10 +419,23 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
       </Box>
 
       {/* Gold */}
-      <Divider sx={{ width: '100%' }} />
+      <Divider sx={{ width: '100%', borderColor: 'rgba(168,85,247,0.12)' }} />
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
         {Object.entries(character.balances).map(([currency, amount]) => (
-          <Chip key={currency} label={`${amount} ${currency}`} size="small" color="warning" variant="outlined" />
+          <Chip
+            key={currency}
+            label={`${amount} ${currency}`}
+            size="small"
+            variant="outlined"
+            sx={{
+              fontWeight: 700,
+              fontSize: 13,
+              height: 28,
+              borderColor: currency === 'gold' ? 'rgba(251,191,36,0.5)' : 'rgba(168,85,247,0.2)',
+              color: currency === 'gold' ? '#fbbf24' : 'text.secondary',
+              ...(currency === 'gold' && { boxShadow: '0 0 8px rgba(251,191,36,0.15)' }),
+            }}
+          />
         ))}
       </Box>
     </Box>

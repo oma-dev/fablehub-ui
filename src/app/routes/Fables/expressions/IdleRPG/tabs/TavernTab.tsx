@@ -25,6 +25,30 @@ interface Props {
 
 type Phase = 'idle' | 'questPicker' | 'questActive' | 'combat' | 'result'
 
+/** Compute player combat stats (max HP, AP, ARM) from character + pack, same as CharacterPanel/Play. */
+function computePlayerCombatStats(character: CharacterState, pack: IdleRpgPackV1): { maxHp: number; ap: number; arm: number } {
+  const cls = pack.classes.find((c) => c.id === character.classId)
+  const mainStat = (cls?.scaling?.damageMainStat ?? 'STR') as keyof Record<string, number>
+  const base: Record<string, number> = {}
+  if (cls?.starting?.stats) {
+    for (const [k, v] of Object.entries(cls.starting.stats)) base[k] = (base[k] ?? 0) + (v ?? 0)
+  }
+  const itemMap = new Map(pack.items.map((it) => [it.id, it]))
+  for (const itemId of Object.values(character.equipment)) {
+    if (!itemId) continue
+    const item = itemMap.get(itemId)
+    if (!item?.stats) continue
+    for (const [k, v] of Object.entries(item.stats)) base[k] = (base[k] ?? 0) + (v ?? 0)
+  }
+  for (const [k, v] of Object.entries(character.allocatedStats ?? {})) {
+    base[k] = (base[k] ?? 0) + (v ?? 0)
+  }
+  const maxHp = 50 + character.level * 10 + (base.HP ?? 0)
+  const ap = Math.max(1, character.level * 2 + (base[mainStat] ?? 0))
+  const arm = Math.max(0, base.ARM ?? 0)
+  return { maxHp, ap, arm }
+}
+
 function pickRandom<T>(arr: T[], n: number): T[] {
   const copy = [...arr]
   const result: T[] = []
@@ -43,7 +67,6 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
   const [error, setError] = useState<string | null>(null)
   const [combatData, setCombatData] = useState<{ combat: CombatResult; victory: boolean; quest: Quest } | null>(null)
 
-  // Timer state
   const [now, setNow] = useState(Date.now())
   const activeQuest = character.questState.activeQuest
   const completesAt = activeQuest?.completesAt ?? 0
@@ -121,39 +144,90 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
+      {error && <Typography color="error" sx={{ mb: 1.5 }}>{error}</Typography>}
 
       {/* Idle: NPC */}
       {phase === 'idle' && (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
           <Paper
-            elevation={3}
+            elevation={0}
             sx={{
-              width: 120, height: 120, borderRadius: '50%', bgcolor: 'secondary.light',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-              transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.08)' },
+              width: 140,
+              height: 140,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(168,85,247,0.25) 0%, rgba(99,102,241,0.15) 100%)',
+              border: '2px solid rgba(168,85,247,0.3)',
+              boxShadow: '0 0 30px rgba(168,85,247,0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              '&:hover': {
+                transform: 'scale(1.08)',
+                boxShadow: '0 0 40px rgba(168,85,247,0.35)',
+              },
             }}
             onClick={openQuestPicker}
           >
-            <Typography variant="h3" color="secondary.contrastText">T</Typography>
+            <Typography
+              variant="h2"
+              sx={{
+                fontWeight: 900,
+                background: 'linear-gradient(135deg, #c084fc, #818cf8)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              T
+            </Typography>
           </Paper>
-          <Typography variant="subtitle1" fontWeight={600}>Tavern Keeper</Typography>
-          <Typography variant="body2" color="text.secondary">Click to view available quests</Typography>
+          <Typography variant="h6" fontWeight={700} color="text.primary">Tavern Keeper</Typography>
+          <Typography variant="body1" color="text.secondary">Click to view available quests</Typography>
         </Box>
       )}
 
       {/* Quest picker modal */}
       <Dialog open={phase === 'questPicker'} onClose={() => setPhase('idle')} maxWidth="sm" fullWidth>
-        <DialogTitle>Choose a Quest</DialogTitle>
+        <DialogTitle
+          sx={{
+            fontWeight: 800,
+            fontSize: '1.3rem',
+            background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
+          Choose a Quest
+        </DialogTitle>
         <DialogContent>
-          <List>
+          <List sx={{ display: 'flex', flexDirection: 'column', gap: 1, pt: 1 }}>
             {randomQuests.map((q) => {
               const creature = creatureForQuest(q)
               return (
-                <ListItemButton key={q.id} onClick={() => handleSelectQuest(q)} sx={{ mb: 1, borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                <ListItemButton
+                  key={q.id}
+                  onClick={() => handleSelectQuest(q)}
+                  sx={{
+                    borderRadius: 2,
+                    border: '1px solid rgba(168,85,247,0.2)',
+                    py: 1.5,
+                    px: 2,
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      borderColor: 'rgba(168,85,247,0.4)',
+                      boxShadow: '0 0 16px rgba(168,85,247,0.15)',
+                      bgcolor: 'rgba(168,85,247,0.08)',
+                    },
+                  }}
+                >
                   <ListItemText
-                    primary={q.name}
-                    secondary={`Creature: ${creature?.name ?? q.creatureId} (Lv ${creature?.level ?? '?'})  |  Duration: ${q.durationSec}s  |  XP: ${q.rewards.xp}  |  Gold: ${q.rewards.currency.gold ?? 0}`}
+                    primary={<Typography variant="body1" fontWeight={700} sx={{ fontSize: '1.05rem' }}>{q.name}</Typography>}
+                    secondary={
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Creature: {creature?.name ?? q.creatureId} (Lv {creature?.level ?? '?'}) · Duration: {q.durationSec}s · XP: {q.rewards.xp} · Gold: {q.rewards.currency.gold ?? 0}
+                      </Typography>
+                    }
                   />
                 </ListItemButton>
               )
@@ -161,27 +235,66 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
           </List>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPhase('idle')}>Cancel</Button>
+          <Button onClick={() => setPhase('idle')} variant="outlined" color="primary">Cancel</Button>
         </DialogActions>
       </Dialog>
 
       {/* Quest active: timer */}
       {phase === 'questActive' && (
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-          <Typography variant="h6" fontWeight={600}>
+          <Typography
+            variant="h5"
+            fontWeight={800}
+            sx={{
+              background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
             {activeQuestDef?.name ?? 'Quest in progress'}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body1" color="text.secondary">
             Fighting {creatureForQuest(activeQuestDef)?.name ?? 'unknown creature'}...
           </Typography>
 
-          <Box sx={{ width: '80%', maxWidth: 400 }}>
-            <LinearProgress variant="determinate" value={timerProgress} sx={{ height: 16, borderRadius: 2 }} />
-            <Typography variant="body2" textAlign="center" sx={{ mt: 1 }} fontWeight={600}>{timerText}</Typography>
+          <Box sx={{ width: '80%', maxWidth: 450 }}>
+            <LinearProgress
+              variant="determinate"
+              value={timerProgress}
+              sx={{
+                height: 20,
+                borderRadius: 2.5,
+                bgcolor: 'rgba(168,85,247,0.1)',
+                border: '1px solid rgba(168,85,247,0.15)',
+                '& .MuiLinearProgress-bar': {
+                  borderRadius: 2.5,
+                  background: questDone
+                    ? 'linear-gradient(90deg, #fbbf24, #f59e0b)'
+                    : 'linear-gradient(90deg, #c084fc, #a855f7)',
+                  boxShadow: questDone
+                    ? '0 0 12px rgba(251,191,36,0.4)'
+                    : '0 0 12px rgba(168,85,247,0.4)',
+                },
+              }}
+            />
+            <Typography
+              variant="h6"
+              textAlign="center"
+              sx={{ mt: 1.5, fontWeight: 700, color: questDone ? '#fbbf24' : 'text.primary' }}
+            >
+              {timerText}
+            </Typography>
           </Box>
 
-          <Button variant="contained" color="primary" disabled={!questDone} onClick={handleClaim} size="large">
-            {questDone ? 'Claim reward' : 'Waiting...'}
+          <Button
+            variant="contained"
+            color={questDone ? 'warning' : 'primary'}
+            disabled={!questDone}
+            onClick={handleClaim}
+            size="large"
+            sx={{ px: 5, py: 1.5, fontSize: '1.1rem' }}
+          >
+            {questDone ? 'Claim Reward' : 'Waiting...'}
           </Button>
         </Box>
       )}
@@ -192,6 +305,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
         const cls = pack.classes.find((c) => c.id === character.classId)
         const weaponItemId = character.equipment?.['attack_source']
         const weaponDef = weaponItemId ? pack.items.find((i) => i.id === weaponItemId) : undefined
+        const playerStats = computePlayerCombatStats(character, pack)
         return (
           <Box sx={{ flex: 1 }}>
             <CombatReplay
@@ -199,9 +313,9 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
               player={{
                 name: character.name,
                 level: character.level,
-                maxHp: character.hp,
-                ap: character.ap,
-                arm: character.arm,
+                maxHp: playerStats.maxHp,
+                ap: playerStats.ap,
+                arm: playerStats.arm,
                 portraitUrl: character.portraitUrl,
                 styleId: cls?.primaryAttack?.styleId,
                 weaponUrl: weaponDef?.iconUrl,
@@ -224,19 +338,49 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
 
       {/* Result */}
       {phase === 'result' && combatData && (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-          <Typography variant="h4" fontWeight={700} color={combatData.victory ? 'success.main' : 'error.main'}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+          <Typography
+            variant="h3"
+            fontWeight={900}
+            sx={{
+              background: combatData.victory
+                ? 'linear-gradient(135deg, #4ade80, #22c55e)'
+                : 'linear-gradient(135deg, #f87171, #ef4444)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              textShadow: combatData.victory
+                ? '0 0 30px rgba(34,197,94,0.3)'
+                : '0 0 30px rgba(239,68,68,0.3)',
+            }}
+          >
             {combatData.victory ? 'Quest Complete!' : 'Quest Failed'}
           </Typography>
           {combatData.victory && combatData.quest && (
-            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="body1">+{combatData.quest.rewards.xp} XP</Typography>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 3,
+                textAlign: 'center',
+                background: 'linear-gradient(135deg, rgba(168,85,247,0.08) 0%, rgba(20,18,31,0.9) 100%)',
+                borderColor: 'rgba(168,85,247,0.2)',
+                boxShadow: '0 0 20px rgba(168,85,247,0.1)',
+              }}
+            >
+              <Typography variant="h6" sx={{ color: '#c084fc', fontWeight: 700 }}>+{combatData.quest.rewards.xp} XP</Typography>
               {Object.entries(combatData.quest.rewards.currency).map(([cur, amt]) => (
-                <Typography key={cur} variant="body1">+{amt} {cur}</Typography>
+                <Typography key={cur} variant="h6" sx={{ color: '#fbbf24', fontWeight: 700 }}>+{amt} {cur}</Typography>
               ))}
             </Paper>
           )}
-          <Button variant="contained" color="primary" onClick={handleBackToTavern} size="large">Back to Tavern</Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleBackToTavern}
+            size="large"
+            sx={{ px: 5, py: 1.5, fontSize: '1.1rem' }}
+          >
+            Back to Tavern
+          </Button>
         </Box>
       )}
     </Box>

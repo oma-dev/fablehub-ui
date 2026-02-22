@@ -99,80 +99,94 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
   return (
     <Box
       sx={{
-        p: 2.5,
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        background: 'linear-gradient(180deg, rgba(255,215,0,0.04) 0%, transparent 100%)',
+        p: 3,
+        borderBottom: '1px solid rgba(168,85,247,0.15)',
+        background: 'linear-gradient(180deg, rgba(168,85,247,0.08) 0%, rgba(0,0,0,0.2) 100%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 1.5,
+        gap: 2,
       }}
     >
-      {/* Portrait */}
-      <Box
-        sx={{
-          width: 110,
-          height: 110,
-          borderRadius: '50%',
-          overflow: 'hidden',
-          border: '3px solid',
-          borderColor: 'primary.main',
-          boxShadow: '0 0 18px 4px rgba(144,202,249,0.25), inset 0 0 12px rgba(0,0,0,0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: 'grey.900',
-          flexShrink: 0,
-          position: 'relative',
-        }}
-      >
-        {character.portraitUrl ? (
-          <Box
-            component="img"
-            src={character.portraitUrl}
-            alt={character.name}
-            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        ) : (
-          <PersonIcon sx={{ fontSize: 64, color: 'grey.600' }} />
-        )}
+      {/* Portrait with decorative ring */}
+      <Box sx={{ position: 'relative' }}>
+        <Box
+          sx={{
+            width: 130,
+            height: 130,
+            borderRadius: '50%',
+            overflow: 'hidden',
+            border: '3px solid transparent',
+            background: 'linear-gradient(135deg, #a855f7, #6366f1, #a855f7) border-box',
+            boxShadow: '0 0 28px 6px rgba(168,85,247,0.3), inset 0 0 20px rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: '#0c0a14',
+            flexShrink: 0,
+          }}
+        >
+          {character.portraitUrl ? (
+            <Box
+              component="img"
+              src={character.portraitUrl}
+              alt={character.name}
+              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <PersonIcon sx={{ fontSize: 72, color: 'rgba(168,85,247,0.35)' }} />
+          )}
+        </Box>
+        {/* Level badge overlapping the portrait */}
+        <Chip
+          label={`Lv ${character.level}`}
+          size="small"
+          sx={{
+            position: 'absolute',
+            bottom: -6,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontWeight: 800,
+            fontSize: 12,
+            height: 26,
+            background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
+            color: '#fff',
+            boxShadow: '0 0 12px rgba(168,85,247,0.5)',
+            zIndex: 1,
+          }}
+        />
       </Box>
 
-      {/* Level badge sits below portrait */}
-      <Chip
-        label={`Lv ${character.level}`}
-        size="small"
-        sx={{
-          mt: -2.5,
-          fontWeight: 700,
-          fontSize: 11,
-          height: 22,
-          bgcolor: 'primary.main',
-          color: 'primary.contrastText',
-          zIndex: 1,
-        }}
-      />
-
       {/* Name & Class */}
-      <Box sx={{ textAlign: 'center', mt: -0.5 }}>
-        <Typography variant="h6" fontWeight={800} lineHeight={1.2} noWrap sx={{ letterSpacing: 0.3 }}>
+      <Box sx={{ textAlign: 'center', mt: 0.5 }}>
+        <Typography
+          variant="h5"
+          fontWeight={800}
+          lineHeight={1.2}
+          noWrap
+          sx={{
+            letterSpacing: 0.5,
+            background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
           {character.name}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+        <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
           Class: {cls?.name ?? character.classId}
         </Typography>
         {cls?.description && (
-          <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic', display: 'block', mt: 0.25, lineHeight: 1.3, maxWidth: 260 }}>
+          <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5, lineHeight: 1.3, maxWidth: 280 }}>
             {cls.description}
           </Typography>
         )}
       </Box>
 
       {/* XP Bar */}
-      <Box sx={{ width: '100%', maxWidth: 280 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
-          <Typography variant="caption" color="text.secondary" fontWeight={600}>
+      <Box sx={{ width: '100%', maxWidth: 320 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>
             XP
           </Typography>
           <Typography variant="caption" color="text.secondary">
@@ -183,14 +197,18 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
           variant="determinate"
           value={xpProgress}
           sx={{
-            height: 8,
-            borderRadius: 4,
-            bgcolor: 'rgba(255,255,255,0.06)',
+            height: 10,
+            borderRadius: 5,
+            bgcolor: 'rgba(168,85,247,0.1)',
+            border: '1px solid rgba(168,85,247,0.15)',
             '& .MuiLinearProgress-bar': {
-              borderRadius: 4,
+              borderRadius: 5,
               background: atMaxLevel
-                ? 'linear-gradient(90deg, #ffd54f, #ffb300)'
-                : 'linear-gradient(90deg, #64b5f6, #1976d2)',
+                ? 'linear-gradient(90deg, #fbbf24, #f59e0b)'
+                : 'linear-gradient(90deg, #c084fc, #a855f7)',
+              boxShadow: atMaxLevel
+                ? '0 0 10px rgba(251,191,36,0.4)'
+                : '0 0 10px rgba(168,85,247,0.4)',
             },
           }}
         />
@@ -200,34 +218,33 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
       {(character.statPoints ?? 0) > 0 && (
         <Chip
           label={`${character.statPoints} unspent stat point${character.statPoints !== 1 ? 's' : ''}!`}
-          color="warning"
           size="small"
           sx={{
             fontWeight: 700,
-            animation: 'pulse 1.5s infinite',
-            '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.6 } },
+            fontSize: 13,
+            height: 28,
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            color: '#000',
+            boxShadow: '0 0 14px rgba(245,158,11,0.4)',
+            animation: 'glow-pulse 2s infinite',
+            '@keyframes glow-pulse': {
+              '0%,100%': { boxShadow: '0 0 14px rgba(245,158,11,0.4)' },
+              '50%': { boxShadow: '0 0 22px rgba(245,158,11,0.7)' },
+            },
           }}
         />
       )}
 
       {/* Combat stats row */}
-      <Box
-        sx={{
-          display: 'flex',
-          gap: 1,
-          width: '100%',
-          maxWidth: 300,
-          justifyContent: 'center',
-        }}
-      >
-        <StatBadge icon={<FavoriteIcon sx={{ fontSize: 14 }} />} label="HP" value={baseHp} color="#ef5350" tooltip="Hit Points" />
-        <StatBadge icon={<BoltIcon sx={{ fontSize: 14 }} />} label="AP" value={baseAp} color="#ffa726" tooltip="Attack Power" />
-        <StatBadge icon={<ShieldIcon sx={{ fontSize: 14 }} />} label="ARM" value={baseArm} color="#42a5f5" tooltip="Armor" />
+      <Box sx={{ display: 'flex', gap: 1.5, width: '100%', maxWidth: 340, justifyContent: 'center' }}>
+        <StatBadge icon={<FavoriteIcon sx={{ fontSize: 16 }} />} label="HP" value={baseHp} color="#ef4444" tooltip="Hit Points" />
+        <StatBadge icon={<BoltIcon sx={{ fontSize: 16 }} />} label="AP" value={baseAp} color="#f59e0b" tooltip="Attack Power" />
+        <StatBadge icon={<ShieldIcon sx={{ fontSize: 16 }} />} label="ARM" value={baseArm} color="#6366f1" tooltip="Armor" />
       </Box>
 
       {/* Primary stat indicator */}
-      <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
-        Main stat: <Box component="span" sx={{ color: 'warning.light', fontWeight: 700 }}>{mainStat}</Box>
+      <Typography variant="caption" color="text.disabled" sx={{ fontSize: 11 }}>
+        Main stat: <Box component="span" sx={{ color: '#fbbf24', fontWeight: 700 }}>{mainStat}</Box>
         {' · '}
         {(['STR', 'DEX', 'INT', 'LCK'] as const)
           .filter((s) => (totalStats[s] ?? 0) > 0)
@@ -236,7 +253,7 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
       </Typography>
 
       {/* Equipment summary */}
-      <Box sx={{ width: '100%', maxWidth: 300, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      <Box sx={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
         <EquipRow label="Weapon" item={weapon} emptyText="bare-handed" />
         <EquipRow label="Armor" item={armor} emptyText="unarmored" />
       </Box>
@@ -250,9 +267,12 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
             size="small"
             variant="outlined"
             sx={{
-              fontWeight: 600,
-              borderColor: currency === 'gold' ? '#ffd54f' : 'divider',
-              color: currency === 'gold' ? '#ffd54f' : 'text.secondary',
+              fontWeight: 700,
+              fontSize: 13,
+              height: 28,
+              borderColor: currency === 'gold' ? 'rgba(251,191,36,0.5)' : 'rgba(168,85,247,0.2)',
+              color: currency === 'gold' ? '#fbbf24' : 'text.secondary',
+              ...(currency === 'gold' && { boxShadow: '0 0 8px rgba(251,191,36,0.15)' }),
             }}
           />
         ))}
@@ -261,7 +281,7 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
             label={`${inventoryCount} item${inventoryCount !== 1 ? 's' : ''}`}
             size="small"
             variant="outlined"
-            sx={{ fontWeight: 600, borderColor: 'divider', color: 'text.secondary' }}
+            sx={{ fontWeight: 600, fontSize: 12, height: 28, borderColor: 'rgba(168,85,247,0.2)', color: 'text.secondary' }}
           />
         )}
       </Box>
@@ -279,19 +299,22 @@ function StatBadge({ icon, label, value, color, tooltip }: { icon: React.ReactNo
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          py: 0.75,
-          borderColor: color,
-          borderRadius: 2,
-          bgcolor: `${color}0A`,
+          py: 1,
+          borderColor: `${color}40`,
+          borderRadius: 2.5,
+          bgcolor: `${color}0D`,
+          boxShadow: `0 0 12px ${color}15`,
+          transition: 'box-shadow 0.2s',
+          '&:hover': { boxShadow: `0 0 18px ${color}30` },
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color }}>
           {icon}
-          <Typography variant="caption" fontWeight={700} sx={{ color, fontSize: 11 }}>
+          <Typography variant="caption" fontWeight={700} sx={{ color, fontSize: 12 }}>
             {label}
           </Typography>
         </Box>
-        <Typography variant="body1" fontWeight={800} sx={{ color, lineHeight: 1.2 }}>
+        <Typography variant="h6" fontWeight={800} sx={{ color, lineHeight: 1.2 }}>
           {value}
         </Typography>
       </Paper>
@@ -302,17 +325,27 @@ function StatBadge({ icon, label, value, color, tooltip }: { icon: React.ReactNo
 function EquipRow({ label, item, emptyText }: { label: string; item?: { name: string; rarity: string } | undefined; emptyText: string }) {
   const color = item ? RARITY_COLORS[item.rarity] ?? '#9e9e9e' : undefined
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1 }}>
-      <Typography variant="caption" color="text.disabled" sx={{ width: 52, flexShrink: 0, textAlign: 'right', fontSize: 10 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        px: 1.5,
+        py: 0.5,
+        borderRadius: 1.5,
+        bgcolor: item ? 'rgba(168,85,247,0.06)' : 'transparent',
+      }}
+    >
+      <Typography variant="caption" color="text.disabled" sx={{ width: 60, flexShrink: 0, textAlign: 'right', fontSize: 11, fontWeight: 600 }}>
         {label}
       </Typography>
       {item ? (
-        <Typography variant="caption" fontWeight={600} sx={{ color }} noWrap>
+        <Typography variant="body2" fontWeight={600} sx={{ color, fontSize: 13 }} noWrap>
           {item.name}
-          <Box component="span" sx={{ ml: 0.5, fontSize: 9, opacity: 0.7 }}>({item.rarity})</Box>
+          <Box component="span" sx={{ ml: 0.5, fontSize: 10, opacity: 0.6 }}>({item.rarity})</Box>
         </Typography>
       ) : (
-        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic', fontSize: 11 }}>
+        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic', fontSize: 12 }}>
           {emptyText}
         </Typography>
       )}
@@ -424,7 +457,7 @@ export default function FableIdleRPG() {
   }
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box sx={{ display: 'flex', height: '100vh', minHeight: 0, bgcolor: 'background.default' }}>
       {/* Character creation dialog */}
       <Dialog open={showCreateChar} disableEscapeKeyDown>
         <DialogTitle>Create your character</DialogTitle>
@@ -460,39 +493,48 @@ export default function FableIdleRPG() {
       </Dialog>
 
       {/* Left sidebar */}
-      <Paper
-        elevation={2}
+      <Box
         sx={{
-          width: 500, flexShrink: 0,
+          width: 360, flexShrink: 0,
           display: 'flex', flexDirection: 'column',
-          borderRadius: 0,
+          borderRight: '1px solid rgba(168,85,247,0.12)',
+          background: 'linear-gradient(180deg, #14121f 0%, #0c0a14 100%)',
+          overflow: 'auto',
         }}
       >
         {/* Character card */}
         {character && pack && <SidebarCharacterCard character={character} pack={pack} />}
 
-        <List sx={{ flex: 1, pt: 1 }}>
+        <List sx={{ flex: 1, pt: 2, px: 1 }}>
           {TABS.map((tab) => (
             <ListItemButton
               key={tab.id}
               selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
+              sx={{ mb: 0.5, py: 1.5 }}
             >
-              <ListItemIcon sx={{ minWidth: 36 }}>{tab.icon}</ListItemIcon>
-              <ListItemText primary={tab.label} />
+              <ListItemIcon sx={{ minWidth: 42, color: activeTab === tab.id ? 'primary.main' : 'text.secondary' }}>
+                {tab.icon}
+              </ListItemIcon>
+              <ListItemText
+                primary={tab.label}
+                primaryTypographyProps={{ fontWeight: activeTab === tab.id ? 700 : 500, fontSize: '1rem' }}
+              />
             </ListItemButton>
           ))}
         </List>
 
-        <Box sx={{ p: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Button component={Link} to={`/fables/${fableId}`} size="small" fullWidth>Back to Fable</Button>
+        <Box sx={{ p: 1.5, borderTop: '1px solid rgba(168,85,247,0.1)' }}>
+          <Button component={Link} to={`/fables/${fableId}`} size="small" fullWidth variant="outlined" color="primary">
+            Back to Fable
+          </Button>
         </Box>
-      </Paper>
+      </Box>
 
       {/* Right content */}
-      <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, minHeight: 0, p: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {character && realm && pack && (
-          <>
+          <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {activeTab === 'tavern' && (
               <TavernTab
                 fableId={fableId}
@@ -513,7 +555,7 @@ export default function FableIdleRPG() {
             )}
             {activeTab === 'guild' && <GuildTab />}
             {activeTab === 'pvp' && <PvPTab />}
-          </>
+          </Box>
         )}
       </Box>
     </Box>
