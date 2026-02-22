@@ -1,39 +1,76 @@
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
 import Container from '@mui/material/Container'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
-
-// Mock fable for MVP: name + short description, Idle RPG mode enabled (context §8.2, §16)
-const MOCK_FABLE: Record<string, { name: string; description: string }> = {
-  '1': {
-    name: 'Realm of Echoes',
-    description:
-      'A world where shadows hold power and every choice echoes. Canon includes entities, tags, relationships, and capabilities. Idle RPG mode is enabled — quest, gear up, and face the boss.',
-  },
-  '2': {
-    name: 'Sundered Isles',
-    description:
-      'Archipelago of warring factions and lost lore. Portable canon; experience it through Idle RPG: Fighter, Rogue, or Sorcerer, level to 10, merchant, PvP, and groups.',
-  },
-  '3': {
-    name: 'The Iron Chronicle',
-    description:
-      'Canon-first world of mercenaries, monsters, and one legendary drop. Same canon, many ways to play — Idle RPG first, more modes later.',
-  },
-}
+import { getFable } from '../../../services/api'
+import type { Fable } from '../../../services/api'
 
 const Fable = () => {
   const { fableId } = useParams<{ fableId: string }>()
-  const fable = fableId ? MOCK_FABLE[fableId] : null
+  const [fable, setFable] = useState<Fable | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  if (!fable) {
+  useEffect(() => {
+    if (!fableId) {
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    getFable(fableId)
+      .then((data: Fable) => {
+        if (!cancelled) {
+          setFable(data)
+          setError(null)
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setFable(null)
+          setError(err instanceof Error ? err.message : 'Failed to load fable')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [fableId])
+
+  if (!fableId) {
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: 4 }}>
         <Container maxWidth="md">
           <Typography variant="h5" color="text.secondary" gutterBottom>
             Fable not found
+          </Typography>
+          <Button component={Link} to="/fables" variant="contained" color="primary">
+            Back to Fables
+          </Button>
+        </Container>
+      </Box>
+    )
+  }
+
+  if (loading) {
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress />
+      </Box>
+    )
+  }
+
+  if (error || !fable) {
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: 4 }}>
+        <Container maxWidth="md">
+          <Typography variant="h5" color="text.secondary" gutterBottom>
+            {error ?? 'Fable not found'}
           </Typography>
           <Button component={Link} to="/fables" variant="contained" color="primary">
             Back to Fables
@@ -56,10 +93,10 @@ const Fable = () => {
           {fable.name}
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-          {fable.description}
+          {fable.description ?? 'No description.'}
         </Typography>
 
-        {/* Modes (context: Idle RPG first, mode is adapter that consumes canon) */}
+        {/* Modes (context §2.3: Idle RPG first, mode is adapter that consumes canon) */}
         <Typography variant="h6" color="text.primary" sx={{ mb: 2 }}>
           Modes
         </Typography>
@@ -72,26 +109,29 @@ const Fable = () => {
             PvP, groups. Friends playtestable.
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Button
-              variant="contained"
-              color="secondary"
-              component={Link}
-              to={`/fables/${fableId}/idle-rpg/create`}
-            >
-              Create Idle RPG
-            </Button>
+            {!fable.idleRpg && (
+              <Button
+                variant="contained"
+                color="secondary"
+                component={Link}
+                to={`/fables/${fableId}/idle-rpg/create`}
+              >
+                Enable Idle RPG
+              </Button>
+            )}
             <Button
               variant="contained"
               color="primary"
               component={Link}
               to={`/fables/${fableId}/idle-rpg`}
+              disabled={!fable.idleRpg}
             >
-              Play Idle RPG
+              {fable.idleRpg ? 'Play Idle RPG' : 'Play (enable Idle RPG first)'}
             </Button>
           </Box>
         </Paper>
 
-        {/* Canon placeholder (context: entities, tags, relationships, capabilities) */}
+        {/* Canon (context §5: entities, tags, relationships, capabilities) */}
         <Typography variant="h6" color="text.primary" sx={{ mb: 2 }}>
           Canon
         </Typography>
