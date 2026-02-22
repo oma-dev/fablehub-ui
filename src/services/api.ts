@@ -212,6 +212,10 @@ export interface CharacterState {
   equipment: Record<string, string | undefined>
   questState: CharacterQuestState
   stats: Record<string, number>
+  /** Unspent stat points from leveling up. */
+  statPoints: number
+  /** Player-allocated stat bonuses: { STR: 2, DEX: 1, ... } */
+  allocatedStats: Record<string, number>
 }
 
 export interface QuestClaimResult {
@@ -295,6 +299,10 @@ export function equipItem(fableId: string, realmId: string, characterId: string,
   return patch<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/equipment`, { body: { slot, itemId } })
 }
 
+export function allocateStat(fableId: string, realmId: string, characterId: string, stat: string, amount = 1) {
+  return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/stats/allocate`, { body: { stat, amount } })
+}
+
 // --- Grouped exports ---
 
 export const api = {
@@ -311,5 +319,6 @@ export const api = {
     claimQuest,
     buyItem,
     equipItem,
+    allocateStat,
   },
 }
