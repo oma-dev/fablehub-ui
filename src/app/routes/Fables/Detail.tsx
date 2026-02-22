@@ -109,14 +109,14 @@ const Fable = () => {
             PvP, groups. Friends playtestable.
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            {!fable.idleRpg && (
+            {(!fable.idleRealms?.length && !fable.idleRpg) && (
               <Button
                 variant="contained"
                 color="secondary"
                 component={Link}
                 to={`/fables/${fableId}/idle-rpg/create`}
               >
-                Enable Idle RPG
+                Create Idle RPG realm
               </Button>
             )}
             <Button
@@ -124,9 +124,9 @@ const Fable = () => {
               color="primary"
               component={Link}
               to={`/fables/${fableId}/idle-rpg`}
-              disabled={!fable.idleRpg}
+              disabled={!fable.idleRealms?.length && !fable.idleRpg}
             >
-              {fable.idleRpg ? 'Play Idle RPG' : 'Play (enable Idle RPG first)'}
+              {fable.idleRealms?.length || fable.idleRpg ? 'Play Idle RPG' : 'Play (create a realm first)'}
             </Button>
           </Box>
         </Paper>
