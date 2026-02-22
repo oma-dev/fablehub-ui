@@ -16,6 +16,8 @@
     "@mui/icons-material": "^7.3.8",
     "@mui/material": "^7.3.8",
     "@supabase/supabase-js": "^2.97.0",
+    "framer-motion": "^12.34.3",
+    "lottie-react": "^2.4.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0"

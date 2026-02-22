@@ -187,19 +187,37 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
       )}
 
       {/* Combat replay */}
-      {phase === 'combat' && combatData && (
-        <Box sx={{ flex: 1 }}>
-          <CombatReplay
-            combat={combatData.combat}
-            playerName={character.name}
-            playerMaxHp={character.hp}
-            creatureName={creatureForQuest(combatData.quest)?.name ?? 'Creature'}
-            creatureMaxHp={creatureForQuest(combatData.quest)?.hp ?? 10}
-            victory={combatData.victory}
-            onFinish={handleCombatFinish}
-          />
-        </Box>
-      )}
+      {phase === 'combat' && combatData && (() => {
+        const creatureDef = creatureForQuest(combatData.quest)
+        const cls = pack.classes.find((c) => c.id === character.classId)
+        return (
+          <Box sx={{ flex: 1 }}>
+            <CombatReplay
+              combat={combatData.combat}
+              player={{
+                name: character.name,
+                level: character.level,
+                maxHp: character.hp,
+                ap: character.ap,
+                arm: character.arm,
+                portraitUrl: character.portraitUrl,
+                styleId: cls?.primaryAttack?.styleId,
+              }}
+              creature={{
+                name: creatureDef?.name ?? 'Creature',
+                level: creatureDef?.level ?? 1,
+                maxHp: creatureDef?.hp ?? 10,
+                ap: creatureDef?.ap ?? 1,
+                arm: creatureDef?.arm ?? 0,
+                portraitUrl: creatureDef?.iconUrl,
+                styleId: 'melee_slash',
+              }}
+              victory={combatData.victory}
+              onFinish={handleCombatFinish}
+            />
+          </Box>
+        )
+      })()}
 
       {/* Result */}
       {phase === 'result' && combatData && (
