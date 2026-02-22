@@ -24,7 +24,7 @@ export interface AttackAnimation {
 
 export const STYLE_ANIMATIONS: Record<string, AttackAnimation> = {
   melee_slash: {
-    casterMotion: 'lunge',
+    casterMotion: 'cast',
     projectile: null,
     impactStyle: 'slash',
     impactColor: '#ef5350',
@@ -33,15 +33,15 @@ export const STYLE_ANIMATIONS: Record<string, AttackAnimation> = {
   },
   melee_flail: {
     casterMotion: 'lunge',
-    projectile: null,
-    impactStyle: 'flail',
+    projectile: 'arc',
+    impactStyle: 'arrow',
     impactColor: '#b0bec5',
-    lungeDistance: 50,
+    lungeDistance: 0,
     sequenceDurationMs: 1000,
   },
   melee_punch: {
-    casterMotion: 'lunge',
-    projectile: null,
+    casterMotion: 'cast',
+    projectile: 'arc',
     impactStyle: 'punch',
     impactColor: '#ff9800',
     lungeDistance: 60,
@@ -49,7 +49,7 @@ export const STYLE_ANIMATIONS: Record<string, AttackAnimation> = {
   },
   projectile_arrow: {
     casterMotion: 'cast',
-    projectile: 'straight',
+    projectile: 'arc',
     impactStyle: 'arrow',
     impactColor: '#8d6e63',
     lungeDistance: 0,
@@ -64,7 +64,7 @@ export const STYLE_ANIMATIONS: Record<string, AttackAnimation> = {
     sequenceDurationMs: 1100,
   },
   instant_slash: {
-    casterMotion: 'none',
+    casterMotion: 'cast',
     projectile: null,
     impactStyle: 'slash',
     impactColor: '#26c6da',
