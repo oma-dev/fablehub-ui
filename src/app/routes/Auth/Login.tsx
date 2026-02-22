@@ -6,7 +6,6 @@ import Container from '@mui/material/Container'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { supabase } from '../../../lib/supabase'
-import { setAccessToken } from '../../../services/webclient'
 
 const Login = () => {
   const navigate = useNavigate()
@@ -24,17 +23,12 @@ const Login = () => {
     }
     setSubmitting(true)
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       })
       if (authError) throw authError
-      if (data.session?.access_token) {
-        setAccessToken(data.session.access_token)
-        navigate('/', { replace: true })
-      } else {
-        setError('No session returned. Try again.')
-      }
+      navigate('/', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed.')
     } finally {

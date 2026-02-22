@@ -1,4 +1,4 @@
-import { get, post } from './webclient'
+import { get, post, patch } from './webclient'
 
 // --- Types (aligned with backend) ---
 
@@ -159,6 +159,67 @@ export interface CreateIdleRpgBody {
   pack: IdleRpgPackV1
 }
 
+// --- Combat types (from backend combat.types.ts) ---
+
+export interface CombatTurnEvent {
+  sourceId: string
+  targetId: string
+  type: 'damage' | 'heal'
+  value: number
+  targetHpAfter: number
+}
+
+export interface CombatTurn {
+  turnIndex: number
+  events: CombatTurnEvent[]
+}
+
+export interface CombatResult {
+  turns: CombatTurn[]
+  winnerId: string | null
+  finalHp: Record<string, number>
+  timeout?: boolean
+}
+
+// --- Character state (simplified from backend RealmCharacter) ---
+
+export interface QuestProgress {
+  questId: string
+  startedAt: number
+  completesAt: number
+  status: 'active' | 'completed' | 'claimed'
+  role?: 'quest' | 'boss'
+}
+
+export interface CharacterQuestState {
+  activeQuest?: QuestProgress
+  completed: { questId: string; completedAt: number }[]
+  cooldowns?: Record<string, number>
+}
+
+export interface CharacterState {
+  id: string
+  name: string
+  portraitUrl?: string
+  classId: string
+  level: number
+  xp: number
+  hp: number
+  ap: number
+  arm: number
+  balances: Record<string, number>
+  inventory: { itemId: string; qty: number }[]
+  equipment: Record<string, string | undefined>
+  questState: CharacterQuestState
+  stats: Record<string, number>
+}
+
+export interface QuestClaimResult {
+  character: CharacterState
+  combat: CombatResult
+  victory: boolean
+}
+
 // --- Auth ---
 
 /** GET /auth/me — current user from JWT (auth required). */
@@ -200,20 +261,55 @@ export function getIdleRpgRealm(fableId: string, realmId: string) {
   return get<IdleRpgRealm>(`/fables/${fableId}/idle-rpg/${realmId}`)
 }
 
+// --- Idle RPG Characters (play endpoints) ---
+
+function charBase(fableId: string, realmId: string) {
+  return `/fables/${fableId}/idle-rpg/${realmId}/characters`
+}
+
+export function getMyCharacters(fableId: string, realmId: string) {
+  return get<CharacterState[]>(charBase(fableId, realmId))
+}
+
+export function createCharacter(fableId: string, realmId: string, body: { name: string; classId: string; portraitUrl?: string }) {
+  return post<CharacterState>(charBase(fableId, realmId), { body })
+}
+
+export function getPlayState(fableId: string, realmId: string, characterId: string) {
+  return get<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/play-state`)
+}
+
+export function startQuest(fableId: string, realmId: string, characterId: string, questId: string) {
+  return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/quests/start`, { body: { questId } })
+}
+
+export function claimQuest(fableId: string, realmId: string, characterId: string) {
+  return post<QuestClaimResult>(`${charBase(fableId, realmId)}/${characterId}/quests/claim`)
+}
+
+export function buyItem(fableId: string, realmId: string, characterId: string, itemId: string) {
+  return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/merchant/buy`, { body: { itemId } })
+}
+
+export function equipItem(fableId: string, realmId: string, characterId: string, slot: string, itemId?: string) {
+  return patch<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/equipment`, { body: { slot, itemId } })
+}
+
 // --- Grouped exports ---
 
 export const api = {
-  auth: {
-    getMe,
-  },
-  fables: {
-    create: createFable,
-    getAll: getFables,
-    getOne: getFable,
-  },
+  auth: { getMe },
+  fables: { create: createFable, getAll: getFables, getOne: getFable },
   idleRpg: {
     createRealm: createIdleRpgRealm,
     getRealms: getIdleRpgRealms,
     getRealm: getIdleRpgRealm,
+    getMyCharacters,
+    createCharacter,
+    getPlayState,
+    startQuest,
+    claimQuest,
+    buyItem,
+    equipItem,
   },
 }

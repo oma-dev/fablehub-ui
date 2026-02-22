@@ -6,7 +6,6 @@ import Container from '@mui/material/Container'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { supabase } from '../../../lib/supabase'
-import { setAccessToken } from '../../../services/webclient'
 
 const Register = () => {
   const navigate = useNavigate()
@@ -35,8 +34,7 @@ const Register = () => {
         password,
       })
       if (authError) throw authError
-      if (data.session?.access_token) {
-        setAccessToken(data.session.access_token)
+      if (data.session) {
         navigate('/', { replace: true })
       } else {
         setSuccess(true)
