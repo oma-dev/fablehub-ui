@@ -1,5 +1,9 @@
 import { motion, AnimatePresence } from 'framer-motion'
+import Box from '@mui/material/Box'
 import type { ImpactStyle } from './animationConfig'
+
+const IMPACT_SCALE = 5
+const IMPACT_SIZE = Math.round(64 * IMPACT_SCALE)  // 96
 
 interface Props {
   show: boolean
@@ -163,6 +167,8 @@ const IMPACT_MAP: Record<ImpactStyle, React.FC<{ color: string }>> = {
 export default function ImpactEffect({ show, style, color, id }: Props) {
   const Component = IMPACT_MAP[style] ?? GenericSvg
 
+  const half = IMPACT_SIZE / 2
+
   return (
     <AnimatePresence>
       {show && (
@@ -176,12 +182,18 @@ export default function ImpactEffect({ show, style, color, id }: Props) {
             position: 'absolute',
             top: '50%',
             left: '50%',
-            transform: 'translate(-50%, -50%)',
+            marginTop: -half,
+            marginLeft: -half,
+            width: IMPACT_SIZE,
+            height: IMPACT_SIZE,
             pointerEvents: 'none',
             zIndex: 15,
+            transformOrigin: 'center center',
           }}
         >
-          <Component color={color} />
+          <Box sx={{ width: '100%', height: '100%', '& svg': { width: '100%', height: '100%' } }}>
+            <Component color={color} />
+          </Box>
         </motion.div>
       )}
     </AnimatePresence>

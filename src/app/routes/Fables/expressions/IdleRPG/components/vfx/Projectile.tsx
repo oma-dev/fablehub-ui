@@ -22,10 +22,10 @@ interface Props {
 const ARC_PEAK = -70
 
 /** Projectile flight duration in seconds. Lower = faster. */
-export const PROJECTILE_SPEED = 1
+export const PROJECTILE_SPEED = 0.7
 
 /** Weapon image size in px (width & height). */
-export const PROJECTILE_SIZE = 160
+export const PROJECTILE_SIZE = 300
 
 function tipRotation(direction: 'left-to-right' | 'right-to-left') {
   return direction === 'left-to-right' ? 90 : -90

@@ -31,37 +31,54 @@ interface Props {
   onFinish: () => void
 }
 
-interface LogEntry {
-  turn: number
-  text: string
-}
-
 const STAT_LABELS: { key: keyof Pick<CombatantInfo, 'ap' | 'arm'>; label: string }[] = [
   { key: 'ap', label: 'Attack' },
   { key: 'arm', label: 'Armor' },
 ]
 
+const SCALE = 1.5
+const PORTRAIT_SIZE = Math.round(380 * SCALE)  // 300
+const PORTRAIT_BORDER_RADIUS = 3 * SCALE
+const PORTRAIT_BORDER = Math.round(3 * SCALE)
+const WEAPON_SIZE = Math.round(56 * SCALE)
+const WEAPON_OFFSET = Math.round(-24 * SCALE)
+const PERSON_ICON_SIZE = Math.round(100 * SCALE)
+const HP_FONT_SIZE = Math.round(12 * SCALE)
+const HP_BAR_HEIGHT = Math.round(16 * SCALE)
+const HP_BAR_RADIUS = 2 * SCALE
+const STAT_FONT_SIZE = Math.round(13 * SCALE)
+const NAME_FONT_SIZE = `${1.1 * SCALE}rem`
+const LEVEL_FONT_SIZE = `${0.875 * SCALE}rem`
+const CARD_GAP = 1.5 * SCALE
+const CARD_PADDING = 2.5 * SCALE
+const CARD_RADIUS = 3 * SCALE
+const CARD_MAX_WIDTH = Math.round(380 * SCALE)
+const VS_WIDTH = Math.round(70 * SCALE)
+const TURN_FONT_SIZE = Math.round(14 * SCALE)
+const RESULT_FONT_SIZE = `${1.5 * SCALE}rem`
+const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
+
 function Portrait({ url, weaponUrl }: { url?: string | null; weaponUrl?: string | null }) {
   return (
-    <Box sx={{ position: 'relative', width: 120, height: 120, flexShrink: 0 }}>
+    <Box sx={{ position: 'relative', width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, flexShrink: 0 }}>
       <Box
         sx={{
-          width: 120,
-          height: 120,
-          borderRadius: 2,
+          width: PORTRAIT_SIZE,
+          height: PORTRAIT_SIZE,
+          borderRadius: PORTRAIT_BORDER_RADIUS,
           overflow: 'hidden',
           bgcolor: 'rgba(168,85,247,0.06)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          border: '2px solid rgba(168,85,247,0.2)',
-          boxShadow: '0 0 16px rgba(168,85,247,0.1)',
+          border: `${PORTRAIT_BORDER}px solid rgba(168,85,247,0.2)`,
+          boxShadow: '0 0 36px rgba(168,85,247,0.15)',
         }}
       >
         {url ? (
           <Box component="img" src={url} alt="portrait" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <PersonIcon sx={{ fontSize: 60, color: 'rgba(168,85,247,0.25)' }} />
+          <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
         )}
       </Box>
       {weaponUrl && (
@@ -71,15 +88,15 @@ function Portrait({ url, weaponUrl }: { url?: string | null; weaponUrl?: string 
           alt="weapon"
           sx={{
             position: 'absolute',
-            bottom: -18,
-            right: -18,
-            width: 44,
-            height: 44,
+            bottom: WEAPON_OFFSET,
+            right: WEAPON_OFFSET,
+            width: WEAPON_SIZE,
+            height: WEAPON_SIZE,
             objectFit: 'contain',
             borderRadius: '50%',
             border: '2px solid rgba(245,158,11,0.5)',
             bgcolor: '#14121f',
-            boxShadow: '0 0 10px rgba(245,158,11,0.2)',
+            boxShadow: '0 0 12px rgba(245,158,11,0.2)',
             zIndex: 5,
           }}
         />
@@ -98,22 +115,22 @@ function HpBar({ current, max }: { current: number; max: number }) {
   const glowColor = pct > 50 ? 'rgba(34,197,94,0.3)' : pct > 25 ? 'rgba(251,191,36,0.3)' : 'rgba(239,68,68,0.3)'
   return (
     <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-        <Typography variant="caption" fontWeight={700} sx={{ fontSize: 12 }}>HP</Typography>
-        <Typography variant="caption" fontWeight={700} sx={{ fontSize: 12 }}>{current} / {max}</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE }}>HP</Typography>
+        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE }}>{current} / {max}</Typography>
       </Box>
       <LinearProgress
         variant="determinate"
         value={pct}
         sx={{
-          height: 16,
-          borderRadius: 2,
+          height: HP_BAR_HEIGHT,
+          borderRadius: HP_BAR_RADIUS,
           bgcolor: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(168,85,247,0.1)',
           transition: 'none',
           '& .MuiLinearProgress-bar': {
             transition: 'transform 0.4s ease-out',
-            borderRadius: 2,
+            borderRadius: HP_BAR_RADIUS,
             background: grad,
             boxShadow: `0 0 10px ${glowColor}`,
           },
@@ -140,20 +157,14 @@ function getMotionVariants(anim: AttackAnimation, direction: 'left' | 'right') {
 export default function CombatReplay({ combat, player, creature, victory, onFinish }: Props) {
   const [playerHp, setPlayerHp] = useState(player.maxHp)
   const [creatureHp, setCreatureHp] = useState(creature.maxHp)
-  const [log, setLog] = useState<LogEntry[]>([])
   const [done, setDone] = useState(false)
   const [currentTurn, setCurrentTurn] = useState(-1)
-  const logRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef(false)
   const arenaRef = useRef<HTMLDivElement>(null)
   const playerPortraitRef = useRef<HTMLDivElement>(null)
   const creaturePortraitRef = useRef<HTMLDivElement>(null)
 
   const playerId = combat.turns[0]?.events[0]?.sourceId ?? 'player'
-  const nameOf = useCallback(
-    (id: string) => (id === playerId ? player.name : creature.name),
-    [playerId, player.name, creature.name],
-  )
 
   const [playerVariant, setPlayerVariant] = useState<string>('idle')
   const [creatureVariant, setCreatureVariant] = useState<string>('idle')
@@ -257,15 +268,6 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           const anim = attackerSide === 'player' ? playerAnim : creatureAnim
 
           await animateAttack(attackerSide, ev, anim)
-
-          const verb = ev.type === 'damage' ? 'deals' : 'heals'
-          setLog((prev) => [
-            ...prev,
-            {
-              turn: turn.turnIndex,
-              text: `${nameOf(ev.sourceId)} ${verb} ${ev.value} to ${nameOf(ev.targetId)} (HP: ${Math.max(0, ev.targetHpAfter)})`,
-            },
-          ])
         }
         if (!abortRef.current) await sleep(300)
       }
@@ -276,10 +278,6 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     return () => { abortRef.current = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
-  }, [log])
 
   const handleSkip = () => {
     abortRef.current = true
@@ -292,22 +290,16 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     setPlayerDmg(null)
     setCreatureDmg(null)
 
-    const entries: LogEntry[] = []
     let pHp = player.maxHp
     let cHp = creature.maxHp
     for (const turn of combat.turns) {
       for (const ev of turn.events) {
         if (ev.targetId === playerId) pHp = Math.max(0, ev.targetHpAfter)
         else cHp = Math.max(0, ev.targetHpAfter)
-        entries.push({
-          turn: turn.turnIndex,
-          text: `${nameOf(ev.sourceId)} ${ev.type === 'damage' ? 'deals' : 'heals'} ${ev.value} to ${nameOf(ev.targetId)} (HP: ${Math.max(0, ev.targetHpAfter)})`,
-        })
       }
     }
     setPlayerHp(pHp)
     setCreatureHp(cHp)
-    setLog(entries)
     setCurrentTurn(combat.turns[combat.turns.length - 1]?.turnIndex ?? 0)
     setDone(true)
   }
@@ -316,7 +308,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: '100%' }}>
 
       {currentTurn >= 0 && (
-        <Typography variant="body2" color="text.secondary" textAlign="center" fontWeight={600}>
+        <Typography variant="body2" color="text.secondary" textAlign="center" fontWeight={600} sx={{ fontSize: TURN_FONT_SIZE }}>
           Turn {currentTurn + 1} / {combat.turns.length}
         </Typography>
       )}
@@ -344,13 +336,13 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
         <motion.div
           variants={playerVariants}
           animate={playerVariant}
-          style={{ flex: 1, maxWidth: 300, position: 'relative' }}
+          style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
         >
           <Paper
             variant="outlined"
             sx={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
-              gap: 1.5, p: 2.5, borderRadius: 3,
+              gap: CARD_GAP, p: CARD_PADDING, pt: 0, borderRadius: CARD_RADIUS,
               background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(20,18,31,0.9) 100%)',
               borderColor: 'rgba(99,102,241,0.2)',
               boxShadow: '0 0 20px rgba(99,102,241,0.08)',
@@ -371,15 +363,15 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               </AnimatePresence>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: '1.1rem' }}>{player.name}</Typography>
-              <Typography variant="body2" color="text.secondary">Level {player.level}</Typography>
+              <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: NAME_FONT_SIZE }}>{player.name}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {player.level}</Typography>
             </Box>
             <HpBar current={playerHp} max={player.maxHp} />
-            <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
               {STAT_LABELS.map(({ key, label }) => (
-                <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>{label}</Typography>
-                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: 13 }}>{player[key]}</Typography>
+                <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: STAT_FONT_SIZE }}>{label}</Typography>
+                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: STAT_FONT_SIZE }}>{player[key]}</Typography>
                 </Box>
               ))}
             </Box>
@@ -387,11 +379,12 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
         </motion.div>
 
         {/* Center: VS label */}
-        <Box sx={{ alignSelf: 'center', position: 'relative', width: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Box sx={{ alignSelf: 'center', position: 'relative', width: VS_WIDTH, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Typography
             variant="h3"
             fontWeight={900}
             sx={{
+              fontSize: `${2 * SCALE}rem`,
               userSelect: 'none',
               background: 'linear-gradient(135deg, rgba(168,85,247,0.4), rgba(99,102,241,0.3))',
               WebkitBackgroundClip: 'text',
@@ -406,13 +399,13 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
         <motion.div
           variants={creatureVariants}
           animate={creatureVariant}
-          style={{ flex: 1, maxWidth: 300, position: 'relative' }}
+          style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
         >
           <Paper
             variant="outlined"
             sx={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
-              gap: 1.5, p: 2.5, borderRadius: 3,
+              gap: CARD_GAP, p: CARD_PADDING, pt: 0 ,borderRadius: CARD_RADIUS,
               background: 'linear-gradient(135deg, rgba(239,68,68,0.06) 0%, rgba(20,18,31,0.9) 100%)',
               borderColor: 'rgba(239,68,68,0.15)',
               boxShadow: '0 0 20px rgba(239,68,68,0.05)',
@@ -433,15 +426,15 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               </AnimatePresence>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: '1.1rem' }}>{creature.name}</Typography>
-              <Typography variant="body2" color="text.secondary">Level {creature.level}</Typography>
+              <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: NAME_FONT_SIZE }}>{creature.name}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {creature.level}</Typography>
             </Box>
             <HpBar current={creatureHp} max={creature.maxHp} />
-            <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
               {STAT_LABELS.map(({ key, label }) => (
-                <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>{label}</Typography>
-                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: 13 }}>{creature[key]}</Typography>
+                <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: STAT_FONT_SIZE }}>{label}</Typography>
+                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: STAT_FONT_SIZE }}>{creature[key]}</Typography>
                 </Box>
               ))}
             </Box>
@@ -455,44 +448,6 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           <Button variant="outlined" size="medium" onClick={handleSkip} color="primary">Skip</Button>
         </Box>
       )}
-
-      {/* Battle log */}
-      <Paper
-        variant="outlined"
-        ref={logRef}
-        sx={{
-          flex: 1,
-          minHeight: 100,
-          maxHeight: 220,
-          overflow: 'auto',
-          p: 2,
-          borderRadius: 2.5,
-          background: 'rgba(12,10,20,0.6)',
-          borderColor: 'rgba(168,85,247,0.12)',
-        }}
-      >
-        <Typography
-          variant="subtitle2"
-          fontWeight={700}
-          gutterBottom
-          sx={{
-            fontSize: 13,
-            background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}
-        >
-          Battle Log
-        </Typography>
-        {log.length === 0 && (
-          <Typography variant="body2" color="text.disabled" sx={{ fontSize: 13 }}>Combat starting...</Typography>
-        )}
-        {log.map((entry, i) => (
-          <Typography key={i} variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12, lineHeight: 1.6, color: 'text.secondary' }}>
-            <Box component="strong" sx={{ color: 'text.primary' }}>T{entry.turn + 1}:</Box> {entry.text}
-          </Typography>
-        ))}
-      </Paper>
 
       {/* Result */}
       <AnimatePresence>
@@ -508,6 +463,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               fontWeight={900}
               gutterBottom
               sx={{
+                fontSize: RESULT_FONT_SIZE,
                 background: victory
                   ? 'linear-gradient(135deg, #4ade80, #22c55e)'
                   : 'linear-gradient(135deg, #f87171, #ef4444)',
@@ -522,7 +478,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               color="primary"
               onClick={onFinish}
               size="large"
-              sx={{ px: 5, py: 1.5, fontSize: '1.1rem' }}
+              sx={{ px: 5, py: 1.5, fontSize: BUTTON_FONT_SIZE }}
             >
               Continue
             </Button>
