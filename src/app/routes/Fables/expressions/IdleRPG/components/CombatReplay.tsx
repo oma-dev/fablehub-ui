@@ -36,7 +36,7 @@ const STAT_LABELS: { key: keyof Pick<CombatantInfo, 'ap' | 'arm'>; label: string
   { key: 'arm', label: 'Armor' },
 ]
 
-const SCALE = 1.5
+const SCALE = 1.2
 const PORTRAIT_SIZE = Math.round(380 * SCALE)  // 300
 const PORTRAIT_BORDER_RADIUS = 3 * SCALE
 const PORTRAIT_BORDER = Math.round(3 * SCALE)
