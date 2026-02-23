@@ -213,7 +213,7 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
                           size="medium"
                           variant="contained"
                           color="warning"
-                          disabled={!canAfford || buyingId === listing.itemId}
+                          disabled={!canAfford || buyingId !== null}
                           onClick={() => handleBuy(listing.itemId)}
                           sx={{ minWidth: 80 }}
                         >
@@ -323,7 +323,7 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
                                 size="medium"
                                 variant="outlined"
                                 color="primary"
-                                disabled={equippingId === inv.itemId}
+                                disabled={equippingId !== null}
                                 onClick={() => handleEquip(inv.itemId, item.slot)}
                                 sx={{ minWidth: 80 }}
                               >

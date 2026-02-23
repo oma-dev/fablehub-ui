@@ -65,6 +65,8 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
   )
   const [randomQuests, setRandomQuests] = useState<Quest[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [startingQuestId, setStartingQuestId] = useState<string | null>(null)
+  const [claiming, setClaiming] = useState(false)
   const [combatData, setCombatData] = useState<{ combat: CombatResult; victory: boolean; quest: Quest } | null>(null)
 
   const [now, setNow] = useState(Date.now())
@@ -107,18 +109,24 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
   }, [pack.quests])
 
   const handleSelectQuest = async (quest: Quest) => {
+    if (startingQuestId) return
     setError(null)
+    setStartingQuestId(quest.id)
     try {
       const updated = await startQuest(fableId, realmId, character.id, quest.id)
       onCharacterUpdate(updated)
       setPhase('questActive')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to start quest')
+    } finally {
+      setStartingQuestId(null)
     }
   }
 
   const handleClaim = async () => {
+    if (claiming) return
     setError(null)
+    setClaiming(true)
     try {
       const result = await claimQuest(fableId, realmId, character.id)
       onCharacterUpdate(result.character)
@@ -127,6 +135,8 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
       setPhase('combat')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to claim quest')
+    } finally {
+      setClaiming(false)
     }
   }
 
@@ -207,6 +217,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
               return (
                 <ListItemButton
                   key={q.id}
+                  disabled={startingQuestId !== null}
                   onClick={() => handleSelectQuest(q)}
                   sx={{
                     borderRadius: 2,
@@ -222,7 +233,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                   }}
                 >
                   <ListItemText
-                    primary={<Typography variant="body1" fontWeight={700} sx={{ fontSize: '1.05rem' }}>{q.name}</Typography>}
+                    primary={<Typography variant="body1" fontWeight={700} sx={{ fontSize: '1.05rem' }}>{startingQuestId === q.id ? `${q.name} …` : q.name}</Typography>}
                     secondary={
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                         Creature: {creature?.name ?? q.creatureId} (Lv {creature?.level ?? '?'}) · Duration: {q.durationSec}s · XP: {q.rewards.xp} · Gold: {q.rewards.currency.gold ?? 0}
@@ -235,7 +246,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
           </List>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPhase('idle')} variant="outlined" color="primary">Cancel</Button>
+          <Button onClick={() => setPhase('idle')} variant="outlined" color="primary" disabled={startingQuestId !== null}>Cancel</Button>
         </DialogActions>
       </Dialog>
 
@@ -289,12 +300,12 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
           <Button
             variant="contained"
             color={questDone ? 'warning' : 'primary'}
-            disabled={!questDone}
+            disabled={!questDone || claiming}
             onClick={handleClaim}
             size="large"
             sx={{ px: 5, py: 1.5, fontSize: '1.1rem' }}
           >
-            {questDone ? 'Claim Reward' : 'Waiting...'}
+            {claiming ? 'Claiming…' : questDone ? 'Claim Reward' : 'Waiting...'}
           </Button>
         </Box>
       )}

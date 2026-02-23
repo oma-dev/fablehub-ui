@@ -132,14 +132,15 @@ function EquipmentSlot({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 0.5,
-          cursor: equippedItem ? 'pointer' : 'default',
+          cursor: equippedItem && !unequipping ? 'pointer' : 'default',
+          pointerEvents: unequipping ? 'none' : 'auto',
           bgcolor: isEmpty ? 'rgba(168,85,247,0.04)' : `${rarityColor}0D`,
           borderStyle: isEmpty ? 'dashed' : 'solid',
           borderColor: isEmpty ? 'rgba(168,85,247,0.15)' : `${rarityColor}40`,
           borderWidth: 2,
           transition: 'all 0.2s',
-          opacity: unequipping === slot ? 0.5 : 1,
-          '&:hover': equippedItem ? {
+          opacity: unequipping ? 0.5 : 1,
+          '&:hover': equippedItem && !unequipping ? {
             borderColor: 'rgba(239,68,68,0.5)',
             bgcolor: 'rgba(239,68,68,0.08)',
             boxShadow: '0 0 12px rgba(239,68,68,0.15)',
