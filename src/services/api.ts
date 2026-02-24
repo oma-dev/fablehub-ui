@@ -216,6 +216,8 @@ export interface CharacterState {
   statPoints: number
   /** Player-allocated stat bonuses: { STR: 2, DEX: 1, ... } */
   allocatedStats: Record<string, number>
+  /** Per-character shop (listings refresh every 24h). */
+  merchant?: { listings: MerchantListing[]; lastUpdatedAt: number }
 }
 
 export interface QuestClaimResult {
@@ -284,8 +286,14 @@ export function createCharacter(fableId: string, realmId: string, body: { name: 
   return post<CharacterState>(charBase(fableId, realmId), { body })
 }
 
+export interface PlayStateResponse {
+  character: CharacterState
+  pack: IdleRpgPackV1
+  className?: string
+}
+
 export function getPlayState(fableId: string, realmId: string, characterId: string) {
-  return get<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/play-state`)
+  return get<PlayStateResponse>(`${charBase(fableId, realmId)}/${characterId}/play-state`)
 }
 
 export function startQuest(fableId: string, realmId: string, characterId: string, questId: string) {

@@ -32,6 +32,7 @@ import ShieldIcon from '@mui/icons-material/Shield'
 import {
   getIdleRpgRealms,
   getMyCharacters,
+  getPlayState,
   createCharacter,
 } from '../../../../../services/api'
 import type {
@@ -370,6 +371,7 @@ export default function FableIdleRPG() {
   const [error, setError] = useState<string | null>(null)
   const [realm, setRealm] = useState<IdleRpgRealm | null>(null)
   const [character, setCharacter] = useState<CharacterState | null>(null)
+  const [playState, setPlayState] = useState<{ character: CharacterState; pack: IdleRpgPackV1 } | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('tavern')
 
   // Character creation
@@ -378,7 +380,8 @@ export default function FableIdleRPG() {
   const [charClassId, setCharClassId] = useState('')
   const [creating, setCreating] = useState(false)
 
-  const pack: IdleRpgPackV1 | null = realm?.pack ?? null
+  const pack: IdleRpgPackV1 | null = playState?.pack ?? realm?.pack ?? null
+  const displayCharacter = playState?.character ?? character
 
   useEffect(() => {
     if (!fableId) return
@@ -413,6 +416,18 @@ export default function FableIdleRPG() {
     return () => { cancelled = true }
   }, [fableId])
 
+  // Fetch play state (character + pack with fresh merchant) when we have a character
+  useEffect(() => {
+    if (!fableId || !realm || !character?.id) return
+    let cancelled = false
+    getPlayState(fableId, realm.id, character.id)
+      .then((res) => {
+        if (!cancelled) setPlayState({ character: res.character, pack: res.pack })
+      })
+      .catch(() => { /* keep existing character/pack */ })
+    return () => { cancelled = true }
+  }, [fableId, realm?.id, character?.id])
+
   const handleCreateCharacter = async () => {
     if (!fableId || !realm || !charName.trim() || !charClassId) return
     setCreating(true)
@@ -428,7 +443,10 @@ export default function FableIdleRPG() {
     }
   }
 
-  const handleCharacterUpdate = (c: CharacterState) => setCharacter(c)
+  const handleCharacterUpdate = (c: CharacterState) => {
+    setCharacter(c)
+    setPlayState((prev) => (prev ? { ...prev, character: c } : null))
+  }
 
   if (!fableId) {
     return (
@@ -503,7 +521,7 @@ export default function FableIdleRPG() {
         }}
       >
         {/* Character card */}
-        {character && pack && <SidebarCharacterCard character={character} pack={pack} />}
+        {displayCharacter && pack && <SidebarCharacterCard character={displayCharacter} pack={pack} />}
 
         <List sx={{ flex: 1, pt: 2, px: 1 }}>
           {TABS.map((tab) => (
@@ -533,13 +551,13 @@ export default function FableIdleRPG() {
 
       {/* Right content */}
       <Box sx={{ flex: 1, minHeight: 0, p: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {character && realm && pack && (
+        {displayCharacter && realm && pack && (
           <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {activeTab === 'tavern' && (
               <TavernTab
                 fableId={fableId}
                 realmId={realm.id}
-                character={character}
+                character={displayCharacter}
                 pack={pack}
                 onCharacterUpdate={handleCharacterUpdate}
               />
@@ -548,7 +566,7 @@ export default function FableIdleRPG() {
               <ShopTab
                 fableId={fableId}
                 realmId={realm.id}
-                character={character}
+                character={displayCharacter}
                 pack={pack}
                 onCharacterUpdate={handleCharacterUpdate}
               />

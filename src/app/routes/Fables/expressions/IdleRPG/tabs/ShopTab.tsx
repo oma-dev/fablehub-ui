@@ -37,6 +37,7 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
   const itemMap = new Map(pack.items.map((it) => [it.id, it]))
   const gold = character.balances.gold ?? 0
   const primaryCurrency = pack.economy.currencies[0]
+  const merchantListings = character.merchant?.listings ?? []
 
   const handleBuy = async (itemId: string) => {
     setError(null)
@@ -121,11 +122,11 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
             Merchant
           </Typography>
           <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 1.5, pb: 1.5 }}>
-            {pack.merchant.listings.length === 0 ? (
+            {merchantListings.length === 0 ? (
               <Typography color="text.secondary" variant="body2">No items for sale.</Typography>
             ) : (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-                {pack.merchant.listings.map((listing) => {
+                {merchantListings.map((listing) => {
                   const item = itemMap.get(listing.itemId)
                   if (!item) return null
                   const canAfford = gold >= listing.price
