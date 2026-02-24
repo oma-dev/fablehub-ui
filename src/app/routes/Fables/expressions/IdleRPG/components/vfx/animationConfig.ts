@@ -24,7 +24,7 @@ export interface AttackAnimation {
 
 export const STYLE_ANIMATIONS: Record<string, AttackAnimation> = {
   melee_slash: {
-    casterMotion: 'cast',
+    casterMotion: 'lunge',
     projectile: null,
     impactStyle: 'slash',
     impactColor: '#ef5350',

@@ -22,7 +22,7 @@ interface Props {
 const ARC_PEAK = -70
 
 /** Projectile flight duration in seconds. Lower = faster. */
-export const PROJECTILE_SPEED = 0.7
+export const PROJECTILE_SPEED = 0.4
 
 /** Weapon image size in px (width & height). */
 export const PROJECTILE_SIZE = 300

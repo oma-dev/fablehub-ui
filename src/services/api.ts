@@ -265,6 +265,11 @@ export function getIdleRpgRealm(fableId: string, realmId: string) {
   return get<IdleRpgRealm>(`/fables/${fableId}/idle-rpg/${realmId}`)
 }
 
+/** POST /fables/:fableId/idle-rpg/:realmId — update an Idle RPG realm (auth required). */
+export function updateIdleRpgRealm(fableId: string, realmId: string, body: CreateIdleRpgBody) {
+  return post<IdleRpgRealm>(`/fables/${fableId}/idle-rpg/${realmId}`, { body })
+}
+
 // --- Idle RPG Characters (play endpoints) ---
 
 function charBase(fableId: string, realmId: string) {
@@ -310,6 +315,7 @@ export const api = {
   fables: { create: createFable, getAll: getFables, getOne: getFable },
   idleRpg: {
     createRealm: createIdleRpgRealm,
+    updateRealm: updateIdleRpgRealm,
     getRealms: getIdleRpgRealms,
     getRealm: getIdleRpgRealm,
     getMyCharacters,

@@ -9,6 +9,7 @@ import Fable from './routes/Fables/Detail'
 import FableCreate from './routes/Fables/Create'
 import FableIdleRPG from './routes/Fables/expressions/IdleRPG/Play'
 import IdleRpgCreate from './routes/Fables/expressions/IdleRPG/Create'
+import IdleRpgEdit from './routes/Fables/expressions/IdleRPG/Edit'
 import AnimationTest from './routes/Dev/AnimationTest'
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
             <Route path="fables/create" element={<FableCreate />} />
             <Route path="fables/:fableId" element={<Fable />} />
             <Route path="fables/:fableId/idle-rpg/create" element={<IdleRpgCreate />} />
+            <Route path="fables/:fableId/idle-rpg/:realmId/edit" element={<IdleRpgEdit />} />
             <Route path="fables/:fableId/idle-rpg" element={<FableIdleRPG />} />
             <Route path="dev/animation-test" element={<AnimationTest />} />
           </Route>
