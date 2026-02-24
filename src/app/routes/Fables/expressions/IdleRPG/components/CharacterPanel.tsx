@@ -13,6 +13,7 @@ import ShieldIcon from '@mui/icons-material/Shield'
 import SwordIcon from '@mui/icons-material/SportsMartialArts'
 import type { CharacterState, IdleRpgPackV1, ItemTemplate } from '../../../../../../services/api'
 import { allocateStat, equipItem } from '../../../../../../services/api'
+import ItemView from './ItemView'
 
 interface Props {
   fableId: string
@@ -102,6 +103,7 @@ function EquipmentSlot({
   label,
   icon,
   equippedItem,
+  currency,
   onUnequip,
   unequipping,
 }: {
@@ -109,21 +111,32 @@ function EquipmentSlot({
   label: string
   icon: React.ReactNode
   equippedItem?: ItemTemplate
+  currency?: { id: string; name: string; iconUrl?: string }
   onUnequip: (slot: string) => void
   unequipping: string | null
 }) {
-  const isEmpty = !equippedItem
-  const rarityColor = equippedItem ? RARITY_COLORS[equippedItem.rarity] ?? '#78748a' : undefined
+  if (equippedItem) {
+    return (
+      <Tooltip title="Click to unequip" arrow>
+        <Box
+          onClick={() => onUnequip(slot)}
+          sx={{
+            cursor: unequipping ? 'default' : 'pointer',
+            opacity: unequipping ? 0.5 : 1,
+            transition: 'opacity 0.2s',
+            pointerEvents: unequipping ? 'none' : 'auto',
+          }}
+        >
+          <ItemView item={equippedItem} currency={currency} size={84} />
+        </Box>
+      </Tooltip>
+    )
+  }
+
   return (
-    <Tooltip
-      title={equippedItem
-        ? `${equippedItem.name} (${equippedItem.rarity}) — click to unequip`
-        : `${label} slot — empty`}
-      arrow
-    >
+    <Tooltip title={`${label} slot — empty`} arrow>
       <Paper
         variant="outlined"
-        onClick={() => { if (equippedItem) onUnequip(slot) }}
         sx={{
           width: 84,
           height: 84,
@@ -132,35 +145,14 @@ function EquipmentSlot({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 0.5,
-          cursor: equippedItem && !unequipping ? 'pointer' : 'default',
-          pointerEvents: unequipping ? 'none' : 'auto',
-          bgcolor: isEmpty ? 'rgba(168,85,247,0.04)' : `${rarityColor}0D`,
-          borderStyle: isEmpty ? 'dashed' : 'solid',
-          borderColor: isEmpty ? 'rgba(168,85,247,0.15)' : `${rarityColor}40`,
+          bgcolor: 'rgba(168,85,247,0.04)',
+          borderStyle: 'dashed',
+          borderColor: 'rgba(168,85,247,0.15)',
           borderWidth: 2,
-          transition: 'all 0.2s',
-          opacity: unequipping ? 0.5 : 1,
-          '&:hover': equippedItem && !unequipping ? {
-            borderColor: 'rgba(239,68,68,0.5)',
-            bgcolor: 'rgba(239,68,68,0.08)',
-            boxShadow: '0 0 12px rgba(239,68,68,0.15)',
-          } : {},
-          position: 'relative',
         }}
       >
-        {equippedItem ? (
-          <>
-            <Box sx={{ color: rarityColor }}>{icon}</Box>
-            <Typography variant="caption" align="center" sx={{ fontSize: 10, lineHeight: 1.2, px: 0.5, color: rarityColor, fontWeight: 600 }} noWrap>
-              {equippedItem.name}
-            </Typography>
-          </>
-        ) : (
-          <>
-            <Box sx={{ color: 'rgba(168,85,247,0.25)', opacity: 0.6 }}>{icon}</Box>
-            <Typography variant="caption" sx={{ fontSize: 10, color: 'text.disabled' }}>{label}</Typography>
-          </>
-        )}
+        <Box sx={{ color: 'rgba(168,85,247,0.25)', opacity: 0.6 }}>{icon}</Box>
+        <Typography variant="caption" sx={{ fontSize: 10, color: 'text.disabled' }}>{label}</Typography>
       </Paper>
     </Tooltip>
   )
@@ -180,6 +172,7 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
 
   const equippedAttack = character.equipment.attack_source ? itemMap.get(character.equipment.attack_source) : undefined
   const equippedDefense = character.equipment.defense_layer ? itemMap.get(character.equipment.defense_layer) : undefined
+  const primaryCurrency = pack.economy.currencies[0]
 
   const handleAllocate = async (stat: StatId) => {
     if (allocating || (character.statPoints ?? 0) <= 0) return
@@ -217,6 +210,7 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
           label="Weapon"
           icon={<SwordIcon fontSize="small" />}
           equippedItem={equippedAttack}
+          currency={primaryCurrency}
           onUnequip={handleUnequip}
           unequipping={unequipping}
         />
@@ -224,8 +218,8 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
         {/* Portrait */}
         <Box
           sx={{
-            width: 110,
-            height: 110,
+            width: 250,
+            height: 250,
             borderRadius: '50%',
             overflow: 'hidden',
             border: '3px solid transparent',
@@ -250,6 +244,7 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
           label="Armor"
           icon={<ShieldIcon fontSize="small" />}
           equippedItem={equippedDefense}
+          currency={primaryCurrency}
           onUnequip={handleUnequip}
           unequipping={unequipping}
         />

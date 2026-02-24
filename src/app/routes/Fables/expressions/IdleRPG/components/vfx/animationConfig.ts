@@ -24,15 +24,15 @@ export interface AttackAnimation {
 
 export const STYLE_ANIMATIONS: Record<string, AttackAnimation> = {
   melee_slash: {
-    casterMotion: 'lunge',
-    projectile: null,
+    casterMotion: 'cast',
+    projectile: 'arc',
     impactStyle: 'slash',
     impactColor: '#ef5350',
     lungeDistance: 60,
     sequenceDurationMs: 900,
   },
   melee_flail: {
-    casterMotion: 'lunge',
+    casterMotion: 'cast',
     projectile: 'arc',
     impactStyle: 'arrow',
     impactColor: '#b0bec5',
