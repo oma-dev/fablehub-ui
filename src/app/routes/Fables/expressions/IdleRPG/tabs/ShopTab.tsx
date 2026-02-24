@@ -125,7 +125,7 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
             {merchantListings.length === 0 ? (
               <Typography color="text.secondary" variant="body2">No items for sale.</Typography>
             ) : (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+              <Box sx={{ display: 'inline-grid', gridTemplateColumns: 'repeat(3, auto)', gap: 10, justifyContent: 'center', width: '100%' }}>
                 {merchantListings.map((listing) => {
                   const item = itemMap.get(listing.itemId)
                   if (!item) return null
@@ -136,7 +136,7 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
                         item={item}
                         currency={primaryCurrency}
                         price={listing.price}
-                        size={68}
+                        size={120}
                       />
                       <Button
                         size="small"
@@ -180,7 +180,7 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
             {inventoryItems.length === 0 ? (
               <Typography color="text.secondary" variant="body2">Your bag is empty.</Typography>
             ) : (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+              <Box sx={{ display: 'inline-grid', gridTemplateColumns: 'repeat(3, auto)', gap: 10, justifyContent: 'center', width: '100%' }}>
                 {inventoryItems.map(({ inv, item }) => {
                   const isEquipped = Object.values(character.equipment).includes(inv.itemId)
                   const equippedInSlot = character.equipment[item.slot] === inv.itemId
@@ -190,7 +190,7 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
                       <ItemView
                         item={item}
                         currency={primaryCurrency}
-                        size={68}
+                        size={120}
                         badge={inv.qty > 1 ? (
                           <Typography variant="caption" sx={{ fontSize: 10, fontWeight: 700, color: '#fff', lineHeight: 1 }}>
                             ×{inv.qty}
