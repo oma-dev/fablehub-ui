@@ -40,6 +40,7 @@ import type {
   IdleRpgPackV1,
   IdleRpgRealm,
 } from '../../../../../services/api'
+import { RARITY_COLORS as RARITY_COLORS_MAP, RARITY_NAMES } from '../../../../../services/api'
 import TavernTab from './tabs/TavernTab'
 import ShopTab from './tabs/ShopTab'
 import GuildTab from './tabs/GuildTab'
@@ -48,12 +49,6 @@ import PvPTab from './tabs/PvPTab'
 /* ------------------------------------------------------------------ */
 /*  Sidebar Character Card                                            */
 /* ------------------------------------------------------------------ */
-
-const RARITY_COLORS: Record<string, string> = {
-  common: '#9e9e9e',
-  rare: '#42a5f5',
-  legendary: '#ffa726',
-}
 
 function SidebarCharacterCard({ character, pack }: { character: CharacterState; pack: IdleRpgPackV1 }) {
   const cls = pack.classes.find((c) => c.id === character.classId)
@@ -323,8 +318,9 @@ function StatBadge({ icon, label, value, color, tooltip }: { icon: React.ReactNo
   )
 }
 
-function EquipRow({ label, item, emptyText }: { label: string; item?: { name: string; rarity: string } | undefined; emptyText: string }) {
-  const color = item ? RARITY_COLORS[item.rarity] ?? '#9e9e9e' : undefined
+function EquipRow({ label, item, emptyText }: { label: string; item?: { name: string; rarity: number } | undefined; emptyText: string }) {
+  const rarityNum = item?.rarity ?? 1
+  const color = item ? (RARITY_COLORS_MAP[rarityNum] ?? '#9e9bab') : undefined
   return (
     <Box
       sx={{
@@ -343,7 +339,7 @@ function EquipRow({ label, item, emptyText }: { label: string; item?: { name: st
       {item ? (
         <Typography variant="body2" fontWeight={600} sx={{ color, fontSize: 13 }} noWrap>
           {item.name}
-          <Box component="span" sx={{ ml: 0.5, fontSize: 10, opacity: 0.6 }}>({item.rarity})</Box>
+          <Box component="span" sx={{ ml: 0.5, fontSize: 10, opacity: 0.6 }}>({RARITY_NAMES[rarityNum] ?? 'common'})</Box>
         </Typography>
       ) : (
         <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic', fontSize: 12 }}>

@@ -28,6 +28,9 @@ import type {
   ItemTemplate,
   LootTable,
   MerchantListing,
+} from '../../../../../services/api'
+import { RARITY_NAMES, RARITY_NAME_TO_NUMBER } from '../../../../../services/api'
+import type {
   Quest,
 } from '../../../../../services/api'
 
@@ -60,7 +63,7 @@ const STAT_IDS = ['STR', 'DEX', 'INT', 'LCK', 'HP', 'ARM'] as const
 const DELIVERIES = ['melee', 'projectile_straight', 'projectile_arced', 'instant'] as const
 const STYLE_IDS = ['melee_slash', 'melee_punch', 'projectile_arrow', 'projectile_bolt', 'instant_slash'] as const
 const SLOTS = ['attack_source', 'defense_layer'] as const
-const RARITIES = ['common', 'rare', 'legendary'] as const
+const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
 const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate']
 
 // --- Form state types (same as Create) ---
@@ -147,7 +150,7 @@ function hydrateItems(pack: IdleRpgPackV1): ItemForm[] {
   return pack.items.map((i) => ({
     id: i.id,
     name: i.name,
-    rarity: i.rarity,
+    rarity: RARITY_NAMES[typeof i.rarity === 'number' ? i.rarity : 1] ?? 'common',
     slot: i.slot,
     tags: i.tags?.join(', ') ?? '',
     stats: serializeStats(i.stats),
@@ -325,7 +328,7 @@ export default function IdleRpgEdit() {
       .map((i) => ({
         id: i.id.trim(),
         name: i.name.trim(),
-        rarity: i.rarity as ItemTemplate['rarity'],
+        rarity: RARITY_NAME_TO_NUMBER[i.rarity] ?? 1,
         slot: i.slot,
         tags: parseTags(i.tags),
         stats: parseKeyValueNumber(i.stats),
@@ -624,12 +627,30 @@ export default function IdleRpgEdit() {
                 <Box key={i} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                   <TextField size="small" label="ID" value={item.id} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} sx={{ width: 90 }} />
                   <TextField size="small" label="Name" value={item.name} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 100 }} />
-                  <Select size="small" value={item.rarity} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, rarity: e.target.value } : x))} sx={{ width: 100 }}>
-                    {RARITIES.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
-                  </Select>
-                  <Select size="small" value={item.slot} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, slot: e.target.value } : x))} sx={{ width: 120 }}>
-                    {SLOTS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-                  </Select>
+                  <FormControl size="small" sx={{ width: 120 }}>
+                    <InputLabel id={`item-rarity-${i}`}>Rarity</InputLabel>
+                    <Select
+                      labelId={`item-rarity-${i}`}
+                      label="Rarity"
+                      value={RARITIES.includes(item.rarity as typeof RARITIES[number]) ? item.rarity : 'common'}
+                      onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, rarity: e.target.value } : x))}
+                    >
+                      {RARITIES.map((r) => (
+                        <MenuItem key={r} value={r}>{r}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" sx={{ width: 120 }}>
+                    <InputLabel id={`item-slot-${i}`}>Slot</InputLabel>
+                    <Select
+                      labelId={`item-slot-${i}`}
+                      label="Slot"
+                      value={item.slot}
+                      onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, slot: e.target.value } : x))}
+                    >
+                      {SLOTS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                    </Select>
+                  </FormControl>
                   <TextField size="small" label="Tags (comma)" value={item.tags} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, tags: e.target.value } : x))} placeholder="weapon:sword" sx={{ width: 140 }} />
                   <TextField size="small" label="Stats (STR:2, ARM:5)" value={item.stats} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, stats: e.target.value } : x))} sx={{ width: 140 }} />
                   <TextField size="small" label="Icon URL" value={item.iconUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 120 }} />

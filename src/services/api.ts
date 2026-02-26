@@ -115,15 +115,41 @@ export interface CreatureTemplate {
   tags?: string[]
 }
 
+/** Backend sends rarity as number: 1=common, 2=uncommon, 3=rare, 4=epic, 5=legendary */
 export interface ItemTemplate {
   id: string
   name: string
-  rarity: string
+  rarity: number
   slot: string
   tags: string[]
   stats: Record<string, number>
   iconUrl?: string
   price?: { currencyId: string; amount: number }
+}
+
+export const RARITY_NAMES: Record<number, string> = {
+  1: 'common',
+  2: 'uncommon',
+  3: 'rare',
+  4: 'epic',
+  5: 'legendary',
+}
+
+export const RARITY_NAME_TO_NUMBER: Record<string, number> = {
+  common: 1,
+  uncommon: 2,
+  rare: 3,
+  epic: 4,
+  legendary: 5,
+}
+
+/** Rarity number (1–5) to display color */
+export const RARITY_COLORS: Record<number, string> = {
+  1: '#9e9bab',
+  2: '#22c55e',
+  3: '#818cf8',
+  4: '#a78bfa',
+  5: '#fbbf24',
 }
 
 export interface Quest {

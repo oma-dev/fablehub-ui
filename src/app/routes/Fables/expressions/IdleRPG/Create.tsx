@@ -34,6 +34,7 @@ import type {
   MerchantListing,
   Quest,
 } from '../../../../../services/api'
+import { RARITY_NAME_TO_NUMBER } from '../../../../../services/api'
 import { exampleFormState } from './examplePack'
 
 // --- Helpers ---
@@ -64,7 +65,7 @@ const STAT_IDS = ['STR', 'DEX', 'INT', 'LCK', 'HP', 'ARM'] as const
 const DELIVERIES = ['melee', 'projectile_straight', 'projectile_arced', 'instant'] as const
 const STYLE_IDS = ['melee_slash', 'melee_punch', 'projectile_arrow', 'projectile_bolt', 'instant_slash'] as const
 const SLOTS = ['attack_source', 'defense_layer'] as const
-const RARITIES = ['common', 'rare', 'legendary'] as const
+const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
 const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate']
 
 // --- Form state types ---
@@ -245,7 +246,7 @@ export default function IdleRpgCreate() {
       .map((i) => ({
         id: i.id.trim(),
         name: i.name.trim(),
-        rarity: i.rarity as ItemTemplate['rarity'],
+        rarity: RARITY_NAME_TO_NUMBER[i.rarity] ?? 1,
         slot: i.slot,
         tags: parseTags(i.tags),
         stats: parseKeyValueNumber(i.stats),

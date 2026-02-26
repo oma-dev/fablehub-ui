@@ -7,29 +7,49 @@ import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import CategoryIcon from '@mui/icons-material/Category'
 import type { ItemTemplate } from '../../../../../../services/api'
+import { RARITY_NAMES } from '../../../../../../services/api'
 
-const RARITY_COLORS: Record<string, string> = {
-  common: '#9e9bab',
-  rare: '#818cf8',
-  legendary: '#fbbf24',
+/** Rarity 1=common .. 5=legendary; colors keyed by number */
+const RARITY_COLORS: Record<number, string> = {
+  1: '#9e9bab',
+  2: '#22c55e',
+  3: '#3b82f6',
+  4: '#a78bfa',
+  5: '#f59e0b',
 }
 
-const RARITY_BG: Record<string, string> = {
-  common: '#1e1d24',
-  rare: '#1e2035',
-  legendary: '#2a2518',
+/** Slot background: grey / green / blue / purple / orange */
+const RARITY_BG: Record<number, string> = {
+  1: '#3d3b45',
+  2: '#1e3d2a',
+  3: '#1e2a4a',
+  4: '#2e1f4a',
+  5: '#4a3512',
 }
 
-const RARITY_BORDER: Record<string, string> = {
-  common: 'rgba(158,155,171,0.25)',
-  rare: 'rgba(129,140,248,0.35)',
-  legendary: 'rgba(251,191,36,0.40)',
+const RARITY_BORDER: Record<number, string> = {
+  1: 'rgba(158,155,171,0.4)',
+  2: 'rgba(34,197,94,0.5)',
+  3: 'rgba(59,130,246,0.5)',
+  4: 'rgba(167,139,250,0.6)',
+  5: 'rgba(245,158,11,0.7)',
 }
 
-const RARITY_GLOW: Record<string, string> = {
-  common: 'none',
-  rare: '0 0 10px rgba(129,140,248,0.15)',
-  legendary: '0 0 14px rgba(251,191,36,0.25)',
+const RARITY_GLOW: Record<number, string> = {
+  1: 'none',
+  2: '0 0 10px rgba(34,197,94,0.2)',
+  3: '0 0 12px rgba(59,130,246,0.25)',
+  4: '0 0 16px rgba(167,139,250,0.35), inset 0 0 20px rgba(139,92,246,0.08)',
+  5: '0 0 20px rgba(245,158,11,0.4), 0 0 40px rgba(251,191,36,0.15), inset 0 0 24px rgba(251,191,36,0.06)',
+}
+
+/** Epic/legendary use gradient backgrounds for fancy slot */
+const RARITY_BG_GRADIENT: Record<number, string | undefined> = {
+  1: undefined,
+  2: undefined,
+  3: undefined,
+  4: 'linear-gradient(145deg, rgba(88,28,135,0.4) 0%, rgba(139,92,246,0.25) 50%, rgba(30,27,75,0.9) 100%)',
+  5: 'linear-gradient(145deg, rgba(180,83,9,0.35) 0%, rgba(245,158,11,0.3) 50%, rgba(75,45,5,0.95) 100%)',
 }
 
 interface ItemViewProps {
@@ -56,7 +76,8 @@ export default function ItemView({
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const open = Boolean(anchorEl)
 
-  const rarityColor = RARITY_COLORS[item.rarity] ?? RARITY_COLORS.common
+  const rarityNum = typeof item.rarity === 'number' ? item.rarity : 1
+  const rarityColor = RARITY_COLORS[rarityNum] ?? RARITY_COLORS[1]
   const resolvedPrice = price ?? item.price?.amount
   const statEntries = Object.entries(item.stats).filter(([, v]) => v && v !== 0)
 
@@ -71,9 +92,11 @@ export default function ItemView({
           flexShrink: 0,
           position: 'relative',
           borderRadius: 1.5,
-          border: `2px solid ${RARITY_BORDER[item.rarity] ?? RARITY_BORDER.common}`,
-          bgcolor: RARITY_BG[item.rarity] ?? RARITY_BG.common,
-          boxShadow: RARITY_GLOW[item.rarity] ?? 'none',
+          border: `2px solid ${RARITY_BORDER[rarityNum] ?? RARITY_BORDER[1]}`,
+          ...(RARITY_BG_GRADIENT[rarityNum]
+            ? { background: RARITY_BG_GRADIENT[rarityNum] }
+            : { bgcolor: RARITY_BG[rarityNum] ?? RARITY_BG[1] }),
+          boxShadow: RARITY_GLOW[rarityNum] ?? 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -82,8 +105,9 @@ export default function ItemView({
           transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.15s',
           '&:hover': {
             borderColor: rarityColor,
-            boxShadow: `0 0 16px ${rarityColor}40`,
-            
+            boxShadow: rarityNum >= 4
+              ? `0 0 24px ${rarityColor}60, 0 0 48px ${rarityColor}30`
+              : `0 0 16px ${rarityColor}40`,
           },
         }}
       >
@@ -155,7 +179,7 @@ export default function ItemView({
               {/* Rarity + slot */}
               <Box sx={{ display: 'flex', gap: 0.5, mb: 1 }}>
                 <Chip
-                  label={item.rarity}
+                  label={RARITY_NAMES[rarityNum] ?? 'common'}
                   size="small"
                   sx={{
                     fontSize: 10,
