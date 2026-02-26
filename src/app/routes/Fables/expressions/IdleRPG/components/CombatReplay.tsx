@@ -67,12 +67,12 @@ function Portrait({ url, weaponUrl }: { url?: string | null; weaponUrl?: string 
           height: PORTRAIT_SIZE,
           borderRadius: PORTRAIT_BORDER_RADIUS,
           overflow: 'hidden',
-          bgcolor: 'rgba(168,85,247,0.06)',
+          bgcolor: '#14121f',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          border: `${PORTRAIT_BORDER}px solid rgba(168,85,247,0.2)`,
-          boxShadow: '0 0 36px rgba(168,85,247,0.15)',
+          border: `${PORTRAIT_BORDER}px solid rgba(168,85,247,0.35)`,
+          boxShadow: '0 0 36px rgba(168,85,247,0.2), inset 0 0 24px rgba(0,0,0,0.3)',
         }}
       >
         {url ? (
@@ -343,9 +343,9 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
             sx={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
               gap: CARD_GAP, p: CARD_PADDING, pt: 0, borderRadius: CARD_RADIUS,
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(20,18,31,0.9) 100%)',
-              borderColor: 'rgba(99,102,241,0.2)',
-              boxShadow: '0 0 20px rgba(99,102,241,0.08)',
+              bgcolor: '#14121f',
+              borderColor: 'rgba(99,102,241,0.45)',
+              boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(99,102,241,0.12)',
             }}
           >
             <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
@@ -406,9 +406,9 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
             sx={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
               gap: CARD_GAP, p: CARD_PADDING, pt: 0 ,borderRadius: CARD_RADIUS,
-              background: 'linear-gradient(135deg, rgba(239,68,68,0.06) 0%, rgba(20,18,31,0.9) 100%)',
-              borderColor: 'rgba(239,68,68,0.15)',
-              boxShadow: '0 0 20px rgba(239,68,68,0.05)',
+              bgcolor: '#1a1414',
+              borderColor: 'rgba(239,68,68,0.4)',
+              boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(239,68,68,0.1)',
             }}
           >
             <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>

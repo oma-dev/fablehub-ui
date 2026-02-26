@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Box from '@mui/material/Box'
+import tavernBg from '../../../../../../assets/backgrounds/tavern.png'
+import arenaBg from '../../../../../../assets/backgrounds/arena.png'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
@@ -152,8 +154,18 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
     setPhase('idle')
   }
 
+  const bgImage = phase === 'combat' ? arenaBg : tavernBg
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        backgroundImage: `url(${bgImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
       {error && <Typography color="error" sx={{ mb: 1.5 }}>{error}</Typography>}
 
       {/* Idle: NPC */}
@@ -165,9 +177,9 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
               width: 140,
               height: 140,
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, rgba(168,85,247,0.25) 0%, rgba(99,102,241,0.15) 100%)',
-              border: '2px solid rgba(168,85,247,0.3)',
-              boxShadow: '0 0 30px rgba(168,85,247,0.2)',
+              bgcolor: '#1e1d2e',
+              border: '2px solid rgba(168,85,247,0.5)',
+              boxShadow: '0 0 30px rgba(168,85,247,0.25), 0 0 60px rgba(0,0,0,0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -175,7 +187,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
               transition: 'transform 0.2s, box-shadow 0.2s',
               '&:hover': {
                 transform: 'scale(1.08)',
-                boxShadow: '0 0 40px rgba(168,85,247,0.35)',
+                boxShadow: '0 0 40px rgba(168,85,247,0.4), 0 0 80px rgba(0,0,0,0.35)',
               },
             }}
             onClick={openQuestPicker}

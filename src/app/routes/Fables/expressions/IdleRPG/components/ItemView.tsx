@@ -15,9 +15,9 @@ const RARITY_COLORS: Record<string, string> = {
 }
 
 const RARITY_BG: Record<string, string> = {
-  common: 'rgba(158,155,171,0.06)',
-  rare: 'rgba(129,140,248,0.08)',
-  legendary: 'rgba(251,191,36,0.10)',
+  common: '#1e1d24',
+  rare: '#1e2035',
+  legendary: '#2a2518',
 }
 
 const RARITY_BORDER: Record<string, string> = {
