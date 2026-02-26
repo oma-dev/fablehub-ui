@@ -8,16 +8,12 @@ import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
-import FormControl from '@mui/material/FormControl'
-import InputLabel from '@mui/material/InputLabel'
 import LinearProgress from '@mui/material/LinearProgress'
 import List from '@mui/material/List'
 import ListItemButton from '@mui/material/ListItemButton'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
-import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
-import Select from '@mui/material/Select'
 import TextField from '@mui/material/TextField'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
@@ -29,6 +25,9 @@ import PersonIcon from '@mui/icons-material/Person'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import BoltIcon from '@mui/icons-material/Bolt'
 import ShieldIcon from '@mui/icons-material/Shield'
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import IconButton from '@mui/material/IconButton'
 import {
   getIdleRpgRealms,
   getMyCharacters,
@@ -373,7 +372,7 @@ export default function FableIdleRPG() {
   // Character creation
   const [showCreateChar, setShowCreateChar] = useState(false)
   const [charName, setCharName] = useState('')
-  const [charClassId, setCharClassId] = useState('')
+  const [charClassIndex, setCharClassIndex] = useState(0)
   const [creating, setCreating] = useState(false)
 
   const pack: IdleRpgPackV1 | null = playState?.pack ?? realm?.pack ?? null
@@ -400,7 +399,7 @@ export default function FableIdleRPG() {
         if (chars.length > 0) {
           setCharacter(chars[0])
         } else {
-          setCharClassId(selectedRealm.pack.classes[0]?.id ?? '')
+          setCharClassIndex(0)
           setShowCreateChar(true)
         }
       } catch (err: unknown) {
@@ -424,12 +423,16 @@ export default function FableIdleRPG() {
     return () => { cancelled = true }
   }, [fableId, realm?.id, character?.id])
 
+  const createPack = realm?.pack ?? pack
+  const classes = createPack?.classes ?? []
+  const selectedClass = classes[charClassIndex]
+  const selectedClassId = selectedClass?.id ?? ''
   const handleCreateCharacter = async () => {
-    if (!fableId || !realm || !charName.trim() || !charClassId) return
+    if (!fableId || !realm || !charName.trim() || !selectedClassId) return
     setCreating(true)
     setError(null)
     try {
-      const c = await createCharacter(fableId, realm.id, { name: charName.trim(), classId: charClassId })
+      const c = await createCharacter(fableId, realm.id, { name: charName.trim(), classId: selectedClassId })
       setCharacter(c)
       setShowCreateChar(false)
     } catch (err: unknown) {
@@ -473,34 +476,82 @@ export default function FableIdleRPG() {
   return (
     <Box sx={{ display: 'flex', height: '100vh', minHeight: 0, margin: '0 auto', bgcolor: 'background.default' }}>
       {/* Character creation dialog */}
-      <Dialog open={showCreateChar} disableEscapeKeyDown>
-        <DialogTitle>Create your character</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 360, pt: '16px !important' }}>
-          <TextField
-            label="Character name"
-            size="small"
-            fullWidth
-            value={charName}
-            onChange={(e) => setCharName(e.target.value)}
-          />
-          <FormControl size="small" fullWidth>
-            <InputLabel>Class</InputLabel>
-            <Select value={charClassId} label="Class" onChange={(e) => setCharClassId(e.target.value)}>
-              {pack?.classes.map((cls) => (
-                <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {pack?.classes.find((c) => c.id === charClassId)?.description && (
-            <Typography variant="body2" color="text.secondary">
-              {pack.classes.find((c) => c.id === charClassId)!.description}
-            </Typography>
-          )}
+      <Dialog open={!showCreateChar} disableEscapeKeyDown maxWidth="sm" fullWidth PaperProps={{ sx: { minHeight: 420 } }}>
+        <DialogTitle sx={{ textAlign: 'center' }}>Create your character</DialogTitle>
+        <DialogContent sx={{ pt: 1, pb: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, minWidth: 400 }}>
+          <Box sx={{ width: '100%', maxWidth: 360 }}>
+            <TextField
+              label="Character name"
+              size="small"
+              fullWidth
+              value={charName}
+              onChange={(e) => setCharName(e.target.value)}
+            />
+          </Box>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ textAlign: 'center' }}>Choose a class</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'stretch', gap: 1, minHeight: 240 }}>
+            <IconButton
+              onClick={() => setCharClassIndex((i) => (i - 1 + classes.length) % Math.max(1, classes.length))}
+              disabled={classes.length <= 1}
+              sx={{ alignSelf: 'center' }}
+              size="large"
+            >
+              <ChevronLeftIcon />
+            </IconButton>
+            <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
+              <Box sx={{ width: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', px: 2 }}>
+                {selectedClass && (
+                  <>
+                    <Box
+                      sx={{
+                        width: 300,
+                        height: 300,
+                        flexShrink: 0,
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        bgcolor: '#14121f',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '3px solid rgba(168,85,247,0.35)',
+                        boxShadow: '0 0 36px rgba(168,85,247,0.2), inset 0 0 24px rgba(0,0,0,0.3)',
+                      }}
+                    >
+                      {selectedClass.iconUrl ? (
+                        <Box
+                          component="img"
+                          src={selectedClass.iconUrl}
+                          alt={selectedClass.name}
+                          sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <PersonIcon sx={{ fontSize: 64, color: 'rgba(168,85,247,0.25)' }} />
+                      )}
+                    </Box>
+                    <Typography variant="h6" sx={{ mt: 1.5 }}>{selectedClass.name}</Typography>
+                    {selectedClass.description && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 360 }}>
+                        {selectedClass.description}
+                      </Typography>
+                    )}
+                  </>
+                )}
+              </Box>
+            </Box>
+            <IconButton
+              onClick={() => setCharClassIndex((i) => (i + 1) % Math.max(1, classes.length))}
+              disabled={classes.length <= 1}
+              sx={{ alignSelf: 'center' }}
+              size="large"
+            >
+              <ChevronRightIcon />
+            </IconButton>
+          </Box>
           {error && <Typography color="error">{error}</Typography>}
         </DialogContent>
         <DialogActions>
           <Button component={Link} to={`/fables/${fableId}`} disabled={creating}>Cancel</Button>
-          <Button variant="contained" onClick={handleCreateCharacter} disabled={creating || !charName.trim() || !charClassId}>
+          <Button variant="contained" onClick={handleCreateCharacter} disabled={creating || !charName.trim() || !selectedClassId}>
             {creating ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
