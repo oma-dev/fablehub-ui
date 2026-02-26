@@ -476,7 +476,7 @@ export default function FableIdleRPG() {
   return (
     <Box sx={{ display: 'flex', height: '100vh', minHeight: 0, margin: '0 auto', bgcolor: 'background.default' }}>
       {/* Character creation dialog */}
-      <Dialog open={!showCreateChar} disableEscapeKeyDown maxWidth="sm" fullWidth PaperProps={{ sx: { minHeight: 420 } }}>
+      <Dialog open={showCreateChar} disableEscapeKeyDown maxWidth="sm" fullWidth PaperProps={{ sx: { minHeight: 420 } }}>
         <DialogTitle sx={{ textAlign: 'center' }}>Create your character</DialogTitle>
         <DialogContent sx={{ pt: 1, pb: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, minWidth: 400 }}>
           <Box sx={{ width: '100%', maxWidth: 360 }}>
