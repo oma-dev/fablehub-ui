@@ -13,6 +13,14 @@ interface Props {
   id: string | number
   weaponUrl?: string | null
   trajectory?: ProjectileType
+  /** Override flight duration in ms (when e.g. from AnimationFrames.projectile.speedMs). */
+  durationMs?: number
+  /** Display size in px (width & height). Single size fallback. */
+  sizePx?: number
+  /** Start size in px; animates to endSizePx over flight. */
+  startSizePx?: number
+  /** End size in px. */
+  endSizePx?: number
   /** Start position relative to the arena container */
   from?: ProjectilePos
   /** End position relative to the arena container */
@@ -38,6 +46,10 @@ function WeaponProjectile({
   id,
   from,
   to,
+  durationSec,
+  sizePx,
+  startSizePx,
+  endSizePx,
 }: {
   direction: 'left-to-right' | 'right-to-left'
   weaponUrl: string
@@ -45,8 +57,35 @@ function WeaponProjectile({
   id: string | number
   from: ProjectilePos
   to: ProjectilePos
+  durationSec: number
+  sizePx?: number
+  startSizePx?: number
+  endSizePx?: number
 }) {
   const baseRotate = tipRotation(direction)
+  const duration = trajectory === 'arc' ? durationSec * 1.25 : durationSec
+  const singleSize = sizePx ?? PROJECTILE_SIZE
+  const startSize = startSizePx ?? sizePx ?? PROJECTILE_SIZE
+  const endSize = endSizePx ?? sizePx ?? PROJECTILE_SIZE
+  const animateSize = startSizePx != null && endSizePx != null && startSizePx !== endSizePx
+  const size = animateSize ? endSize : singleSize
+  const flightDuration = trajectory === 'arc' ? duration : durationSec
+
+  const imgStyle = { objectFit: 'contain' as const, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }
+  const imgEl = (
+    animateSize
+      ? (
+        <motion.div
+          initial={{ width: startSize, height: startSize }}
+          animate={{ width: endSize, height: endSize }}
+          transition={{ duration: flightDuration, ease: 'easeInOut' }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <img src={weaponUrl} alt="" style={{ width: '100%', height: '100%', ...imgStyle }} />
+        </motion.div>
+        )
+      : <img src={weaponUrl} alt="" style={{ width: size, height: size, ...imgStyle }} />
+  )
 
   if (trajectory === 'arc') {
     const sign = direction === 'left-to-right' ? -1 : 1
@@ -72,14 +111,10 @@ function WeaponProjectile({
           scale: [0.6, 1, 1],
         }}
         exit={{ opacity: 0, scale: 0.3 }}
-        transition={{ duration: PROJECTILE_SPEED * 1.25, ease: 'easeInOut' }}
+        transition={{ duration, ease: 'easeInOut' }}
         style={{ position: 'absolute', pointerEvents: 'none', zIndex: 10 }}
       >
-        <img
-          src={weaponUrl}
-          alt=""
-          style={{ width: PROJECTILE_SIZE, height: PROJECTILE_SIZE, objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }}
-        />
+        {imgEl}
       </motion.div>
     )
   }
@@ -106,14 +141,10 @@ function WeaponProjectile({
         scale: 1,
       }}
       exit={{ opacity: 0, scale: 0.3 }}
-      transition={{ duration: PROJECTILE_SPEED, ease: 'easeIn' }}
+      transition={{ duration: durationSec, ease: 'easeIn' }}
       style={{ position: 'absolute', pointerEvents: 'none', zIndex: 10 }}
     >
-      <img
-        src={weaponUrl}
-        alt=""
-        style={{ width: PROJECTILE_SIZE, height: PROJECTILE_SIZE, objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }}
-      />
+      {imgEl}
     </motion.div>
   )
 }
@@ -154,15 +185,29 @@ function OrbProjectile({
 const FALLBACK_FROM: ProjectilePos = { x: 100, y: 100 }
 const FALLBACK_TO: ProjectilePos = { x: 300, y: 100 }
 
-export default function Projectile({ show, color, direction, id, weaponUrl, trajectory, from, to }: Props) {
+export default function Projectile({ show, color, direction, id, weaponUrl, trajectory, durationMs, sizePx, startSizePx, endSizePx, from, to }: Props) {
   const start = from ?? (direction === 'left-to-right' ? FALLBACK_FROM : FALLBACK_TO)
   const end = to ?? (direction === 'left-to-right' ? FALLBACK_TO : FALLBACK_FROM)
+  const durationSec = durationMs != null ? durationMs / 1000 : PROJECTILE_SPEED
 
   return (
     <AnimatePresence>
       {show && (
         weaponUrl
-          ? <WeaponProjectile direction={direction} weaponUrl={weaponUrl} trajectory={trajectory ?? 'straight'} id={id} from={start} to={end} />
+          ? (
+            <WeaponProjectile
+              direction={direction}
+              weaponUrl={weaponUrl}
+              trajectory={trajectory ?? 'straight'}
+              id={id}
+              from={start}
+              to={end}
+              durationSec={durationSec}
+              sizePx={sizePx}
+              startSizePx={startSizePx}
+              endSizePx={endSizePx}
+            />
+            )
           : <OrbProjectile color={color} id={id} from={start} to={end} />
       )}
     </AnimatePresence>

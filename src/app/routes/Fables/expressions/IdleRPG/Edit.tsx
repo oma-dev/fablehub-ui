@@ -22,6 +22,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { getIdleRpgRealm, getFable, updateIdleRpgRealm } from '../../../../../services/api'
 import type {
   Ability,
+  AnimationFrameImageSource,
   ClassBlock,
   CreatureTemplate,
   IdleRpgPackV1,
@@ -68,7 +69,12 @@ const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive'
 
 // --- Form state types (same as Create) ---
 type XpEntry = { level: string; xp: string }
-type AbilityForm = { id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string; delivery: string; styleId: string }
+type AbilityForm = {
+  id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string; delivery: string; styleId: string
+  animWeaponSource: AnimationFrameImageSource; animWeaponUrl: string
+  animProjectileSource: AnimationFrameImageSource; animProjectileUrl: string; animProjectileTrajectory: 'straight' | 'arc'
+  animImpactSource: AnimationFrameImageSource; animImpactUrl: string
+}
 type ClassForm = {
   id: string; name: string; description: string; iconUrl: string
   damageMainStat: string; primaryAttackAbilityId: string
@@ -77,12 +83,17 @@ type ClassForm = {
   regularAbilityIds: string; ultimateAbilityId: string
 }
 type CreatureForm = { id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string; iconUrl: string; tags: string }
-type ItemForm = { id: string; name: string; rarity: string; slot: string; tags: string; stats: string; iconUrl: string; priceCurrencyId: string; priceAmount: string }
+type ItemForm = { id: string; name: string; rarity: string; slot: string; tags: string; stats: string; iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string }
 type QuestForm = { id: string; name: string; creatureId: string; durationSec: string; iconUrl: string; rewardXp: string; rewardCurrency: string; lootTableId: string }
 type LootEntryForm = { itemId: string; weight: string; classId: string }
 
 const emptyXp = (): XpEntry => ({ level: '', xp: '' })
-const emptyAbility = (): AbilityForm => ({ id: '', name: '', abilityType: 'regular', description: '', iconUrl: '', delivery: 'melee', styleId: 'melee_slash' })
+const emptyAbility = (): AbilityForm => ({
+  id: '', name: '', abilityType: 'regular', description: '', iconUrl: '', delivery: 'melee', styleId: 'melee_slash',
+  animWeaponSource: 'url', animWeaponUrl: '',
+  animProjectileSource: 'url', animProjectileUrl: '', animProjectileTrajectory: 'arc',
+  animImpactSource: 'url', animImpactUrl: '',
+})
 const emptyClass = (): ClassForm => ({
   id: '', name: '', description: '', iconUrl: '',
   damageMainStat: 'STR', primaryAttackAbilityId: '',
@@ -91,11 +102,19 @@ const emptyClass = (): ClassForm => ({
   regularAbilityIds: '', ultimateAbilityId: '',
 })
 const emptyCreature = (): CreatureForm => ({ id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0', iconUrl: '', tags: '' })
-const emptyItem = (): ItemForm => ({ id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '', iconUrl: '', priceCurrencyId: '', priceAmount: '' })
+const emptyItem = (): ItemForm => ({ id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '', iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '' })
 const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', durationSec: '60', iconUrl: '', rewardXp: '10', rewardCurrency: '', lootTableId: '' })
 const emptyLootEntry = (): LootEntryForm => ({ itemId: '', weight: '1', classId: '' })
 
 // --- Hydrate form state from pack ---
+const IMAGE_SOURCES: { value: AnimationFrameImageSource; label: string }[] = [
+  { value: 'url', label: 'Custom URL' },
+  { value: 'weaponIcon', label: 'Weapon icon' },
+  { value: 'weaponAnimation', label: 'Weapon animation' },
+  { value: 'weaponProjectile', label: 'Weapon projectile' },
+  { value: 'weaponImpact', label: 'Weapon impact' },
+]
+
 function hydrateAbilities(pack: IdleRpgPackV1): AbilityForm[] {
   return (pack.abilities ?? []).map((a) => ({
     id: a.id,
@@ -105,6 +124,13 @@ function hydrateAbilities(pack: IdleRpgPackV1): AbilityForm[] {
     iconUrl: a.iconUrl ?? '',
     delivery: a.primaryAttack?.delivery ?? 'melee',
     styleId: a.primaryAttack?.styleId ?? 'melee_slash',
+    animWeaponSource: (a.animationFrames?.weapon?.imageSource ?? 'url') as AnimationFrameImageSource,
+    animWeaponUrl: a.animationFrames?.weapon?.url ?? '',
+    animProjectileSource: (a.animationFrames?.projectile?.imageSource ?? 'url') as AnimationFrameImageSource,
+    animProjectileUrl: a.animationFrames?.projectile?.url ?? '',
+    animProjectileTrajectory: a.animationFrames?.projectile?.trajectory ?? 'arc',
+    animImpactSource: (a.animationFrames?.impact?.imageSource ?? 'url') as AnimationFrameImageSource,
+    animImpactUrl: a.animationFrames?.impact?.url ?? '',
   }))
 }
 
@@ -155,6 +181,9 @@ function hydrateItems(pack: IdleRpgPackV1): ItemForm[] {
     tags: i.tags?.join(', ') ?? '',
     stats: serializeStats(i.stats),
     iconUrl: i.iconUrl ?? '',
+    animationUrl: i.animationUrl ?? '',
+    projectileUrl: i.projectileUrl ?? '',
+    impactUrl: i.impactUrl ?? '',
     priceCurrencyId: i.price?.currencyId ?? '',
     priceAmount: i.price?.amount != null ? String(i.price.amount) : '',
   }))
@@ -267,6 +296,31 @@ export default function IdleRpgEdit() {
             styleId: a.styleId || 'melee_slash',
           }
         }
+        const hasWeapon = a.animWeaponSource !== 'url' || (a.animWeaponUrl?.trim() ?? '') !== ''
+        const hasProjectile = a.animProjectileSource !== 'url' || (a.animProjectileUrl?.trim() ?? '') !== ''
+        const hasImpact = a.animImpactSource !== 'url' || (a.animImpactUrl?.trim() ?? '') !== ''
+        if (hasWeapon || hasProjectile || hasImpact) {
+          def.animationFrames = {}
+          if (hasWeapon) {
+            def.animationFrames.weapon = {
+              ...(a.animWeaponSource === 'url' && a.animWeaponUrl?.trim() ? { url: a.animWeaponUrl.trim() } : {}),
+              ...(a.animWeaponSource !== 'url' ? { imageSource: a.animWeaponSource } : {}),
+            }
+          }
+          if (hasProjectile) {
+            def.animationFrames.projectile = {
+              trajectory: a.animProjectileTrajectory,
+              ...(a.animProjectileSource === 'url' && a.animProjectileUrl?.trim() ? { url: a.animProjectileUrl.trim() } : {}),
+              ...(a.animProjectileSource !== 'url' ? { imageSource: a.animProjectileSource } : {}),
+            }
+          }
+          if (hasImpact) {
+            def.animationFrames.impact = {
+              ...(a.animImpactSource === 'url' && a.animImpactUrl?.trim() ? { url: a.animImpactUrl.trim() } : {}),
+              ...(a.animImpactSource !== 'url' ? { imageSource: a.animImpactSource } : {}),
+            }
+          }
+        }
         return def
       })
 
@@ -333,6 +387,9 @@ export default function IdleRpgEdit() {
         tags: parseTags(i.tags),
         stats: parseKeyValueNumber(i.stats),
         ...(i.iconUrl.trim() ? { iconUrl: i.iconUrl.trim() } : {}),
+        ...(i.animationUrl.trim() ? { animationUrl: i.animationUrl.trim() } : {}),
+        ...(i.projectileUrl.trim() ? { projectileUrl: i.projectileUrl.trim() } : {}),
+        ...(i.impactUrl.trim() ? { impactUrl: i.impactUrl.trim() } : {}),
         ...(i.priceCurrencyId.trim() && i.priceAmount.trim()
           ? { price: { currencyId: i.priceCurrencyId.trim(), amount: Number(i.priceAmount) || 0 } }
           : {}),
@@ -505,34 +562,64 @@ export default function IdleRpgEdit() {
                 Define abilities here. Use type <strong>primary</strong> for basic attacks (set delivery &amp; style); then in Classes assign only primary abilities as the class primary attack.
               </Typography>
               {abilities.map((a, i) => (
-                <Box key={i} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1 }}>
-                  <TextField size="small" label="ID" value={a.id} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} sx={{ width: 100 }} />
-                  <TextField size="small" label="Name" value={a.name} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 120 }} />
-                  <FormControl size="small" sx={{ minWidth: 110 }}>
-                    <InputLabel>Type</InputLabel>
-                    <Select value={a.abilityType} label="Type" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, abilityType: e.target.value as Ability['abilityType'] } : x))}>
-                      {ABILITY_TYPES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+                <Box key={i} sx={{ mb: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1 }}>
+                    <TextField size="small" label="ID" value={a.id} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} sx={{ width: 100 }} />
+                    <TextField size="small" label="Name" value={a.name} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 120 }} />
+                    <FormControl size="small" sx={{ minWidth: 110 }}>
+                      <InputLabel>Type</InputLabel>
+                      <Select value={a.abilityType} label="Type" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, abilityType: e.target.value as Ability['abilityType'] } : x))}>
+                        {ABILITY_TYPES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+                      </Select>
+                    </FormControl>
+                    {a.abilityType === 'primary' && (
+                      <>
+                        <FormControl size="small" sx={{ minWidth: 140 }}>
+                          <InputLabel>Delivery</InputLabel>
+                          <Select value={a.delivery} label="Delivery" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, delivery: e.target.value } : x))}>
+                            {DELIVERIES.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                          </Select>
+                        </FormControl>
+                        <FormControl size="small" sx={{ minWidth: 140 }}>
+                          <InputLabel>Style</InputLabel>
+                          <Select value={a.styleId} label="Style" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, styleId: e.target.value } : x))}>
+                            {STYLE_IDS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                          </Select>
+                        </FormControl>
+                      </>
+                    )}
+                    <TextField size="small" label="Description" value={a.description} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} sx={{ flex: 1, minWidth: 140 }} />
+                    <TextField size="small" label="Icon URL" value={a.iconUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 140 }} />
+                    <IconButton size="small" color="error" onClick={() => setAbilities((p) => p.filter((_, j) => j !== i))}>−</IconButton>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1.5, pl: 1 }}>
+                  <Typography variant="caption" color="text.secondary">Animation frames:</Typography>
+                  <FormControl size="small" sx={{ minWidth: 100 }}>
+                    <InputLabel>Weapon</InputLabel>
+                    <Select value={a.animWeaponSource} label="Weapon" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animWeaponSource: e.target.value as AnimationFrameImageSource } : x))}>
+                      {IMAGE_SOURCES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
                     </Select>
                   </FormControl>
-                  {a.abilityType === 'primary' && (
-                    <>
-                      <FormControl size="small" sx={{ minWidth: 140 }}>
-                        <InputLabel>Delivery</InputLabel>
-                        <Select value={a.delivery} label="Delivery" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, delivery: e.target.value } : x))}>
-                          {DELIVERIES.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
-                        </Select>
-                      </FormControl>
-                      <FormControl size="small" sx={{ minWidth: 140 }}>
-                        <InputLabel>Style</InputLabel>
-                        <Select value={a.styleId} label="Style" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, styleId: e.target.value } : x))}>
-                          {STYLE_IDS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-                        </Select>
-                      </FormControl>
-                    </>
-                  )}
-                  <TextField size="small" label="Description" value={a.description} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} sx={{ flex: 1, minWidth: 140 }} />
-                  <TextField size="small" label="Icon URL" value={a.iconUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 140 }} />
-                  <IconButton size="small" color="error" onClick={() => setAbilities((p) => p.filter((_, j) => j !== i))}>−</IconButton>
+                  {a.animWeaponSource === 'url' && <TextField size="small" placeholder="Weapon URL" value={a.animWeaponUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animWeaponUrl: e.target.value } : x))} sx={{ width: 140 }} />}
+                  <FormControl size="small" sx={{ minWidth: 100 }}>
+                    <InputLabel>Projectile</InputLabel>
+                    <Select value={a.animProjectileSource} label="Projectile" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animProjectileSource: e.target.value as AnimationFrameImageSource } : x))}>
+                      {IMAGE_SOURCES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                  {a.animProjectileSource === 'url' && <TextField size="small" placeholder="Projectile URL" value={a.animProjectileUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animProjectileUrl: e.target.value } : x))} sx={{ width: 140 }} />}
+                  <Select size="small" value={a.animProjectileTrajectory} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animProjectileTrajectory: e.target.value as 'straight' | 'arc' } : x))} sx={{ width: 90 }}>
+                    <MenuItem value="straight">straight</MenuItem>
+                    <MenuItem value="arc">arc</MenuItem>
+                  </Select>
+                  <FormControl size="small" sx={{ minWidth: 100 }}>
+                    <InputLabel>Impact</InputLabel>
+                    <Select value={a.animImpactSource} label="Impact" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animImpactSource: e.target.value as AnimationFrameImageSource } : x))}>
+                      {IMAGE_SOURCES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                  {a.animImpactSource === 'url' && <TextField size="small" placeholder="Impact URL" value={a.animImpactUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animImpactUrl: e.target.value } : x))} sx={{ width: 140 }} />}
+                  </Box>
                 </Box>
               ))}
               <Button type="button" size="small" variant="outlined" onClick={() => setAbilities((p) => [...p, emptyAbility()])}>+ Add ability</Button>
@@ -654,6 +741,9 @@ export default function IdleRpgEdit() {
                   <TextField size="small" label="Tags (comma)" value={item.tags} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, tags: e.target.value } : x))} placeholder="weapon:sword" sx={{ width: 140 }} />
                   <TextField size="small" label="Stats (STR:2, ARM:5)" value={item.stats} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, stats: e.target.value } : x))} sx={{ width: 140 }} />
                   <TextField size="small" label="Icon URL" value={item.iconUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 120 }} />
+                  <TextField size="small" label="Animation URL (weapon tip-up)" value={item.animationUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, animationUrl: e.target.value } : x))} placeholder="for projectile frame" sx={{ width: 140 }} />
+                  <TextField size="small" label="Projectile URL" value={item.projectileUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, projectileUrl: e.target.value } : x))} placeholder="custom projectile" sx={{ width: 120 }} />
+                  <TextField size="small" label="Impact URL" value={item.impactUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, impactUrl: e.target.value } : x))} placeholder="custom impact" sx={{ width: 120 }} />
                   <TextField size="small" label="Price currency" value={item.priceCurrencyId} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, priceCurrencyId: e.target.value } : x))} placeholder="gold" sx={{ width: 90 }} />
                   <TextField size="small" label="Price" type="number" value={item.priceAmount} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, priceAmount: e.target.value } : x))} sx={{ width: 70 }} />
                   <IconButton size="small" color="error" onClick={() => setItems((p) => p.filter((_, j) => j !== i))}>−</IconButton>

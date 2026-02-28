@@ -48,6 +48,9 @@ export type ExampleItemForm = {
   tags: string
   stats: string
   iconUrl: string
+  animationUrl: string
+  projectileUrl: string
+  impactUrl: string
   priceCurrencyId: string
   priceAmount: string
 }
@@ -241,6 +244,9 @@ const itemDefs: { id: string; name: string; rarity: string; slot: string; tags: 
 const items: ExampleItemForm[] = itemDefs.map((it) => ({
   ...it,
   iconUrl: '',
+  animationUrl: '',
+  projectileUrl: '',
+  impactUrl: '',
   priceCurrencyId: 'gold',
   priceAmount: String(it.price),
 }))

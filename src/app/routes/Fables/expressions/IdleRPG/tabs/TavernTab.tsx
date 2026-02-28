@@ -14,6 +14,7 @@ import ListItemText from '@mui/material/ListItemText'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import CombatReplay from '../components/CombatReplay'
+import { resolveAnimationFrames } from '../components/vfx/animationConfig'
 import { computePlayerCombatStats } from '../utils/combatStats'
 import { startQuest, claimQuest } from '../../../../../../services/api'
 import type { CharacterState, CombatResult, IdleRpgPackV1, Quest } from '../../../../../../services/api'
@@ -305,6 +306,14 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
         const cls = pack.classes.find((c) => c.id === character.classId)
         const weaponItemId = character.equipment?.['attack_source']
         const weaponDef = weaponItemId ? pack.items.find((i) => i.id === weaponItemId) : undefined
+        const primaryAbility = pack.abilities?.find((a) => a.primaryAttack?.styleId === cls?.primaryAttack?.styleId)
+        const resolvedFrames = resolveAnimationFrames(
+          primaryAbility?.animationFrames,
+          weaponDef?.iconUrl,
+          weaponDef?.animationUrl,
+          weaponDef?.projectileUrl,
+          weaponDef?.impactUrl
+        )
         const playerStats = computePlayerCombatStats(character, pack)
         return (
           <Box sx={{ flex: 1 }}>
@@ -320,6 +329,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                 portraitUrl: character.portraitUrl ?? cls?.iconUrl,
                 styleId: cls?.primaryAttack?.styleId,
                 weaponUrl: weaponDef?.iconUrl,
+                animationFrames: resolvedFrames ?? primaryAbility?.animationFrames,
               }}
               creature={{
                 name: creatureDef?.name ?? 'Creature',

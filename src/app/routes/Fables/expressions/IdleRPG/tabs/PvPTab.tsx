@@ -27,6 +27,7 @@ import type {
 import { computePlayerCombatStats } from '../utils/combatStats'
 import CharacterCardModal from '../components/CharacterCardModal'
 import CombatReplay from '../components/CombatReplay'
+import { resolveAnimationFrames } from '../components/vfx/animationConfig'
 import arenaBg from '../../../../../../assets/backgrounds/arena.png'
 
 interface Props {
@@ -203,40 +204,47 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
         gap: inCombat ? 0 : 2,
       }}
     >
-      {inCombat && combatResult && targetStats ? (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, overflow: 'auto' }}>
-          <CombatReplay
-            combat={combatResult.combat}
-            leftCharacterId={character.id}
-            player={{
-              name: character.name,
-              level: character.level,
-              maxHp: playerStats.maxHp,
-              ap: playerStats.ap,
-              arm: playerStats.arm,
-              portraitUrl: character.portraitUrl ?? cls?.iconUrl,
-              styleId: cls?.primaryAttack?.styleId,
-              weaponUrl: weaponDef?.iconUrl,
-            }}
-            creature={{
-              name: combatResult.targetProfile.character.name,
-              level: combatResult.targetProfile.character.level,
-              maxHp: targetStats.maxHp,
-              ap: targetStats.ap,
-              arm: targetStats.arm,
-              portraitUrl: combatResult.targetProfile.character.portraitUrl ?? pack.classes.find((c) => c.id === combatResult.targetProfile.character.classId)?.iconUrl,
-              styleId: pack.classes.find((c) => c.id === combatResult.targetProfile.character.classId)?.primaryAttack?.styleId,
-              weaponUrl: combatResult.targetProfile.character.equipment?.attack_source
-                ? pack.items.find(
-                    (i) => i.id === combatResult.targetProfile.character.equipment?.attack_source,
-                  )?.iconUrl
-                : undefined,
-            }}
-            victory={combatResult.victory}
-            onFinish={handleCombatFinish}
-          />
-        </Box>
-      ) : (
+      {inCombat && combatResult && targetStats ? (() => {
+        const targetCls = pack.classes.find((c) => c.id === combatResult!.targetProfile.character.classId)
+        const targetWeaponId = combatResult!.targetProfile.character.equipment?.attack_source
+        const targetWeaponDef = targetWeaponId ? pack.items.find((i) => i.id === targetWeaponId) : undefined
+        const playerAbility = pack.abilities?.find((a) => a.primaryAttack?.styleId === cls?.primaryAttack?.styleId)
+        const targetAbility = pack.abilities?.find((a) => a.primaryAttack?.styleId === targetCls?.primaryAttack?.styleId)
+        const playerResolvedFrames = resolveAnimationFrames(playerAbility?.animationFrames, weaponDef?.iconUrl, weaponDef?.animationUrl, weaponDef?.projectileUrl, weaponDef?.impactUrl)
+        const creatureResolvedFrames = resolveAnimationFrames(targetAbility?.animationFrames, targetWeaponDef?.iconUrl, targetWeaponDef?.animationUrl, targetWeaponDef?.projectileUrl, targetWeaponDef?.impactUrl)
+        return (
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, overflow: 'auto' }}>
+            <CombatReplay
+              combat={combatResult.combat}
+              leftCharacterId={character.id}
+              player={{
+                name: character.name,
+                level: character.level,
+                maxHp: playerStats.maxHp,
+                ap: playerStats.ap,
+                arm: playerStats.arm,
+                portraitUrl: character.portraitUrl ?? cls?.iconUrl,
+                styleId: cls?.primaryAttack?.styleId,
+                weaponUrl: weaponDef?.iconUrl,
+                animationFrames: playerResolvedFrames ?? playerAbility?.animationFrames,
+              }}
+              creature={{
+                name: combatResult.targetProfile.character.name,
+                level: combatResult.targetProfile.character.level,
+                maxHp: targetStats.maxHp,
+                ap: targetStats.ap,
+                arm: targetStats.arm,
+                portraitUrl: combatResult.targetProfile.character.portraitUrl ?? targetCls?.iconUrl,
+                styleId: targetCls?.primaryAttack?.styleId,
+                weaponUrl: targetWeaponDef?.iconUrl,
+                animationFrames: creatureResolvedFrames ?? targetAbility?.animationFrames,
+              }}
+              victory={combatResult.victory}
+              onFinish={handleCombatFinish}
+            />
+          </Box>
+        )
+      })() : (
         <>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <SportsKabaddiIcon sx={{ fontSize: 32, color: 'primary.main' }} />

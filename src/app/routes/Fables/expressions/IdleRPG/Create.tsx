@@ -88,7 +88,7 @@ type ClassForm = {
   ultimateAbilityId: string
 }
 type CreatureForm = { id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string; iconUrl: string; tags: string }
-type ItemForm = { id: string; name: string; rarity: string; slot: string; tags: string; stats: string; iconUrl: string; priceCurrencyId: string; priceAmount: string }
+type ItemForm = { id: string; name: string; rarity: string; slot: string; tags: string; stats: string; iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string }
 type QuestForm = { id: string; name: string; creatureId: string; durationSec: string; iconUrl: string; rewardXp: string; rewardCurrency: string; lootTableId: string }
 type LootEntryForm = { itemId: string; weight: string; classId: string }
 
@@ -102,7 +102,7 @@ const emptyClass = (): ClassForm => ({
   regularAbilityIds: '', ultimateAbilityId: '',
 })
 const emptyCreature = (): CreatureForm => ({ id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0', iconUrl: '', tags: '' })
-const emptyItem = (): ItemForm => ({ id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '', iconUrl: '', priceCurrencyId: '', priceAmount: '' })
+const emptyItem = (): ItemForm => ({ id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '', iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '' })
 const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', durationSec: '60', iconUrl: '', rewardXp: '10', rewardCurrency: '', lootTableId: '' })
 const emptyLootEntry = (): LootEntryForm => ({ itemId: '', weight: '1', classId: '' })
 
@@ -253,6 +253,9 @@ export default function IdleRpgCreate() {
         tags: parseTags(i.tags),
         stats: parseKeyValueNumber(i.stats),
         ...(i.iconUrl.trim() ? { iconUrl: i.iconUrl.trim() } : {}),
+        ...(i.animationUrl.trim() ? { animationUrl: i.animationUrl.trim() } : {}),
+        ...(i.projectileUrl.trim() ? { projectileUrl: i.projectileUrl.trim() } : {}),
+        ...(i.impactUrl.trim() ? { impactUrl: i.impactUrl.trim() } : {}),
         ...(i.priceCurrencyId.trim() && i.priceAmount.trim()
           ? { price: { currencyId: i.priceCurrencyId.trim(), amount: Number(i.priceAmount) || 0 } }
           : {}),
@@ -563,6 +566,9 @@ export default function IdleRpgCreate() {
                   <TextField size="small" label="Tags (comma)" value={item.tags} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, tags: e.target.value } : x))} placeholder="weapon:sword" sx={{ width: 140 }} />
                   <TextField size="small" label="Stats (STR:2, ARM:5)" value={item.stats} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, stats: e.target.value } : x))} sx={{ width: 140 }} />
                   <TextField size="small" label="Icon URL" value={item.iconUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 120 }} />
+                  <TextField size="small" label="Animation URL (weapon tip-up)" value={item.animationUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, animationUrl: e.target.value } : x))} placeholder="for projectile frame" sx={{ width: 140 }} />
+                  <TextField size="small" label="Projectile URL" value={item.projectileUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, projectileUrl: e.target.value } : x))} placeholder="custom projectile" sx={{ width: 120 }} />
+                  <TextField size="small" label="Impact URL" value={item.impactUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, impactUrl: e.target.value } : x))} placeholder="custom impact" sx={{ width: 120 }} />
                   <TextField size="small" label="Price currency" value={item.priceCurrencyId} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, priceCurrencyId: e.target.value } : x))} placeholder="gold" sx={{ width: 90 }} />
                   <TextField size="small" label="Price" type="number" value={item.priceAmount} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, priceAmount: e.target.value } : x))} sx={{ width: 70 }} />
                   <IconButton size="small" color="error" onClick={() => setItems((p) => p.filter((_, j) => j !== i))}>−</IconButton>

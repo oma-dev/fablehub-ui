@@ -6,11 +6,13 @@ import LinearProgress from '@mui/material/LinearProgress'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import PersonIcon from '@mui/icons-material/Person'
-import type { CombatResult, CombatTurnEvent } from '../../../../../../services/api'
-import { getAttackAnimation, type AttackAnimation } from './vfx/animationConfig'
+import type { AnimationFrames, CombatResult, CombatTurnEvent } from '../../../../../../services/api'
+import { getAttackAnimationConfig, type AttackAnimationConfig } from './vfx/animationConfig'
 import DamageNumber from './vfx/DamageNumber'
 import ImpactEffect from './vfx/ImpactEffect'
+import ImpactFrame from './vfx/ImpactFrame'
 import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from './vfx/Projectile'
+import WeaponFrame from './vfx/WeaponFrame'
 
 interface CombatantInfo {
   name: string
@@ -20,7 +22,10 @@ interface CombatantInfo {
   arm: number
   portraitUrl?: string | null
   styleId?: string
+  /** Weapon icon URL for portrait overlay and fallback projectile image when ability has no frame URL. */
   weaponUrl?: string | null
+  /** Pre-resolved animation frames (Ability + weapon URLs already resolved by caller). */
+  animationFrames?: AnimationFrames | null
 }
 
 interface Props {
@@ -142,11 +147,10 @@ function HpBar({ current, max }: { current: number; max: number }) {
   )
 }
 
-function getMotionVariants(anim: AttackAnimation, direction: 'left' | 'right') {
+function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'right') {
   const sign = direction === 'left' ? 1 : -1
   return {
     idle: { x: 0, scale: 1 },
-    lunge: { x: sign * anim.lungeDistance, scale: 1.05, transition: { duration: 0.2, ease: [0.0, 0.0, 0.58, 1.0] as const } },
     cast: { scale: 1.08, transition: { duration: 0.15 } },
     hit: {
       x: [0, sign * -6, sign * 6, sign * -4, 0],
@@ -176,12 +180,20 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const [projectileAttacker, setProjectileAttacker] = useState<'player' | 'creature'>('player')
   const [projFrom, setProjFrom] = useState<ProjectilePos>({ x: 0, y: 0 })
   const [projTo, setProjTo] = useState<ProjectilePos>({ x: 0, y: 0 })
+  const [projectileImageUrl, setProjectileImageUrl] = useState<string | null>(null)
+  const [projectileDurationMs, setProjectileDurationMs] = useState<number | undefined>(undefined)
+  const [showWeaponFrame, setShowWeaponFrame] = useState<'player' | 'creature' | null>(null)
+  const [weaponFrameConfig, setWeaponFrameConfig] = useState<{ url: string; fadeInMs: number; sizePx?: number; startSizePx?: number; endSizePx?: number } | null>(null)
+  const [impactFrameConfig, setImpactFrameConfig] = useState<{ url: string; showMs: number; vanishMs: number; sizePx?: number; startSizePx?: number; endSizePx?: number } | null>(null)
+  const [projectileSizePx, setProjectileSizePx] = useState<number | undefined>(undefined)
+  const [projectileStartSizePx, setProjectileStartSizePx] = useState<number | undefined>(undefined)
+  const [projectileEndSizePx, setProjectileEndSizePx] = useState<number | undefined>(undefined)
   const [playerDmg, setPlayerDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
   const [creatureDmg, setCreatureDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
   const dmgKeyRef = useRef(0)
 
-  const playerAnim = getAttackAnimation(player.styleId)
-  const creatureAnim = getAttackAnimation(creature.styleId)
+  const playerAnim = getAttackAnimationConfig(player.styleId, player.animationFrames)
+  const creatureAnim = getAttackAnimationConfig(creature.styleId, creature.animationFrames)
   const playerVariants = getMotionVariants(playerAnim, 'left')
   const creatureVariants = getMotionVariants(creatureAnim, 'right')
 
@@ -202,7 +214,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const animateAttack = useCallback(async (
     attackerSide: 'player' | 'creature',
     event: CombatTurnEvent,
-    anim: AttackAnimation,
+    anim: AttackAnimationConfig,
   ) => {
     if (abortRef.current) return
     const setAttackerVariant = attackerSide === 'player' ? setPlayerVariant : setCreatureVariant
@@ -210,13 +222,16 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     const setTargetDmg = attackerSide === 'player' ? setCreatureDmg : setPlayerDmg
     const setTargetHp = event.targetId === playerId ? setPlayerHp : setCreatureHp
     const setTargetVariant = attackerSide === 'player' ? setCreatureVariant : setPlayerVariant
+    const frames = anim.frames
 
-    if (anim.casterMotion === 'lunge') {
-      setAttackerVariant('lunge')
-      await sleep(220)
-    } else if (anim.casterMotion === 'cast') {
-      setAttackerVariant('cast')
-      await sleep(160)
+    setAttackerVariant('cast')
+    await sleep(160)
+
+    const weaponFrameUrl = frames?.weapon?.url?.trim()
+    if (frames?.weapon && weaponFrameUrl) {
+      setWeaponFrameConfig({ url: weaponFrameUrl, fadeInMs: frames.weapon.fadeInMs ?? 200, sizePx: frames.weapon.sizePx, startSizePx: frames.weapon.startSizePx, endSizePx: frames.weapon.endSizePx })
+      setShowWeaponFrame(attackerSide)
+      await sleep(frames.weapon.fadeInMs ?? 200)
     }
 
     if (anim.projectile) {
@@ -226,21 +241,49 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
       setProjFrom(getPortraitPos(srcRef))
       setProjTo(getPortraitPos(tgtRef))
       setProjectileAttacker(attackerSide)
+      const weaponUrlFallback = attackerSide === 'player' ? player.weaponUrl : creature.weaponUrl
+      const projUrl = (frames?.projectile?.url?.trim()) ?? weaponUrlFallback ?? null
+      const projDurationMs = frames?.projectile?.speedMs
+      setProjectileImageUrl(projUrl)
+      setProjectileDurationMs(projDurationMs)
+      setProjectileSizePx(frames?.projectile?.sizePx)
+      setProjectileStartSizePx(frames?.projectile?.startSizePx)
+      setProjectileEndSizePx(frames?.projectile?.endSizePx)
       setShowProjectile(dir)
-      const flightMs = (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
+      const flightMs = projDurationMs ?? (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
       await sleep(flightMs)
       setShowProjectile(null)
     }
 
     if (abortRef.current) return
 
+    const impactUrl = frames?.impact?.url?.trim()
+    if (frames?.impact && impactUrl) {
+      setImpactFrameConfig({
+        url: impactUrl,
+        showMs: frames.impact.showMs ?? 100,
+        vanishMs: frames.impact.vanishMs ?? 500,
+        sizePx: frames.impact.sizePx,
+        startSizePx: frames.impact.startSizePx,
+        endSizePx: frames.impact.endSizePx,
+      })
+    }
     setTargetImpact(true)
     setTargetVariant('hit')
     dmgKeyRef.current++
     setTargetDmg({ value: event.value, type: event.type, key: dmgKeyRef.current })
     setTargetHp(Math.max(0, event.targetHpAfter))
-    await sleep(350)
+    const impactDuration = frames?.impact
+      ? (frames.impact.showMs ?? 100) + (frames.impact.vanishMs ?? 500)
+      : 350
+    await sleep(impactDuration)
 
+    setShowWeaponFrame(null)
+    setWeaponFrameConfig(null)
+    setImpactFrameConfig(null)
+    setProjectileSizePx(undefined)
+    setProjectileStartSizePx(undefined)
+    setProjectileEndSizePx(undefined)
     setTargetImpact(false)
     setAttackerVariant('return')
     setTargetVariant('idle')
@@ -248,7 +291,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
 
     setAttackerVariant('idle')
     setTargetDmg(null)
-  }, [playerId])
+  }, [playerId, player.weaponUrl, creature.weaponUrl])
 
   useEffect(() => {
     if (combat.turns.length === 0) {
@@ -289,6 +332,12 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     setShowCreatureImpact(false)
     setShowProjectile(null)
     setProjectileAttacker('player')
+    setShowWeaponFrame(null)
+    setWeaponFrameConfig(null)
+    setImpactFrameConfig(null)
+    setProjectileSizePx(undefined)
+    setProjectileStartSizePx(undefined)
+    setProjectileEndSizePx(undefined)
     setPlayerDmg(null)
     setCreatureDmg(null)
 
@@ -326,8 +375,12 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               color={showProjectile === 'left-to-right' ? playerAnim.impactColor : creatureAnim.impactColor}
               direction={showProjectile}
               id={`proj-${dmgKeyRef.current}`}
-              weaponUrl={projectileAttacker === 'player' ? player.weaponUrl : creature.weaponUrl}
+              weaponUrl={projectileImageUrl ?? (projectileAttacker === 'player' ? player.weaponUrl : creature.weaponUrl)}
               trajectory={projectileAttacker === 'player' ? playerAnim.projectile : creatureAnim.projectile}
+              durationMs={projectileDurationMs}
+              sizePx={projectileSizePx}
+              startSizePx={projectileStartSizePx}
+              endSizePx={projectileEndSizePx}
               from={projFrom}
               to={projTo}
             />
@@ -352,12 +405,28 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           >
             <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
               <Portrait url={player.portraitUrl} weaponUrl={player.weaponUrl} />
-              <ImpactEffect
-                show={showPlayerImpact}
-                style={creatureAnim.impactStyle}
-                color={creatureAnim.impactColor}
-                id={`p-impact-${dmgKeyRef.current}`}
-              />
+              {showWeaponFrame === 'player' && weaponFrameConfig && (
+                <WeaponFrame show url={weaponFrameConfig.url} fadeInMs={weaponFrameConfig.fadeInMs} sizePx={weaponFrameConfig.sizePx} startSizePx={weaponFrameConfig.startSizePx} endSizePx={weaponFrameConfig.endSizePx} id="player-weapon" />
+              )}
+              {showPlayerImpact && impactFrameConfig ? (
+                <ImpactFrame
+                  show
+                  url={impactFrameConfig.url}
+                  showMs={impactFrameConfig.showMs}
+                  vanishMs={impactFrameConfig.vanishMs}
+                  sizePx={impactFrameConfig.sizePx}
+                  startSizePx={impactFrameConfig.startSizePx}
+                  endSizePx={impactFrameConfig.endSizePx}
+                  id={`p-impact-${dmgKeyRef.current}`}
+                />
+              ) : (
+                <ImpactEffect
+                  show={showPlayerImpact}
+                  style={'generic' as const}
+                  color={creatureAnim.impactColor}
+                  id={`p-impact-${dmgKeyRef.current}`}
+                />
+              )}
               <AnimatePresence>
                 {playerDmg && (
                   <DamageNumber value={playerDmg.value} type={playerDmg.type} id={playerDmg.key} />
@@ -415,12 +484,28 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           >
             <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
               <Portrait url={creature.portraitUrl} weaponUrl={creature.weaponUrl} />
-              <ImpactEffect
-                show={showCreatureImpact}
-                style={playerAnim.impactStyle}
-                color={playerAnim.impactColor}
-                id={`c-impact-${dmgKeyRef.current}`}
-              />
+              {showWeaponFrame === 'creature' && weaponFrameConfig && (
+                <WeaponFrame show url={weaponFrameConfig.url} fadeInMs={weaponFrameConfig.fadeInMs} sizePx={weaponFrameConfig.sizePx} startSizePx={weaponFrameConfig.startSizePx} endSizePx={weaponFrameConfig.endSizePx} id="creature-weapon" />
+              )}
+              {showCreatureImpact && impactFrameConfig ? (
+                <ImpactFrame
+                  show
+                  url={impactFrameConfig.url}
+                  showMs={impactFrameConfig.showMs}
+                  vanishMs={impactFrameConfig.vanishMs}
+                  sizePx={impactFrameConfig.sizePx}
+                  startSizePx={impactFrameConfig.startSizePx}
+                  endSizePx={impactFrameConfig.endSizePx}
+                  id={`c-impact-${dmgKeyRef.current}`}
+                />
+              ) : (
+                <ImpactEffect
+                  show={showCreatureImpact}
+                  style={'generic' as const}
+                  color={playerAnim.impactColor}
+                  id={`c-impact-${dmgKeyRef.current}`}
+                />
+              )}
               <AnimatePresence>
                 {creatureDmg && (
                   <DamageNumber value={creatureDmg.value} type={creatureDmg.type} id={creatureDmg.key} />

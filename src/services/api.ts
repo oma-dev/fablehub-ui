@@ -52,6 +52,58 @@ export interface IdleRpgRealm {
   updatedAt: string
 }
 
+/** Source for frame image: custom URL or resolve from equipped weapon at runtime. */
+export type AnimationFrameImageSource = 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact'
+
+/** Optional weapon frame: pops at caster portrait center, fades in, stays until animation end. */
+export interface AnimationWeaponFrame {
+  /** When imageSource is 'url', use this; otherwise resolved from attacker's weapon. */
+  url?: string
+  imageSource?: AnimationFrameImageSource
+  fadeInMs?: number
+  /** Display size in px (width & height). */
+  sizePx?: number
+  /** Start size in px; animates to endSizePx over fadeInMs. */
+  startSizePx?: number
+  /** End size in px. */
+  endSizePx?: number
+}
+
+/** Optional projectile frame: flies from caster to target (straight or arc). */
+export interface AnimationProjectileFrame {
+  url?: string
+  imageSource?: AnimationFrameImageSource
+  trajectory: 'straight' | 'arc'
+  speedMs?: number
+  /** Display size in px (width & height). */
+  sizePx?: number
+  /** Start size in px; animates to endSizePx over flight. */
+  startSizePx?: number
+  /** End size in px. */
+  endSizePx?: number
+}
+
+/** Optional impact frame: pops at target center after projectile vanishes, then fades out. */
+export interface AnimationImpactFrame {
+  url?: string
+  imageSource?: AnimationFrameImageSource
+  showMs?: number
+  vanishMs?: number
+  /** Display size in px (width & height). */
+  sizePx?: number
+  /** Start size in px; animates to endSizePx over show+vanish. */
+  startSizePx?: number
+  /** End size in px. */
+  endSizePx?: number
+}
+
+/** Attack animation as three optional PNG frames: weapon (caster), projectile, impact (target). */
+export interface AnimationFrames {
+  weapon?: AnimationWeaponFrame
+  projectile?: AnimationProjectileFrame
+  impact?: AnimationImpactFrame
+}
+
 /** Ability (matches backend); optional fields allow minimal pack catalog entries from the create form. */
 export interface Ability {
   id: string
@@ -67,6 +119,8 @@ export interface Ability {
   /** When abilityType is 'primary': defines the class primary attack. */
   primaryAttack?: { delivery: string; styleId: string }
   iconUrl?: string
+  /** Optional animation frames (weapon / projectile / impact PNGs). */
+  animationFrames?: AnimationFrames
 }
 
 /** Realm pack shape (backend IdleRpgPackV1). */
@@ -125,7 +179,14 @@ export interface ItemTemplate {
   slot: string
   tags: string[]
   stats: Record<string, number>
+  /** Icon for inventory, shop, item slot. */
   iconUrl?: string
+  /** Animation image (weapon tip up for projectile); used when ability frame uses weapon animation. */
+  animationUrl?: string
+  /** Optional custom projectile image URL for this weapon. */
+  projectileUrl?: string
+  /** Optional custom impact image URL for this weapon. */
+  impactUrl?: string
   price?: { currencyId: string; amount: number }
 }
 
