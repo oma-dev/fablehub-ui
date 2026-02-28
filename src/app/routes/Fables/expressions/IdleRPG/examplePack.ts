@@ -65,6 +65,7 @@ export type ExampleQuestForm = {
   lootTableId: string
 }
 export type ExampleLootEntryForm = { itemId: string; weight: string; classId: string }
+export type ExampleDungeonForm = { id: string; name: string; description: string; imageUrl?: string; requiredLevel: string; bossCreatureId: string }
 
 export interface ExampleFormState {
   visibility: 'private' | 'public'
@@ -80,6 +81,7 @@ export interface ExampleFormState {
   creatures: ExampleCreatureForm[]
   items: ExampleItemForm[]
   quests: ExampleQuestForm[]
+  dungeons: ExampleDungeonForm[]
   listings: { itemId: string; currencyId: string; price: number }[]
   lootTables: { id: string; entries: ExampleLootEntryForm[] }[]
 }
@@ -301,6 +303,7 @@ export const exampleFormState: ExampleFormState = {
   creatures,
   items,
   quests,
+  dungeons: [],
   listings,
   lootTables,
 }

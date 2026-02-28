@@ -60,6 +60,8 @@ export interface AnimationWeaponFrame {
   /** When imageSource is 'url', use this; otherwise resolved from attacker's weapon. */
   url?: string
   imageSource?: AnimationFrameImageSource
+  /** Delay in ms before this frame starts. */
+  delayMs?: number
   fadeInMs?: number
   /** Display size in px (width & height). */
   sizePx?: number
@@ -73,6 +75,8 @@ export interface AnimationWeaponFrame {
 export interface AnimationProjectileFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
+  /** Delay in ms before this frame starts. */
+  delayMs?: number
   trajectory: 'straight' | 'arc'
   speedMs?: number
   /** Display size in px (width & height). */
@@ -87,6 +91,8 @@ export interface AnimationProjectileFrame {
 export interface AnimationImpactFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
+  /** Delay in ms before this frame starts. */
+  delayMs?: number
   showMs?: number
   vanishMs?: number
   /** Display size in px (width & height). */
@@ -142,6 +148,7 @@ export interface IdleRpgPackV1 {
   creatures: CreatureTemplate[]
   items: ItemTemplate[]
   quests: Quest[]
+  dungeons?: Dungeon[]
   merchant: { listings: MerchantListing[] }
   lootTables: LootTable[]
 }
@@ -222,6 +229,29 @@ export interface Quest {
   durationSec: number
   iconUrl?: string
   rewards: { xp: number; currency: Record<string, number>; lootTableId?: string }
+}
+
+/** Dungeon: boss encounter with level requirement. bossCreatureId references pack.creatures (e.g. role 'boss'). */
+export interface Dungeon {
+  id: string
+  name: string
+  description?: string
+  imageUrl?: string
+  requiredLevel: number
+  bossCreatureId: string
+}
+
+/** Dungeon with resolved boss and per-character completion/cooldown (from getDungeons). */
+export interface DungeonWithBoss {
+  id: string
+  name: string
+  description?: string
+  imageUrl?: string
+  requiredLevel: number
+  bossCreatureId: string
+  boss: CreatureTemplate | null
+  completed: boolean
+  cooldownUntil?: number
 }
 
 export interface MerchantListing {
@@ -309,6 +339,8 @@ export interface CharacterState {
   merchant?: { listings: MerchantListing[]; lastUpdatedAt: number }
   /** Idle RPG group/guild (when in one). */
   groupId?: string | null
+  /** Progression: completed dungeons, boss cooldowns. */
+  progression?: { completedDungeonIds?: string[]; dungeonBossCooldowns?: Record<string, number> }
 }
 
 export interface QuestClaimResult {
@@ -410,6 +442,23 @@ export interface PlayStateResponse {
 
 export function getPlayState(fableId: string, realmId: string, characterId: string) {
   return get<PlayStateResponse>(`${charBase(fableId, realmId)}/${characterId}/play-state`)
+}
+
+export function getDungeons(fableId: string, realmId: string, characterId: string) {
+  return get<{ dungeons: DungeonWithBoss[] }>(`${charBase(fableId, realmId)}/${characterId}/dungeons`)
+}
+
+export interface DungeonFightResult {
+  character: CharacterState
+  combat: CombatResult
+  victory: boolean
+  droppedItem?: ItemTemplate
+}
+
+export function fightDungeonBoss(fableId: string, realmId: string, characterId: string, dungeonId: string) {
+  return post<DungeonFightResult>(
+    `${charBase(fableId, realmId)}/${characterId}/dungeons/${encodeURIComponent(dungeonId)}/fight`,
+  )
 }
 
 export function getGuildMemberPlayState(

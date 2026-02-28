@@ -21,6 +21,7 @@ import LocalBarIcon from '@mui/icons-material/LocalBar'
 import StorefrontIcon from '@mui/icons-material/Storefront'
 import GroupsIcon from '@mui/icons-material/Groups'
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi'
+import CastleIcon from '@mui/icons-material/Castle'
 import PersonIcon from '@mui/icons-material/Person'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import BoltIcon from '@mui/icons-material/Bolt'
@@ -45,6 +46,7 @@ import TavernTab from './tabs/TavernTab'
 import ShopTab from './tabs/ShopTab'
 import GuildTab from './tabs/GuildTab'
 import PvPTab from './tabs/PvPTab'
+import DungeonsTab from './tabs/DungeonsTab'
 
 /* ------------------------------------------------------------------ */
 /*  Sidebar Character Card                                            */
@@ -352,12 +354,13 @@ function EquipRow({ label, item, emptyText }: { label: string; item?: { name: st
 
 /* ------------------------------------------------------------------ */
 
-type Tab = 'tavern' | 'shop' | 'guild' | 'pvp'
+type Tab = 'tavern' | 'shop' | 'guild' | 'dungeons' | 'pvp'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'tavern', label: 'Tavern', icon: <LocalBarIcon /> },
   { id: 'shop', label: 'Shop', icon: <StorefrontIcon /> },
   { id: 'guild', label: 'Guild', icon: <GroupsIcon /> },
+  { id: 'dungeons', label: 'Dungeons', icon: <CastleIcon /> },
   { id: 'pvp', label: 'PvP', icon: <SportsKabaddiIcon /> },
 ]
 
@@ -638,6 +641,15 @@ export default function FableIdleRPG() {
                 pack={pack}
                 onCharacterUpdate={handleCharacterUpdate}
                 onRequestPvpFight={handleRequestPvpFight}
+              />
+            )}
+            {activeTab === 'dungeons' && displayCharacter && realm && pack && (
+              <DungeonsTab
+                fableId={fableId}
+                realmId={realm.id}
+                character={displayCharacter}
+                pack={pack}
+                onCharacterUpdate={handleCharacterUpdate}
               />
             )}
             {activeTab === 'pvp' && displayCharacter && realm && pack && (

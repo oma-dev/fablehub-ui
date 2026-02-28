@@ -7,10 +7,10 @@ import './index.css'
 import App from './app/app.tsx'
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />
       <App />
     </ThemeProvider>
-  </StrictMode>,
+
 )

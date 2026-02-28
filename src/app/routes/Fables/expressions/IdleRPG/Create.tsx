@@ -27,6 +27,7 @@ import type {
   Ability,
   ClassBlock,
   CreatureTemplate,
+  Dungeon,
   Fable,
   IdleRpgPackV1,
   ItemTemplate,
@@ -90,6 +91,7 @@ type ClassForm = {
 type CreatureForm = { id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string; iconUrl: string; tags: string }
 type ItemForm = { id: string; name: string; rarity: string; slot: string; tags: string; stats: string; iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string }
 type QuestForm = { id: string; name: string; creatureId: string; durationSec: string; iconUrl: string; rewardXp: string; rewardCurrency: string; lootTableId: string }
+type DungeonForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string }
 type LootEntryForm = { itemId: string; weight: string; classId: string }
 
 const emptyXp = (): XpEntry => ({ level: '', xp: '' })
@@ -104,6 +106,7 @@ const emptyClass = (): ClassForm => ({
 const emptyCreature = (): CreatureForm => ({ id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0', iconUrl: '', tags: '' })
 const emptyItem = (): ItemForm => ({ id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '', iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '' })
 const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', durationSec: '60', iconUrl: '', rewardXp: '10', rewardCurrency: '', lootTableId: '' })
+const emptyDungeon = (): DungeonForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '' })
 const emptyLootEntry = (): LootEntryForm => ({ itemId: '', weight: '1', classId: '' })
 
 export default function IdleRpgCreate() {
@@ -128,6 +131,7 @@ export default function IdleRpgCreate() {
   const [creatures, setCreatures] = useState<CreatureForm[]>([])
   const [items, setItems] = useState<ItemForm[]>([])
   const [quests, setQuests] = useState<QuestForm[]>([])
+  const [dungeons, setDungeons] = useState<DungeonForm[]>([])
   const [listings, setListings] = useState<MerchantListing[]>([])
   const [lootTables, setLootTables] = useState<{ id: string; entries: LootEntryForm[] }[]>([])
 
@@ -150,6 +154,14 @@ export default function IdleRpgCreate() {
     setCreatures(ex.creatures)
     setItems(ex.items)
     setQuests(ex.quests)
+    setDungeons((ex.dungeons ?? []).map((d) => ({
+      id: d.id,
+      name: d.name,
+      description: d.description ?? '',
+      imageUrl: d.imageUrl ?? '',
+      requiredLevel: String(d.requiredLevel),
+      bossCreatureId: d.bossCreatureId,
+    })))
     setListings(ex.listings)
     setLootTables(ex.lootTables)
     setShowExampleModal(false)
@@ -276,6 +288,17 @@ export default function IdleRpgCreate() {
         },
       }))
 
+    const dungeonList: Dungeon[] = dungeons
+      .filter((d) => d.id.trim() && d.name.trim() && d.bossCreatureId.trim())
+      .map((d) => ({
+        id: d.id.trim(),
+        name: d.name.trim(),
+        ...(d.description.trim() ? { description: d.description.trim() } : {}),
+        ...(d.imageUrl?.trim() ? { imageUrl: d.imageUrl.trim() } : {}),
+        requiredLevel: Number(d.requiredLevel) || 1,
+        bossCreatureId: d.bossCreatureId.trim(),
+      }))
+
     const lootTableList: LootTable[] = lootTables
       .filter((t) => t.id.trim())
       .map((t) => ({
@@ -304,6 +327,7 @@ export default function IdleRpgCreate() {
       creatures: creatureList,
       items: itemList,
       quests: questList,
+      ...(dungeonList.length > 0 ? { dungeons: dungeonList } : {}),
       merchant: { listings },
       lootTables: lootTableList,
     }
@@ -595,6 +619,35 @@ export default function IdleRpgCreate() {
                 </Box>
               ))}
               <Button type="button" size="small" variant="outlined" onClick={() => setQuests((p) => [...p, emptyQuest()])}>+ Add quest</Button>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Dungeons</Typography></AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Each dungeon has a boss creature; select from your creatures (use role &quot;boss&quot; for bosses).
+              </Typography>
+              {dungeons.map((d, i) => (
+                <Box key={i} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
+                  <TextField size="small" label="ID" value={d.id} onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} sx={{ width: 100 }} />
+                  <TextField size="small" label="Name" value={d.name} onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 120 }} />
+                  <TextField size="small" label="Description" value={d.description} onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} placeholder="Optional" sx={{ width: 180 }} />
+                  <TextField size="small" label="Image URL" value={d.imageUrl} onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, imageUrl: e.target.value } : x))} placeholder="Dungeon card image" sx={{ width: 200 }} />
+                  <TextField size="small" label="Required level" type="number" value={d.requiredLevel} onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, requiredLevel: e.target.value } : x))} inputProps={{ min: 1 }} sx={{ width: 110 }} />
+                  <FormControl size="small" sx={{ minWidth: 160 }}>
+                    <InputLabel>Boss creature</InputLabel>
+                    <Select value={d.bossCreatureId} label="Boss creature" onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, bossCreatureId: e.target.value } : x))} displayEmpty>
+                      <MenuItem value="">— Select —</MenuItem>
+                      {creatures.filter((c) => c.id.trim()).map((c) => (
+                        <MenuItem key={c.id} value={c.id}>{c.name || c.id} {c.role === 'boss' ? '(boss)' : ''}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <IconButton size="small" color="error" onClick={() => setDungeons((p) => p.filter((_, j) => j !== i))}>−</IconButton>
+                </Box>
+              ))}
+              <Button type="button" size="small" variant="outlined" onClick={() => setDungeons((p) => [...p, emptyDungeon()])}>+ Add dungeon</Button>
             </AccordionDetails>
           </Accordion>
 

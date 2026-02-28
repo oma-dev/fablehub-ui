@@ -25,6 +25,7 @@ import type {
   AnimationFrameImageSource,
   ClassBlock,
   CreatureTemplate,
+  Dungeon,
   IdleRpgPackV1,
   ItemTemplate,
   LootTable,
@@ -63,6 +64,20 @@ function serializeStats(stats: Partial<Record<string, number>> | undefined): str
 const STAT_IDS = ['STR', 'DEX', 'INT', 'LCK', 'HP', 'ARM'] as const
 const DELIVERIES = ['melee', 'projectile_straight', 'projectile_arced', 'instant'] as const
 const STYLE_IDS = ['melee_slash', 'melee_punch', 'projectile_arrow', 'projectile_bolt', 'instant_slash'] as const
+
+/** Coerce to a valid delivery so MUI Select never gets an out-of-range value (avoids console spam and lag). */
+function normalizeDelivery(v: string): (typeof DELIVERIES)[number] {
+  if (v && DELIVERIES.includes(v as (typeof DELIVERIES)[number])) return v as (typeof DELIVERIES)[number]
+  if (v === 'ranged') return 'projectile_straight'
+  return 'melee'
+}
+
+/** Coerce to a valid styleId so MUI Select never gets an out-of-range value (avoids console spam and lag). */
+function normalizeStyleId(v: string): (typeof STYLE_IDS)[number] {
+  if (v && STYLE_IDS.includes(v as (typeof STYLE_IDS)[number])) return v as (typeof STYLE_IDS)[number]
+  if (v === 'melee_flail') return 'melee_slash'
+  return 'melee_slash'
+}
 const SLOTS = ['attack_source', 'defense_layer'] as const
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
 const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate']
@@ -71,9 +86,9 @@ const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive'
 type XpEntry = { level: string; xp: string }
 type AbilityForm = {
   id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string; delivery: string; styleId: string
-  animWeaponSource: AnimationFrameImageSource; animWeaponUrl: string
-  animProjectileSource: AnimationFrameImageSource; animProjectileUrl: string; animProjectileTrajectory: 'straight' | 'arc'
-  animImpactSource: AnimationFrameImageSource; animImpactUrl: string
+  animWeaponSource: AnimationFrameImageSource; animWeaponUrl: string; animWeaponDelayMs: string
+  animProjectileSource: AnimationFrameImageSource; animProjectileUrl: string; animProjectileTrajectory: 'straight' | 'arc'; animProjectileDelayMs: string
+  animImpactSource: AnimationFrameImageSource; animImpactUrl: string; animImpactDelayMs: string
 }
 type ClassForm = {
   id: string; name: string; description: string; iconUrl: string
@@ -85,14 +100,15 @@ type ClassForm = {
 type CreatureForm = { id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string; iconUrl: string; tags: string }
 type ItemForm = { id: string; name: string; rarity: string; slot: string; tags: string; stats: string; iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string }
 type QuestForm = { id: string; name: string; creatureId: string; durationSec: string; iconUrl: string; rewardXp: string; rewardCurrency: string; lootTableId: string }
+type DungeonForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string }
 type LootEntryForm = { itemId: string; weight: string; classId: string }
 
 const emptyXp = (): XpEntry => ({ level: '', xp: '' })
 const emptyAbility = (): AbilityForm => ({
   id: '', name: '', abilityType: 'regular', description: '', iconUrl: '', delivery: 'melee', styleId: 'melee_slash',
-  animWeaponSource: 'url', animWeaponUrl: '',
-  animProjectileSource: 'url', animProjectileUrl: '', animProjectileTrajectory: 'arc',
-  animImpactSource: 'url', animImpactUrl: '',
+  animWeaponSource: 'url', animWeaponUrl: '', animWeaponDelayMs: '0',
+  animProjectileSource: 'url', animProjectileUrl: '', animProjectileTrajectory: 'arc', animProjectileDelayMs: '0',
+  animImpactSource: 'url', animImpactUrl: '', animImpactDelayMs: '0',
 })
 const emptyClass = (): ClassForm => ({
   id: '', name: '', description: '', iconUrl: '',
@@ -104,6 +120,7 @@ const emptyClass = (): ClassForm => ({
 const emptyCreature = (): CreatureForm => ({ id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0', iconUrl: '', tags: '' })
 const emptyItem = (): ItemForm => ({ id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '', iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '' })
 const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', durationSec: '60', iconUrl: '', rewardXp: '10', rewardCurrency: '', lootTableId: '' })
+const emptyDungeon = (): DungeonForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '' })
 const emptyLootEntry = (): LootEntryForm => ({ itemId: '', weight: '1', classId: '' })
 
 // --- Hydrate form state from pack ---
@@ -122,22 +139,25 @@ function hydrateAbilities(pack: IdleRpgPackV1): AbilityForm[] {
     abilityType: a.abilityType,
     description: a.description ?? '',
     iconUrl: a.iconUrl ?? '',
-    delivery: a.primaryAttack?.delivery ?? 'melee',
-    styleId: a.primaryAttack?.styleId ?? 'melee_slash',
+    delivery: normalizeDelivery(a.primaryAttack?.delivery ?? 'melee'),
+    styleId: normalizeStyleId(a.primaryAttack?.styleId ?? 'melee_slash'),
     animWeaponSource: (a.animationFrames?.weapon?.imageSource ?? 'url') as AnimationFrameImageSource,
     animWeaponUrl: a.animationFrames?.weapon?.url ?? '',
+    animWeaponDelayMs: String(a.animationFrames?.weapon?.delayMs ?? 0),
     animProjectileSource: (a.animationFrames?.projectile?.imageSource ?? 'url') as AnimationFrameImageSource,
     animProjectileUrl: a.animationFrames?.projectile?.url ?? '',
     animProjectileTrajectory: a.animationFrames?.projectile?.trajectory ?? 'arc',
+    animProjectileDelayMs: String(a.animationFrames?.projectile?.delayMs ?? 0),
     animImpactSource: (a.animationFrames?.impact?.imageSource ?? 'url') as AnimationFrameImageSource,
     animImpactUrl: a.animationFrames?.impact?.url ?? '',
+    animImpactDelayMs: String(a.animationFrames?.impact?.delayMs ?? 0),
   }))
 }
 
 function hydrateClasses(pack: IdleRpgPackV1): ClassForm[] {
   return pack.classes.map((c) => {
     const primaryAbility = (pack.abilities ?? []).find(
-      (a) => a.abilityType === 'primary' && a.primaryAttack?.delivery === c.primaryAttack.delivery && a.primaryAttack?.styleId === c.primaryAttack.styleId,
+      (a) => a.abilityType === 'primary' && normalizeDelivery(a.primaryAttack?.delivery ?? 'melee') === normalizeDelivery(c.primaryAttack.delivery) && normalizeStyleId(a.primaryAttack?.styleId ?? 'melee_slash') === normalizeStyleId(c.primaryAttack.styleId),
     )
     return {
       id: c.id,
@@ -202,6 +222,17 @@ function hydrateQuests(pack: IdleRpgPackV1): QuestForm[] {
   }))
 }
 
+function hydrateDungeons(pack: IdleRpgPackV1): DungeonForm[] {
+  return (pack.dungeons ?? []).map((d) => ({
+    id: d.id,
+    name: d.name,
+    description: d.description ?? '',
+    imageUrl: d.imageUrl ?? '',
+    requiredLevel: String(d.requiredLevel),
+    bossCreatureId: d.bossCreatureId ?? '',
+  }))
+}
+
 function hydrateLootTables(pack: IdleRpgPackV1): { id: string; entries: LootEntryForm[] }[] {
   return pack.lootTables.map((t) => ({
     id: t.id,
@@ -232,6 +263,7 @@ export default function IdleRpgEdit() {
   const [creatures, setCreatures] = useState<CreatureForm[]>([])
   const [items, setItems] = useState<ItemForm[]>([])
   const [quests, setQuests] = useState<QuestForm[]>([])
+  const [dungeons, setDungeons] = useState<DungeonForm[]>([])
   const [listings, setListings] = useState<MerchantListing[]>([])
   const [lootTables, setLootTables] = useState<{ id: string; entries: LootEntryForm[] }[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -264,6 +296,7 @@ export default function IdleRpgEdit() {
       setCreatures(hydrateCreatures(pack))
       setItems(hydrateItems(pack))
       setQuests(hydrateQuests(pack))
+      setDungeons(hydrateDungeons(pack))
       setListings(pack.merchant?.listings ?? [])
       setLootTables(hydrateLootTables(pack))
     }).catch((err) => {
@@ -292,8 +325,8 @@ export default function IdleRpgEdit() {
         }
         if (a.abilityType === 'primary') {
           def.primaryAttack = {
-            delivery: a.delivery || 'melee',
-            styleId: a.styleId || 'melee_slash',
+            delivery: normalizeDelivery(a.delivery || 'melee'),
+            styleId: normalizeStyleId(a.styleId || 'melee_slash'),
           }
         }
         const hasWeapon = a.animWeaponSource !== 'url' || (a.animWeaponUrl?.trim() ?? '') !== ''
@@ -305,6 +338,7 @@ export default function IdleRpgEdit() {
             def.animationFrames.weapon = {
               ...(a.animWeaponSource === 'url' && a.animWeaponUrl?.trim() ? { url: a.animWeaponUrl.trim() } : {}),
               ...(a.animWeaponSource !== 'url' ? { imageSource: a.animWeaponSource } : {}),
+              ...(Math.max(0, Number(a.animWeaponDelayMs) || 0) > 0 ? { delayMs: Math.max(0, Number(a.animWeaponDelayMs) || 0) } : {}),
             }
           }
           if (hasProjectile) {
@@ -312,12 +346,14 @@ export default function IdleRpgEdit() {
               trajectory: a.animProjectileTrajectory,
               ...(a.animProjectileSource === 'url' && a.animProjectileUrl?.trim() ? { url: a.animProjectileUrl.trim() } : {}),
               ...(a.animProjectileSource !== 'url' ? { imageSource: a.animProjectileSource } : {}),
+              ...(Math.max(0, Number(a.animProjectileDelayMs) || 0) > 0 ? { delayMs: Math.max(0, Number(a.animProjectileDelayMs) || 0) } : {}),
             }
           }
           if (hasImpact) {
             def.animationFrames.impact = {
               ...(a.animImpactSource === 'url' && a.animImpactUrl?.trim() ? { url: a.animImpactUrl.trim() } : {}),
               ...(a.animImpactSource !== 'url' ? { imageSource: a.animImpactSource } : {}),
+              ...(Math.max(0, Number(a.animImpactDelayMs) || 0) > 0 ? { delayMs: Math.max(0, Number(a.animImpactDelayMs) || 0) } : {}),
             }
           }
         }
@@ -331,8 +367,8 @@ export default function IdleRpgEdit() {
         const primaryAbility = c.primaryAttackAbilityId.trim()
           ? primaryAbilities.find((a) => a.id === c.primaryAttackAbilityId.trim())
           : null
-        const delivery = primaryAbility?.primaryAttack?.delivery ?? 'melee'
-        const styleId = primaryAbility?.primaryAttack?.styleId ?? 'melee_slash'
+        const delivery = normalizeDelivery(primaryAbility?.primaryAttack?.delivery ?? 'melee')
+        const styleId = normalizeStyleId(primaryAbility?.primaryAttack?.styleId ?? 'melee_slash')
         return {
           id: c.id.trim(),
           name: c.name.trim(),
@@ -410,6 +446,17 @@ export default function IdleRpgEdit() {
         },
       }))
 
+    const dungeonList: Dungeon[] = dungeons
+      .filter((d) => d.id.trim() && d.name.trim() && d.bossCreatureId.trim())
+      .map((d) => ({
+        id: d.id.trim(),
+        name: d.name.trim(),
+        ...(d.description.trim() ? { description: d.description.trim() } : {}),
+        ...(d.imageUrl?.trim() ? { imageUrl: d.imageUrl.trim() } : {}),
+        requiredLevel: Number(d.requiredLevel) || 1,
+        bossCreatureId: d.bossCreatureId.trim(),
+      }))
+
     const lootTableList: LootTable[] = lootTables
       .filter((t) => t.id.trim())
       .map((t) => ({
@@ -438,6 +485,7 @@ export default function IdleRpgEdit() {
       creatures: creatureList,
       items: itemList,
       quests: questList,
+      ...(dungeonList.length > 0 ? { dungeons: dungeonList } : {}),
       merchant: { listings },
       lootTables: lootTableList,
     }
@@ -576,13 +624,13 @@ export default function IdleRpgEdit() {
                       <>
                         <FormControl size="small" sx={{ minWidth: 140 }}>
                           <InputLabel>Delivery</InputLabel>
-                          <Select value={a.delivery} label="Delivery" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, delivery: e.target.value } : x))}>
+                          <Select value={normalizeDelivery(a.delivery)} label="Delivery" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, delivery: e.target.value } : x))}>
                             {DELIVERIES.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
                           </Select>
                         </FormControl>
                         <FormControl size="small" sx={{ minWidth: 140 }}>
                           <InputLabel>Style</InputLabel>
-                          <Select value={a.styleId} label="Style" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, styleId: e.target.value } : x))}>
+                          <Select value={normalizeStyleId(a.styleId)} label="Style" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, styleId: e.target.value } : x))}>
                             {STYLE_IDS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
                           </Select>
                         </FormControl>
@@ -601,6 +649,7 @@ export default function IdleRpgEdit() {
                     </Select>
                   </FormControl>
                   {a.animWeaponSource === 'url' && <TextField size="small" placeholder="Weapon URL" value={a.animWeaponUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animWeaponUrl: e.target.value } : x))} sx={{ width: 140 }} />}
+                  <TextField size="small" type="number" label="W delay (ms)" value={a.animWeaponDelayMs} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animWeaponDelayMs: e.target.value } : x))} inputProps={{ min: 0 }} sx={{ width: 90 }} />
                   <FormControl size="small" sx={{ minWidth: 100 }}>
                     <InputLabel>Projectile</InputLabel>
                     <Select value={a.animProjectileSource} label="Projectile" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animProjectileSource: e.target.value as AnimationFrameImageSource } : x))}>
@@ -612,6 +661,7 @@ export default function IdleRpgEdit() {
                     <MenuItem value="straight">straight</MenuItem>
                     <MenuItem value="arc">arc</MenuItem>
                   </Select>
+                  <TextField size="small" type="number" label="P delay (ms)" value={a.animProjectileDelayMs} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animProjectileDelayMs: e.target.value } : x))} inputProps={{ min: 0 }} sx={{ width: 90 }} />
                   <FormControl size="small" sx={{ minWidth: 100 }}>
                     <InputLabel>Impact</InputLabel>
                     <Select value={a.animImpactSource} label="Impact" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animImpactSource: e.target.value as AnimationFrameImageSource } : x))}>
@@ -619,6 +669,7 @@ export default function IdleRpgEdit() {
                     </Select>
                   </FormControl>
                   {a.animImpactSource === 'url' && <TextField size="small" placeholder="Impact URL" value={a.animImpactUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animImpactUrl: e.target.value } : x))} sx={{ width: 140 }} />}
+                  <TextField size="small" type="number" label="I delay (ms)" value={a.animImpactDelayMs} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animImpactDelayMs: e.target.value } : x))} inputProps={{ min: 0 }} sx={{ width: 90 }} />
                   </Box>
                 </Box>
               ))}
@@ -770,6 +821,35 @@ export default function IdleRpgEdit() {
                 </Box>
               ))}
               <Button type="button" size="small" variant="outlined" onClick={() => setQuests((p) => [...p, emptyQuest()])}>+ Add quest</Button>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Dungeons</Typography></AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Each dungeon has a boss creature; select from your creatures (use role &quot;boss&quot; for bosses).
+              </Typography>
+              {dungeons.map((d, i) => (
+                <Box key={i} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
+                  <TextField size="small" label="ID" value={d.id} onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} sx={{ width: 100 }} />
+                  <TextField size="small" label="Name" value={d.name} onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 120 }} />
+                  <TextField size="small" label="Description" value={d.description} onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} placeholder="Optional" sx={{ width: 180 }} />
+                  <TextField size="small" label="Image URL" value={d.imageUrl} onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, imageUrl: e.target.value } : x))} placeholder="Dungeon card image" sx={{ width: 200 }} />
+                  <TextField size="small" label="Required level" type="number" value={d.requiredLevel} onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, requiredLevel: e.target.value } : x))} inputProps={{ min: 1 }} sx={{ width: 110 }} />
+                  <FormControl size="small" sx={{ minWidth: 160 }}>
+                    <InputLabel>Boss creature</InputLabel>
+                    <Select value={d.bossCreatureId} label="Boss creature" onChange={(e) => setDungeons((p) => p.map((x, j) => j === i ? { ...x, bossCreatureId: e.target.value } : x))} displayEmpty>
+                      <MenuItem value="">— Select —</MenuItem>
+                      {creatures.filter((c) => c.id.trim()).map((c) => (
+                        <MenuItem key={c.id} value={c.id}>{c.name || c.id} {c.role === 'boss' ? '(boss)' : ''}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <IconButton size="small" color="error" onClick={() => setDungeons((p) => p.filter((_, j) => j !== i))}>−</IconButton>
+                </Box>
+              ))}
+              <Button type="button" size="small" variant="outlined" onClick={() => setDungeons((p) => [...p, emptyDungeon()])}>+ Add dungeon</Button>
             </AccordionDetails>
           </Accordion>
 

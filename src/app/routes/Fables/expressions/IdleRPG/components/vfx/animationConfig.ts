@@ -10,6 +10,8 @@ export type AnimationFrameImageSource = 'url' | 'weaponIcon' | 'weaponAnimation'
 export interface AnimationWeaponFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
+  /** Delay in ms before this frame starts. */
+  delayMs?: number
   fadeInMs?: number
   /** Display size in px (width & height). */
   sizePx?: number
@@ -23,6 +25,8 @@ export interface AnimationWeaponFrame {
 export interface AnimationProjectileFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
+  /** Delay in ms before this frame starts. */
+  delayMs?: number
   trajectory: 'straight' | 'arc'
   speedMs?: number
   /** Display size in px (width & height). */
@@ -37,6 +41,8 @@ export interface AnimationProjectileFrame {
 export interface AnimationImpactFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
+  /** Delay in ms before this frame starts. */
+  delayMs?: number
   showMs?: number
   vanishMs?: number
   /** Display size in px (width & height). */

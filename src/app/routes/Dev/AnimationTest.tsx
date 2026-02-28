@@ -133,12 +133,14 @@ export default function AnimationTest() {
   const [frameWeaponImageSource, setFrameWeaponImageSource] = useState<AnimationFrameImageSource>('url')
   const [frameWeaponUrl, setFrameWeaponUrl] = useState('https://bg3.wiki/w/images/0/0f/Quarterstaff_Unfaded.png')
   const [frameWeaponFadeInMs, setFrameWeaponFadeInMs] = useState(200)
+  const [frameWeaponDelayMs, setFrameWeaponDelayMs] = useState(0)
   const [frameWeaponStartSizePx, setFrameWeaponStartSizePx] = useState(80)
   const [frameWeaponEndSizePx, setFrameWeaponEndSizePx] = useState(120)
   const [frameProjectileEnabled, setFrameProjectileEnabled] = useState(false)
   const [frameProjectileImageSource, setFrameProjectileImageSource] = useState<AnimationFrameImageSource>('url')
   const [frameProjectileUrl, setFrameProjectileUrl] = useState('https://bg3.wiki/w/images/2/2e/Fireball_Spell_Icon.png')
   const [frameProjectileSpeedMs, setFrameProjectileSpeedMs] = useState(400)
+  const [frameProjectileDelayMs, setFrameProjectileDelayMs] = useState(0)
   const [frameProjectileTrajectory, setFrameProjectileTrajectory] = useState<'straight' | 'arc'>('arc')
   const [frameProjectileStartSizePx, setFrameProjectileStartSizePx] = useState(120)
   const [frameProjectileEndSizePx, setFrameProjectileEndSizePx] = useState(300)
@@ -147,6 +149,7 @@ export default function AnimationTest() {
   const [frameImpactUrl, setFrameImpactUrl] = useState('https://bg3.wiki/w/images/4/4e/Smoke_Powder_Unfaded.png')
   const [frameImpactShowMs, setFrameImpactShowMs] = useState(100)
   const [frameImpactVanishMs, setFrameImpactVanishMs] = useState(500)
+  const [frameImpactDelayMs, setFrameImpactDelayMs] = useState(0)
   const [frameImpactStartSizePx, setFrameImpactStartSizePx] = useState(60)
   const [frameImpactEndSizePx, setFrameImpactEndSizePx] = useState(140)
 
@@ -227,13 +230,18 @@ export default function AnimationTest() {
 
     const weaponFrameResolvedUrl = resolveFrameUrl(frameWeaponImageSource, frameWeaponUrl)
     if (frameWeaponEnabled && weaponFrameResolvedUrl) {
+      const weaponDelay = Math.max(0, frameWeaponDelayMs ?? 0)
+      if (weaponDelay) await sleep(weaponDelay)
       setWeaponFrameConfig({ url: weaponFrameResolvedUrl, fadeInMs: frameWeaponFadeInMs, startSizePx: frameWeaponStartSizePx, endSizePx: frameWeaponEndSizePx })
       setShowWeaponFrameSide(side)
       await sleep(frameWeaponFadeInMs)
     }
 
-    const hasProjectile = frameProjectileEnabled ? true : anim.projectile
+    // Only show projectile when "Projectile frame" is enabled; unchecked = no flying image
+    const hasProjectile = frameProjectileEnabled
     if (hasProjectile) {
+      const projDelay = Math.max(0, frameProjectileDelayMs ?? 0)
+      if (projDelay) await sleep(projDelay)
       const dir = side === 'player' ? 'left-to-right' as const : 'right-to-left' as const
       const traj = frameProjectileEnabled ? frameProjectileTrajectory : (trajectoryOverride === 'auto' ? anim.projectile : trajectoryOverride)
       if (traj == null) { setShowWeaponFrameSide(null); setWeaponFrameConfig(null); setImpactFrameConfig(null); return }
@@ -266,6 +274,8 @@ export default function AnimationTest() {
     const dmgValue = Math.floor(Math.random() * 30) + 5
     const impactResolvedUrl = resolveFrameUrl(frameImpactImageSource, frameImpactUrl)
     if (frameImpactEnabled && impactResolvedUrl) {
+      const impactDelay = Math.max(0, frameImpactDelayMs ?? 0)
+      if (impactDelay) await sleep(impactDelay)
       setImpactFrameConfig({
         url: impactResolvedUrl,
         showMs: frameImpactShowMs,
@@ -294,9 +304,9 @@ export default function AnimationTest() {
     setTgtDmg(null)
   }, [
     log,
-    frameWeaponEnabled, frameWeaponImageSource, frameWeaponUrl, frameWeaponFadeInMs, frameWeaponStartSizePx, frameWeaponEndSizePx,
-    frameProjectileEnabled, frameProjectileImageSource, frameProjectileUrl, frameProjectileSpeedMs, frameProjectileTrajectory, frameProjectileStartSizePx, frameProjectileEndSizePx,
-    frameImpactEnabled, frameImpactImageSource, frameImpactUrl, frameImpactShowMs, frameImpactVanishMs, frameImpactStartSizePx, frameImpactEndSizePx,
+    frameWeaponEnabled, frameWeaponImageSource, frameWeaponUrl, frameWeaponFadeInMs, frameWeaponDelayMs, frameWeaponStartSizePx, frameWeaponEndSizePx,
+    frameProjectileEnabled, frameProjectileImageSource, frameProjectileUrl, frameProjectileSpeedMs, frameProjectileDelayMs, frameProjectileTrajectory, frameProjectileStartSizePx, frameProjectileEndSizePx,
+    frameImpactEnabled, frameImpactImageSource, frameImpactUrl, frameImpactShowMs, frameImpactVanishMs, frameImpactDelayMs, frameImpactStartSizePx, frameImpactEndSizePx,
     trajectoryOverride, weaponUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl, resolveFrameUrl,
   ])
 
@@ -487,6 +497,16 @@ export default function AnimationTest() {
               <TextField
                 size="small"
                 type="number"
+                label="Delay (ms)"
+                value={frameWeaponDelayMs}
+                onChange={(e) => setFrameWeaponDelayMs(Math.max(0, Number(e.target.value) || 0))}
+                inputProps={{ min: 0, max: 2000, step: 50 }}
+                sx={{ width: 100 }}
+                disabled={!frameWeaponEnabled}
+              />
+              <TextField
+                size="small"
+                type="number"
                 label="Fade-in (ms)"
                 value={frameWeaponFadeInMs}
                 onChange={(e) => setFrameWeaponFadeInMs(Number(e.target.value) || 200)}
@@ -545,6 +565,16 @@ export default function AnimationTest() {
                   disabled={!frameProjectileEnabled}
                 />
               )}
+              <TextField
+                size="small"
+                type="number"
+                label="Delay (ms)"
+                value={frameProjectileDelayMs}
+                onChange={(e) => setFrameProjectileDelayMs(Math.max(0, Number(e.target.value) || 0))}
+                inputProps={{ min: 0, max: 2000, step: 50 }}
+                sx={{ width: 100 }}
+                disabled={!frameProjectileEnabled}
+              />
               <TextField
                 size="small"
                 type="number"
@@ -618,6 +648,16 @@ export default function AnimationTest() {
                   disabled={!frameImpactEnabled}
                 />
               )}
+              <TextField
+                size="small"
+                type="number"
+                label="Delay (ms)"
+                value={frameImpactDelayMs}
+                onChange={(e) => setFrameImpactDelayMs(Math.max(0, Number(e.target.value) || 0))}
+                inputProps={{ min: 0, max: 2000, step: 50 }}
+                sx={{ width: 100 }}
+                disabled={!frameImpactEnabled}
+              />
               <TextField
                 size="small"
                 type="number"

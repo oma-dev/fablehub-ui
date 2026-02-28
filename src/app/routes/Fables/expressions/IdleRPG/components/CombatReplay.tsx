@@ -229,12 +229,17 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
 
     const weaponFrameUrl = frames?.weapon?.url?.trim()
     if (frames?.weapon && weaponFrameUrl) {
+      const weaponDelay = Math.max(0, frames.weapon.delayMs ?? 0)
+      if (weaponDelay) await sleep(weaponDelay)
       setWeaponFrameConfig({ url: weaponFrameUrl, fadeInMs: frames.weapon.fadeInMs ?? 200, sizePx: frames.weapon.sizePx, startSizePx: frames.weapon.startSizePx, endSizePx: frames.weapon.endSizePx })
       setShowWeaponFrame(attackerSide)
       await sleep(frames.weapon.fadeInMs ?? 200)
     }
 
-    if (anim.projectile) {
+    // Only show projectile when the ability has a projectile frame configured (no weapon fallback when unchecked)
+    if (anim.projectile && frames?.projectile) {
+      const projDelay = Math.max(0, frames.projectile.delayMs ?? 0)
+      if (projDelay) await sleep(projDelay)
       const dir = attackerSide === 'player' ? 'left-to-right' : 'right-to-left'
       const srcRef = attackerSide === 'player' ? playerPortraitRef : creaturePortraitRef
       const tgtRef = attackerSide === 'player' ? creaturePortraitRef : playerPortraitRef
@@ -242,7 +247,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
       setProjTo(getPortraitPos(tgtRef))
       setProjectileAttacker(attackerSide)
       const weaponUrlFallback = attackerSide === 'player' ? player.weaponUrl : creature.weaponUrl
-      const projUrl = (frames?.projectile?.url?.trim()) ?? weaponUrlFallback ?? null
+      const projUrl = (frames.projectile.url?.trim()) ?? weaponUrlFallback ?? null
       const projDurationMs = frames?.projectile?.speedMs
       setProjectileImageUrl(projUrl)
       setProjectileDurationMs(projDurationMs)
@@ -259,6 +264,8 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
 
     const impactUrl = frames?.impact?.url?.trim()
     if (frames?.impact && impactUrl) {
+      const impactDelay = Math.max(0, frames.impact.delayMs ?? 0)
+      if (impactDelay) await sleep(impactDelay)
       setImpactFrameConfig({
         url: impactUrl,
         showMs: frames.impact.showMs ?? 100,
