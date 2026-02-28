@@ -244,6 +244,8 @@ export interface CharacterState {
   allocatedStats: Record<string, number>
   /** Per-character shop (listings refresh every 24h). */
   merchant?: { listings: MerchantListing[]; lastUpdatedAt: number }
+  /** Idle RPG group/guild (when in one). */
+  groupId?: string | null
 }
 
 export interface QuestClaimResult {
@@ -322,6 +324,17 @@ export function getPlayState(fableId: string, realmId: string, characterId: stri
   return get<PlayStateResponse>(`${charBase(fableId, realmId)}/${characterId}/play-state`)
 }
 
+export function getGuildMemberPlayState(
+  fableId: string,
+  realmId: string,
+  viewerCharacterId: string,
+  targetCharacterId: string,
+) {
+  return get<PlayStateResponse>(
+    `${charBase(fableId, realmId)}/${targetCharacterId}/guild-profile?viewerCharacterId=${encodeURIComponent(viewerCharacterId)}`,
+  )
+}
+
 export function startQuest(fableId: string, realmId: string, characterId: string, questId: string) {
   return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/quests/start`, { body: { questId } })
 }
@@ -342,6 +355,75 @@ export function allocateStat(fableId: string, realmId: string, characterId: stri
   return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/stats/allocate`, { body: { stat, amount } })
 }
 
+// --- Idle RPG Groups (guilds) ---
+
+function groupsBase(fableId: string, realmId: string) {
+  return `/fables/${fableId}/idle-rpg/${realmId}/groups`
+}
+
+export interface IdleRpgGroupMember {
+  id: string
+  name: string
+  level: number
+  classId: string
+}
+
+export interface IdleRpgGroup {
+  id: string
+  realmId: string
+  label: string
+  name: string
+  memberIds: string[]
+  leaderId?: string | null
+  memberRanks?: Record<string, number>
+  createdAt: string
+  members: IdleRpgGroupMember[]
+}
+
+export function getGroups(fableId: string, realmId: string) {
+  return get<IdleRpgGroup[]>(groupsBase(fableId, realmId))
+}
+
+export function getGroup(fableId: string, realmId: string, groupId: string) {
+  return get<IdleRpgGroup>(`${groupsBase(fableId, realmId)}/${groupId}`)
+}
+
+export function createGroup(
+  fableId: string,
+  realmId: string,
+  body: { label: string; name: string; creatorCharacterId?: string },
+) {
+  return post<IdleRpgGroup>(groupsBase(fableId, realmId), { body })
+}
+
+export function joinGroup(fableId: string, realmId: string, groupId: string, characterId: string) {
+  return post<IdleRpgGroup>(`${groupsBase(fableId, realmId)}/${groupId}/join`, {
+    body: { characterId },
+  })
+}
+
+export interface GroupMessage {
+  id: string
+  groupId: string
+  characterId: string
+  content: string
+  createdAt: string
+  character: { id: string; name: string }
+}
+
+export function getGroupMessages(fableId: string, realmId: string, groupId: string) {
+  return get<GroupMessage[]>(`${groupsBase(fableId, realmId)}/${groupId}/messages`)
+}
+
+export function sendGroupMessage(
+  fableId: string,
+  realmId: string,
+  groupId: string,
+  body: { characterId: string; content: string },
+) {
+  return post<GroupMessage>(`${groupsBase(fableId, realmId)}/${groupId}/messages`, { body })
+}
+
 // --- Grouped exports ---
 
 export const api = {
@@ -360,5 +442,11 @@ export const api = {
     buyItem,
     equipItem,
     allocateStat,
+    getGroups,
+    getGroup,
+    createGroup,
+    joinGroup,
+    getGroupMessages,
+    sendGroupMessage,
   },
 }

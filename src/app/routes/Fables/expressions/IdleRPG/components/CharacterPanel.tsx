@@ -21,6 +21,8 @@ interface Props {
   character: CharacterState
   pack: IdleRpgPackV1
   onCharacterUpdate: (c: CharacterState) => void
+  /** When true, hide stat allocation and equipment unequip (view-only, e.g. guild roster). */
+  readOnly?: boolean
 }
 
 type StatId = 'STR' | 'DEX' | 'INT' | 'LCK' | 'HP' | 'ARM'
@@ -34,12 +36,6 @@ const STAT_INFO: Record<StatId, { label: string; description: string }> = {
   LCK: { label: 'Luck', description: 'Increases critical hit chance (future update).' },
   HP: { label: 'Health', description: 'Directly adds maximum hit points (+1 HP per point).' },
   ARM: { label: 'Armor', description: 'Reduces incoming damage by a flat amount (-1 damage taken per point).' },
-}
-
-const RARITY_COLORS: Record<string, string> = {
-  common: '#78748a',
-  rare: '#818cf8',
-  legendary: '#fbbf24',
 }
 
 function computeTotalStats(
@@ -106,6 +102,7 @@ function EquipmentSlot({
   currency,
   onUnequip,
   unequipping,
+  readOnly,
 }: {
   slot: string
   label: string
@@ -114,17 +111,18 @@ function EquipmentSlot({
   currency?: { id: string; name: string; iconUrl?: string }
   onUnequip: (slot: string) => void
   unequipping: string | null
+  readOnly?: boolean
 }) {
   if (equippedItem) {
     return (
-      <Tooltip title="Click to unequip" arrow>
+      <Tooltip title={readOnly ? undefined : 'Click to unequip'} arrow>
         <Box
-          onClick={() => onUnequip(slot)}
+          onClick={readOnly ? undefined : () => onUnequip(slot)}
           sx={{
-            cursor: unequipping ? 'default' : 'pointer',
+            cursor: readOnly ? 'default' : unequipping ? 'default' : 'pointer',
             opacity: unequipping ? 0.5 : 1,
             transition: 'opacity 0.2s',
-            pointerEvents: unequipping ? 'none' : 'auto',
+            pointerEvents: readOnly || unequipping ? 'none' : 'auto',
           }}
         >
           <ItemView item={equippedItem} currency={currency} size={84} />
@@ -158,7 +156,7 @@ function EquipmentSlot({
   )
 }
 
-export default function CharacterPanel({ fableId, realmId, character, pack, onCharacterUpdate }: Props) {
+export default function CharacterPanel({ fableId, realmId, character, pack, onCharacterUpdate, readOnly = false }: Props) {
   const [allocating, setAllocating] = useState<string | null>(null)
   const [unequipping, setUnequipping] = useState<string | null>(null)
 
@@ -213,6 +211,7 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
           currency={primaryCurrency}
           onUnequip={handleUnequip}
           unequipping={unequipping}
+          readOnly={readOnly}
         />
 
         {/* Portrait */}
@@ -247,6 +246,7 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
           currency={primaryCurrency}
           onUnequip={handleUnequip}
           unequipping={unequipping}
+          readOnly={readOnly}
         />
       </Box>
 
@@ -275,7 +275,7 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
       </Box>
 
       {/* Unspent stat points banner */}
-      {(character.statPoints ?? 0) > 0 && (
+      {!readOnly && (character.statPoints ?? 0) > 0 && (
         <Chip
           label={`${character.statPoints} unspent stat point${character.statPoints !== 1 ? 's' : ''}!`}
           size="small"
@@ -390,7 +390,7 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
                 </Typography>
               )}
               <Box sx={{ width: 32, display: 'flex', justifyContent: 'center' }}>
-                {canAllocate && (
+                {!readOnly && canAllocate && (
                   <Tooltip title={`Spend 1 point on ${info.label}`} arrow>
                     <span>
                       <IconButton

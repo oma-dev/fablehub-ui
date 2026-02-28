@@ -618,7 +618,15 @@ export default function FableIdleRPG() {
                 onCharacterUpdate={handleCharacterUpdate}
               />
             )}
-            {activeTab === 'guild' && <GuildTab />}
+            {activeTab === 'guild' && pack && (
+              <GuildTab
+                fableId={fableId}
+                realmId={realm.id}
+                character={displayCharacter}
+                pack={pack}
+                onCharacterUpdate={handleCharacterUpdate}
+              />
+            )}
             {activeTab === 'pvp' && <PvPTab />}
           </Box>
         )}
