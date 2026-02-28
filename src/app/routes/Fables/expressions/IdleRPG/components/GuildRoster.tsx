@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
-import Dialog from '@mui/material/Dialog'
-import DialogContent from '@mui/material/DialogContent'
 import Paper from '@mui/material/Paper'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -12,7 +10,7 @@ import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
 import { getGuildMemberPlayState } from '../../../../../../services/api'
 import type { CharacterState, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '../../../../../../services/api'
-import CharacterPanel from './CharacterPanel'
+import CharacterCardModal from './CharacterCardModal'
 
 const RANK_NAMES: Record<number, string> = {
   1: 'Member',
@@ -26,9 +24,11 @@ interface Props {
   group: IdleRpgGroup
   pack: IdleRpgPackV1
   viewerCharacter: CharacterState
+  /** When Fight is clicked, redirect to PvP tab and start fight there. */
+  onRequestPvpFight?: (targetCharacterId: string, targetProfile: PlayStateResponse) => void
 }
 
-export default function GuildRoster({ fableId, realmId, group, pack, viewerCharacter }: Props) {
+export default function GuildRoster({ fableId, realmId, group, pack, viewerCharacter, onRequestPvpFight }: Props) {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [profile, setProfile] = useState<PlayStateResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -66,6 +66,14 @@ export default function GuildRoster({ fableId, realmId, group, pack, viewerChara
   const handleClose = () => {
     setSelectedMemberId(null)
   }
+
+  const handleFight = () => {
+    if (!selectedMemberId || !profile) return
+    onRequestPvpFight?.(selectedMemberId, profile)
+    setSelectedMemberId(null)
+  }
+
+  const canFight = !!selectedMemberId && selectedMemberId !== viewerCharacter.id && !!profile && !!onRequestPvpFight
 
   return (
     <>
@@ -116,26 +124,17 @@ export default function GuildRoster({ fableId, realmId, group, pack, viewerChara
         </TableContainer>
       </Paper>
 
-      <Dialog open={!!selectedMemberId} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogContent sx={{ pt: 3 }}>
-          {loading && (
-            <Typography color="text.secondary">Loading...</Typography>
-          )}
-          {error && (
-            <Typography color="error">{error}</Typography>
-          )}
-          {profile && !loading && (
-            <CharacterPanel
-              fableId={fableId}
-              realmId={realmId}
-              character={profile.character}
-              pack={profile.pack}
-              onCharacterUpdate={() => {}}
-              readOnly
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <CharacterCardModal
+        open={!!selectedMemberId}
+        onClose={handleClose}
+        profile={profile}
+        loading={loading}
+        error={error}
+        fableId={fableId}
+        realmId={realmId}
+        showFightButton={canFight}
+        onFight={handleFight}
+      />
     </>
   )
 }

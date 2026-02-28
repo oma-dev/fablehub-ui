@@ -38,6 +38,7 @@ import type {
   CharacterState,
   IdleRpgPackV1,
   IdleRpgRealm,
+  PlayStateResponse,
 } from '../../../../../services/api'
 import { RARITY_COLORS as RARITY_COLORS_MAP, RARITY_NAMES } from '../../../../../services/api'
 import TavernTab from './tabs/TavernTab'
@@ -368,6 +369,10 @@ export default function FableIdleRPG() {
   const [character, setCharacter] = useState<CharacterState | null>(null)
   const [playState, setPlayState] = useState<{ character: CharacterState; pack: IdleRpgPackV1 } | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('tavern')
+  const [pendingPvpFight, setPendingPvpFight] = useState<{
+    targetCharacterId: string
+    targetProfile: PlayStateResponse
+  } | null>(null)
 
   // Character creation
   const [showCreateChar, setShowCreateChar] = useState(false)
@@ -446,6 +451,13 @@ export default function FableIdleRPG() {
     setCharacter(c)
     setPlayState((prev) => (prev ? { ...prev, character: c } : null))
   }
+
+  const handleRequestPvpFight = (targetCharacterId: string, targetProfile: PlayStateResponse) => {
+    setPendingPvpFight({ targetCharacterId, targetProfile })
+    setActiveTab('pvp')
+  }
+
+  const handleClearPendingPvpFight = () => setPendingPvpFight(null)
 
   if (!fableId) {
     return (
@@ -625,9 +637,19 @@ export default function FableIdleRPG() {
                 character={displayCharacter}
                 pack={pack}
                 onCharacterUpdate={handleCharacterUpdate}
+                onRequestPvpFight={handleRequestPvpFight}
               />
             )}
-            {activeTab === 'pvp' && <PvPTab />}
+            {activeTab === 'pvp' && displayCharacter && realm && pack && (
+              <PvPTab
+                fableId={fableId}
+                realmId={realm.id}
+                character={displayCharacter}
+                pack={pack}
+                pendingPvpFight={pendingPvpFight}
+                onClearPendingPvpFight={handleClearPendingPvpFight}
+              />
+            )}
           </Box>
         )}
       </Box>

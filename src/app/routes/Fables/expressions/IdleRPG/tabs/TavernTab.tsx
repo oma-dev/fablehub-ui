@@ -14,6 +14,7 @@ import ListItemText from '@mui/material/ListItemText'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import CombatReplay from '../components/CombatReplay'
+import { computePlayerCombatStats } from '../utils/combatStats'
 import { startQuest, claimQuest } from '../../../../../../services/api'
 import type { CharacterState, CombatResult, IdleRpgPackV1, Quest } from '../../../../../../services/api'
 
@@ -26,30 +27,6 @@ interface Props {
 }
 
 type Phase = 'idle' | 'questPicker' | 'questActive' | 'combat' | 'result'
-
-/** Compute player combat stats (max HP, AP, ARM) from character + pack, same as CharacterPanel/Play. */
-function computePlayerCombatStats(character: CharacterState, pack: IdleRpgPackV1): { maxHp: number; ap: number; arm: number } {
-  const cls = pack.classes.find((c) => c.id === character.classId)
-  const mainStat = (cls?.scaling?.damageMainStat ?? 'STR') as keyof Record<string, number>
-  const base: Record<string, number> = {}
-  if (cls?.starting?.stats) {
-    for (const [k, v] of Object.entries(cls.starting.stats)) base[k] = (base[k] ?? 0) + (v ?? 0)
-  }
-  const itemMap = new Map(pack.items.map((it) => [it.id, it]))
-  for (const itemId of Object.values(character.equipment)) {
-    if (!itemId) continue
-    const item = itemMap.get(itemId)
-    if (!item?.stats) continue
-    for (const [k, v] of Object.entries(item.stats)) base[k] = (base[k] ?? 0) + (v ?? 0)
-  }
-  for (const [k, v] of Object.entries(character.allocatedStats ?? {})) {
-    base[k] = (base[k] ?? 0) + (v ?? 0)
-  }
-  const maxHp = 50 + character.level * 10 + (base.HP ?? 0)
-  const ap = Math.max(1, character.level * 2 + (base[mainStat] ?? 0))
-  const arm = Math.max(0, base.ARM ?? 0)
-  return { maxHp, ap, arm }
-}
 
 function pickRandom<T>(arr: T[], n: number): T[] {
   const copy = [...arr]
@@ -333,6 +310,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
           <Box sx={{ flex: 1 }}>
             <CombatReplay
               combat={combatData.combat}
+              leftCharacterId={character.id}
               player={{
                 name: character.name,
                 level: character.level,

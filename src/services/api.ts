@@ -310,6 +310,31 @@ export function getMyCharacters(fableId: string, realmId: string) {
   return get<CharacterState[]>(charBase(fableId, realmId))
 }
 
+export function getRealmRoster(fableId: string, realmId: string) {
+  return get<RealmRosterEntry[]>(`${charBase(fableId, realmId)}/realm-roster`)
+}
+
+export interface RealmRosterEntry {
+  id: string
+  name: string
+  classId: string
+  level: number
+  portraitUrl?: string | null
+  userId?: string | null
+  groupId?: string | null
+}
+
+export function getRealmCharacterPlayState(
+  fableId: string,
+  realmId: string,
+  viewerCharacterId: string,
+  targetCharacterId: string,
+) {
+  return get<PlayStateResponse>(
+    `${charBase(fableId, realmId)}/${targetCharacterId}/realm-profile?viewerCharacterId=${encodeURIComponent(viewerCharacterId)}`,
+  )
+}
+
 export function createCharacter(fableId: string, realmId: string, body: { name: string; classId: string; portraitUrl?: string }) {
   return post<CharacterState>(charBase(fableId, realmId), { body })
 }
@@ -353,6 +378,12 @@ export function equipItem(fableId: string, realmId: string, characterId: string,
 
 export function allocateStat(fableId: string, realmId: string, characterId: string, stat: string, amount = 1) {
   return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/stats/allocate`, { body: { stat, amount } })
+}
+
+export function pvpFight(fableId: string, realmId: string, characterId: string, targetCharacterId: string) {
+  return post<CombatResult>(`${charBase(fableId, realmId)}/${characterId}/pvp/fight`, {
+    body: { targetCharacterId },
+  })
 }
 
 // --- Idle RPG Groups (guilds) ---

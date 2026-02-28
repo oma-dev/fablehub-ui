@@ -9,7 +9,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
 import { getGroups, getGroup, createGroup, joinGroup, getPlayState } from '../../../../../../services/api'
-import type { CharacterState, IdleRpgGroup, IdleRpgPackV1 } from '../../../../../../services/api'
+import type { CharacterState, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '../../../../../../services/api'
 import GuildChat from '../components/GuildChat'
 import GuildRoster from '../components/GuildRoster'
 import GuildManagement from '../components/GuildManagement'
@@ -22,9 +22,10 @@ interface Props {
   character: CharacterState
   pack: IdleRpgPackV1
   onCharacterUpdate: (c: CharacterState) => void
+  onRequestPvpFight?: (targetCharacterId: string, targetProfile: PlayStateResponse) => void
 }
 
-export default function GuildTab({ fableId, realmId, character, pack, onCharacterUpdate }: Props) {
+export default function GuildTab({ fableId, realmId, character, pack, onCharacterUpdate, onRequestPvpFight }: Props) {
   const [groups, setGroups] = useState<IdleRpgGroup[]>([])
   const [group, setGroup] = useState<IdleRpgGroup | null>(null)
   const [loading, setLoading] = useState(true)
@@ -133,6 +134,7 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
                   group={group}
                   pack={pack}
                   viewerCharacter={character}
+                  onRequestPvpFight={onRequestPvpFight}
                 />
               </Box>
               <GuildManagement group={group} />

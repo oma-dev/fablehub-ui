@@ -29,6 +29,8 @@ interface Props {
   creature: CombatantInfo
   victory: boolean
   onFinish: () => void
+  /** When provided (e.g. PvP), use this as the left-side combatant ID. Otherwise derived from first event. */
+  leftCharacterId?: string
 }
 
 const STAT_LABELS: { key: keyof Pick<CombatantInfo, 'ap' | 'arm'>; label: string }[] = [
@@ -154,7 +156,7 @@ function getMotionVariants(anim: AttackAnimation, direction: 'left' | 'right') {
   }
 }
 
-export default function CombatReplay({ combat, player, creature, victory, onFinish }: Props) {
+export default function CombatReplay({ combat, player, creature, victory, onFinish, leftCharacterId }: Props) {
   const [playerHp, setPlayerHp] = useState(player.maxHp)
   const [creatureHp, setCreatureHp] = useState(creature.maxHp)
   const [done, setDone] = useState(false)
@@ -164,7 +166,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const playerPortraitRef = useRef<HTMLDivElement>(null)
   const creaturePortraitRef = useRef<HTMLDivElement>(null)
 
-  const playerId = combat.turns[0]?.events[0]?.sourceId ?? 'player'
+  const playerId = leftCharacterId ?? combat.turns[0]?.events[0]?.sourceId ?? 'player'
 
   const [playerVariant, setPlayerVariant] = useState<string>('idle')
   const [creatureVariant, setCreatureVariant] = useState<string>('idle')
