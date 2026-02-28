@@ -214,7 +214,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
               maxHp: playerStats.maxHp,
               ap: playerStats.ap,
               arm: playerStats.arm,
-              portraitUrl: character.portraitUrl,
+              portraitUrl: character.portraitUrl ?? cls?.iconUrl,
               styleId: cls?.primaryAttack?.styleId,
               weaponUrl: weaponDef?.iconUrl,
             }}
@@ -224,7 +224,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
               maxHp: targetStats.maxHp,
               ap: targetStats.ap,
               arm: targetStats.arm,
-              portraitUrl: combatResult.targetProfile.character.portraitUrl,
+              portraitUrl: combatResult.targetProfile.character.portraitUrl ?? pack.classes.find((c) => c.id === combatResult.targetProfile.character.classId)?.iconUrl,
               styleId: pack.classes.find((c) => c.id === combatResult.targetProfile.character.classId)?.primaryAttack?.styleId,
               weaponUrl: combatResult.targetProfile.character.equipment?.attack_source
                 ? pack.items.find(

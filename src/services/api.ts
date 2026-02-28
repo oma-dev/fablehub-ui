@@ -76,6 +76,8 @@ export interface IdleRpgPackV1 {
     maxLevel: number
     xpTable: Record<string, number>
     combatPresetId: string
+    /** Stat points awarded per level gained. Defaults to 3. */
+    statPointsPerLevel?: number
   }
   economy: {
     currencies: { id: string; name: string; iconUrl?: string }[]
@@ -437,6 +439,16 @@ export function getGroups(fableId: string, realmId: string) {
 
 export function getGroup(fableId: string, realmId: string, groupId: string) {
   return get<IdleRpgGroup>(`${groupsBase(fableId, realmId)}/${groupId}`)
+}
+
+export interface GuildChampion {
+  characterId: string
+  name: string
+  wins: number
+}
+
+export function getGuildChampion(fableId: string, realmId: string, groupId: string) {
+  return get<GuildChampion | null>(`${groupsBase(fableId, realmId)}/${groupId}/champion`)
 }
 
 export function createGroup(

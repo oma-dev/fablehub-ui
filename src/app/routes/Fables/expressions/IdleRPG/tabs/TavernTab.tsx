@@ -317,7 +317,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                 maxHp: playerStats.maxHp,
                 ap: playerStats.ap,
                 arm: playerStats.arm,
-                portraitUrl: character.portraitUrl,
+                portraitUrl: character.portraitUrl ?? cls?.iconUrl,
                 styleId: cls?.primaryAttack?.styleId,
                 weaponUrl: weaponDef?.iconUrl,
               }}

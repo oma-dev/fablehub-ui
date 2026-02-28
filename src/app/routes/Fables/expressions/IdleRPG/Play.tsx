@@ -122,10 +122,10 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
             flexShrink: 0,
           }}
         >
-          {character.portraitUrl ? (
+          {(character.portraitUrl ?? cls?.iconUrl) ? (
             <Box
               component="img"
-              src={character.portraitUrl}
+              src={character.portraitUrl ?? cls?.iconUrl}
               alt={character.name}
               sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />

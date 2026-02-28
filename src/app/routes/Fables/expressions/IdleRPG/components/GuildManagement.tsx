@@ -1,18 +1,20 @@
 import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
-import type { IdleRpgGroup } from '../../../../../../services/api'
+import type { GuildChampion, IdleRpgGroup } from '../../../../../../services/api'
 
 interface Props {
   group: IdleRpgGroup
+  champion?: GuildChampion | null
 }
 
-export default function GuildManagement({ group }: Props) {
+export default function GuildManagement({ group, champion }: Props) {
   const displayName = `${group.name} ${group.label}`
   const memberCount = group.members?.length ?? 0
   const leader = group.leaderId
     ? group.members?.find((m) => m.id === group.leaderId)
     : null
+  const championDisplay = champion ? `${champion.name} — ${champion.wins} wins` : '—'
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -26,6 +28,12 @@ export default function GuildManagement({ group }: Props) {
         <InfoRow label="Created" value={group.createdAt ? new Date(group.createdAt).toLocaleDateString() : '—'} />
         <InfoRow label="Description" value="—" />
         <InfoRow label="Donations" value="—" />
+      </Box>
+      <Typography variant="subtitle1" fontWeight={600} sx={{ mt: 2, mb: 1.5 }}>
+        Guild Champion
+      </Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <InfoRow label="Champion" value={championDisplay} />
       </Box>
     </Paper>
   )

@@ -69,6 +69,7 @@ export interface ExampleFormState {
   playerCap: number
   maxLevel: number
   combatPresetId: string
+  statPointsPerLevel: number
   xpEntries: ExampleXpEntry[]
   currencies: { id: string; name: string; iconUrl?: string }[]
   abilities: ExampleAbilityForm[]
@@ -276,6 +277,7 @@ export const exampleFormState: ExampleFormState = {
   playerCap: 10,
   maxLevel: 10,
   combatPresetId: 'combat_v1_simple',
+  statPointsPerLevel: 3,
   xpEntries: [
     { level: '2', xp: '100' },
     { level: '3', xp: '250' },

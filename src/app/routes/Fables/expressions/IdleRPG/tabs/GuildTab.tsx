@@ -8,8 +8,8 @@ import DialogTitle from '@mui/material/DialogTitle'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
-import { getGroups, getGroup, createGroup, joinGroup, getPlayState } from '../../../../../../services/api'
-import type { CharacterState, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '../../../../../../services/api'
+import { getGroups, getGroup, getGuildChampion, createGroup, joinGroup, getPlayState } from '../../../../../../services/api'
+import type { CharacterState, GuildChampion, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '../../../../../../services/api'
 import GuildChat from '../components/GuildChat'
 import GuildRoster from '../components/GuildRoster'
 import GuildManagement from '../components/GuildManagement'
@@ -36,6 +36,7 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
   const [createName, setCreateName] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [champion, setChampion] = useState<GuildChampion | null>(null)
 
   const inGuild = !!character.groupId
 
@@ -50,6 +51,24 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
     }
     setGroup(null)
   }, [fableId, realmId, character.groupId, inGuild])
+
+  useEffect(() => {
+    if (!group?.id) {
+      setChampion(null)
+      return
+    }
+    let cancelled = false
+    getGuildChampion(fableId, realmId, group.id)
+      .then((c) => {
+        if (!cancelled) setChampion(c ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setChampion(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [fableId, realmId, group?.id])
 
   useEffect(() => {
     if (inGuild) {
@@ -137,7 +156,7 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
                   onRequestPvpFight={onRequestPvpFight}
                 />
               </Box>
-              <GuildManagement group={group} />
+              <GuildManagement group={group} champion={champion} />
             </Box>
           </>
         ) : (

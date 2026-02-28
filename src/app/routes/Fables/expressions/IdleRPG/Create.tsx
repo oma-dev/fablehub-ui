@@ -115,6 +115,7 @@ export default function IdleRpgCreate() {
   const [playerCap, setPlayerCap] = useState(10)
   // Rules
   const [maxLevel, setMaxLevel] = useState(10)
+  const [statPointsPerLevel, setStatPointsPerLevel] = useState(3)
   const [combatPresetId, setCombatPresetId] = useState('combat_v1_simple')
   const [xpEntries, setXpEntries] = useState<XpEntry[]>([{ level: '2', xp: '100' }, { level: '3', xp: '250' }])
   // Economy
@@ -140,6 +141,7 @@ export default function IdleRpgCreate() {
     setJoinCode(ex.joinCode)
     setPlayerCap(ex.playerCap)
     setMaxLevel(ex.maxLevel)
+    setStatPointsPerLevel(ex.statPointsPerLevel)
     setCombatPresetId(ex.combatPresetId)
     setXpEntries(ex.xpEntries)
     setCurrencies(ex.currencies)
@@ -292,7 +294,7 @@ export default function IdleRpgCreate() {
 
     return {
       version: 1,
-      rules: { maxLevel, xpTable, combatPresetId },
+      rules: { maxLevel, xpTable, combatPresetId, statPointsPerLevel },
       economy: { currencies: validCurrencies },
       ...(abilityList.length > 0 ? { abilities: abilityList } : {}),
       classes: classBlocks,
@@ -393,6 +395,7 @@ export default function IdleRpgCreate() {
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Rules</Typography></AccordionSummary>
             <AccordionDetails>
               <TextField label="Max level" type="number" size="small" value={maxLevel} onChange={(e) => setMaxLevel(Number(e.target.value) || 1)} sx={{ mr: 2, width: 120 }} inputProps={{ min: 1 }} />
+              <TextField label="Stat points per level" type="number" size="small" value={statPointsPerLevel} onChange={(e) => setStatPointsPerLevel(Number(e.target.value) || 0)} sx={{ mr: 2, width: 140 }} inputProps={{ min: 0 }} />
               <TextField label="Combat preset ID" size="small" value={combatPresetId} onChange={(e) => setCombatPresetId(e.target.value)} sx={{ width: 220 }} />
               <Typography variant="body2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>XP table (level → xp required)</Typography>
               {xpEntries.map((e, i) => (

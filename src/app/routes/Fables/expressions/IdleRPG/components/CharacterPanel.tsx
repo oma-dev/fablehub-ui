@@ -231,8 +231,8 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
             flexShrink: 0,
           }}
         >
-          {character.portraitUrl ? (
-            <Box component="img" src={character.portraitUrl} alt={character.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {(character.portraitUrl ?? cls?.iconUrl) ? (
+            <Box component="img" src={character.portraitUrl ?? cls?.iconUrl} alt={character.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
             <PersonIcon sx={{ fontSize: 60, color: 'rgba(168,85,247,0.3)' }} />
           )}
