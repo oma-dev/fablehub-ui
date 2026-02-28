@@ -386,6 +386,26 @@ export function pvpFight(fableId: string, realmId: string, characterId: string, 
   })
 }
 
+export interface PvpHistoryEntry {
+  id: string
+  challengerId: string
+  challengerName: string
+  challengerLevel: number
+  challengerClassId: string
+  targetId: string
+  targetName: string
+  targetLevel: number
+  targetClassId: string
+  winnerId: string | null
+  createdAt: string
+}
+
+export function getPvpHistory(fableId: string, realmId: string, characterId: string, limit = 30) {
+  return get<PvpHistoryEntry[]>(
+    `${charBase(fableId, realmId)}/${characterId}/pvp/history?limit=${limit}`,
+  )
+}
+
 // --- Idle RPG Groups (guilds) ---
 
 function groupsBase(fableId: string, realmId: string) {
@@ -436,10 +456,10 @@ export function joinGroup(fableId: string, realmId: string, groupId: string, cha
 export interface GroupMessage {
   id: string
   groupId: string
-  characterId: string
+  characterId: string | null
   content: string
   createdAt: string
-  character: { id: string; name: string }
+  character: { id: string; name: string } | null
 }
 
 export function getGroupMessages(fableId: string, realmId: string, groupId: string) {

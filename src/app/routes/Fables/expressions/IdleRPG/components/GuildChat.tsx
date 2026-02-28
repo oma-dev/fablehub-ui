@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
@@ -29,24 +29,27 @@ export default function GuildChat({ fableId, realmId, groupId, character }: Prop
   const [sending, setSending] = useState(false)
   const listEndRef = useRef<HTMLDivElement>(null)
 
+  const fetchMessages = useCallback(() => {
+    return getGroupMessages(fableId, realmId, groupId)
+      .then(setMessages)
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load messages'))
+  }, [fableId, realmId, groupId])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-    getGroupMessages(fableId, realmId, groupId)
-      .then((list) => {
-        if (!cancelled) setMessages(list)
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load messages')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [fableId, realmId, groupId])
+    fetchMessages().finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [fetchMessages])
+
+  // Poll for new messages (e.g. PvP announcements)
+  useEffect(() => {
+    const id = setInterval(fetchMessages, 5000)
+    return () => clearInterval(id)
+  }, [fetchMessages])
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -106,22 +109,24 @@ export default function GuildChat({ fableId, realmId, groupId, character }: Prop
           </Typography>
         ) : (
           ordered.map((msg) => {
-            const isOwn = msg.characterId === character.id
+            const isSystem = !msg.character
+            const isOwn = !isSystem && msg.characterId === character.id
             return (
               <Box
                 key={msg.id}
                 sx={{
-                  alignSelf: isOwn ? 'flex-end' : 'flex-start',
+                  alignSelf: isSystem ? 'center' : isOwn ? 'flex-end' : 'flex-start',
                   maxWidth: '85%',
                   px: 1.5,
                   py: 0.75,
                   borderRadius: 1.5,
-                  bgcolor: isOwn ? 'primary.main' : 'action.hover',
-                  color: isOwn ? 'primary.contrastText' : 'text.primary',
+                  bgcolor: isSystem ? 'rgba(168,85,247,0.12)' : isOwn ? 'primary.main' : 'action.hover',
+                  color: isSystem ? 'text.secondary' : isOwn ? 'primary.contrastText' : 'text.primary',
+                  border: isSystem ? '1px solid rgba(168,85,247,0.2)' : undefined,
                 }}
               >
                 <Typography variant="caption" sx={{ opacity: 0.9, display: 'block' }}>
-                  {msg.character.name}
+                  {msg.character?.name ?? 'Arena'}
                   <Box component="span" sx={{ ml: 1, opacity: 0.7 }}>
                     {formatTime(msg.createdAt)}
                   </Box>

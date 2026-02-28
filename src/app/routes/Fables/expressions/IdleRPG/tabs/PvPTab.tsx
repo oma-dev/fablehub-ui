@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
+import Chip from '@mui/material/Chip'
 import Paper from '@mui/material/Paper'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -12,6 +13,7 @@ import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi'
 import {
   getRealmRoster,
   getRealmCharacterPlayState,
+  getPvpHistory,
   pvpFight,
 } from '../../../../../../services/api'
 import type {
@@ -19,6 +21,7 @@ import type {
   CombatResult,
   IdleRpgPackV1,
   PlayStateResponse,
+  PvpHistoryEntry,
   RealmRosterEntry,
 } from '../../../../../../services/api'
 import { computePlayerCombatStats } from '../utils/combatStats'
@@ -40,6 +43,8 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
   const [roster, setRoster] = useState<RealmRosterEntry[]>([])
   const [rosterLoading, setRosterLoading] = useState(true)
   const [rosterError, setRosterError] = useState<string | null>(null)
+  const [history, setHistory] = useState<PvpHistoryEntry[]>([])
+  const [historyLoading, setHistoryLoading] = useState(true)
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null)
   const [profile, setProfile] = useState<PlayStateResponse | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
@@ -73,6 +78,19 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
   }, [fableId, realmId])
 
   useEffect(() => {
+    let cancelled = false
+    getPvpHistory(fableId, realmId, character.id)
+      .then((list) => {
+        if (!cancelled) setHistory(list)
+      })
+      .catch(() => { /* ignore */ })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [fableId, realmId, character.id])
+
+  useEffect(() => {
     if (!selectedCharacterId) {
       setProfile(null)
       setProfileError(null)
@@ -99,21 +117,20 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
   // Consume pending fight from parent (e.g. Guild Fight button)
   useEffect(() => {
     if (!pendingPvpFight || fighting || combatResult) return
+    const { targetCharacterId, targetProfile } = pendingPvpFight
+    onClearPendingPvpFight?.() // Clear immediately to prevent double-invocation (e.g. StrictMode)
     let cancelled = false
     setFighting(true)
-    pvpFight(fableId, realmId, character.id, pendingPvpFight.targetCharacterId)
+    pvpFight(fableId, realmId, character.id, targetCharacterId)
       .then((combat) => {
         if (!cancelled) {
           const victory = combat.winnerId === character.id
-          setCombatResult({ combat, victory, targetProfile: pendingPvpFight.targetProfile })
+          setCombatResult({ combat, victory, targetProfile })
         }
       })
       .catch(() => { /* parent may show error */ })
       .finally(() => {
-        if (!cancelled) {
-          setFighting(false)
-          onClearPendingPvpFight?.()
-        }
+        if (!cancelled) setFighting(false)
       })
     return () => { cancelled = true }
   }, [pendingPvpFight, fableId, realmId, character.id, onClearPendingPvpFight])
@@ -140,11 +157,27 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
   const handleCombatFinish = () => {
     setCombatResult(null)
     onClearPendingPvpFight?.()
+    // Refresh history
+    getPvpHistory(fableId, realmId, character.id).then(setHistory)
   }
 
   const inCombat = !!combatResult
 
   const getClassName = (classId: string) => pack.classes.find((c) => c.id === classId)?.name ?? classId
+
+  const formatHistoryDate = (iso: string) => {
+    const d = new Date(iso)
+    const now = new Date()
+    if (d.toDateString() === now.toDateString()) {
+      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+    }
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  }
+
+  const getHistoryOpponent = (entry: PvpHistoryEntry) =>
+    entry.challengerId === character.id ? entry.targetName : entry.challengerName
+  const getHistoryVictory = (entry: PvpHistoryEntry) =>
+    entry.winnerId === character.id
 
   const playerStats = computePlayerCombatStats(character, pack)
   const targetStats = combatResult
@@ -257,6 +290,67 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
               </TableContainer>
             </Paper>
           )}
+
+          <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+            <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+              <Typography variant="subtitle1" fontWeight={600}>
+                Fight History
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Your recent PvP duels.
+              </Typography>
+            </Box>
+            <TableContainer>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Opponent</TableCell>
+                    <TableCell align="center">Result</TableCell>
+                    <TableCell align="right">When</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {historyLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary', py: 3 }}>
+                        Loading…
+                      </TableCell>
+                    </TableRow>
+                  ) : history.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary', py: 3 }}>
+                        No fights yet. Challenge someone above!
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    history.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>{getHistoryOpponent(entry)}</TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={entry.winnerId ? (getHistoryVictory(entry) ? 'Victory' : 'Defeat') : 'Draw'}
+                            size="small"
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: 11,
+                              ...(entry.winnerId
+                                ? getHistoryVictory(entry)
+                                  ? { bgcolor: 'rgba(34,197,94,0.2)', color: '#22c55e' }
+                                  : { bgcolor: 'rgba(239,68,68,0.2)', color: '#ef4444' }
+                                : { bgcolor: 'rgba(156,163,175,0.2)', color: '#9ca3af' }),
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="right" sx={{ color: 'text.secondary', fontSize: 13 }}>
+                          {formatHistoryDate(entry.createdAt)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
 
           <CharacterCardModal
             open={!!selectedCharacterId}
