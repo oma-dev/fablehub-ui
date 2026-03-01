@@ -13,6 +13,7 @@ import type { CharacterState, GuildChampion, IdleRpgGroup, IdleRpgPackV1, PlaySt
 import GuildChat from '../components/GuildChat'
 import GuildRoster from '../components/GuildRoster'
 import GuildManagement from '../components/GuildManagement'
+import GuildRaids from '../components/GuildRaids'
 
 const GUILD_LABEL = 'Guild'
 
@@ -156,7 +157,29 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
                   onRequestPvpFight={onRequestPvpFight}
                 />
               </Box>
-              <GuildManagement group={group} champion={champion} />
+<Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <GuildManagement
+                  group={group}
+                  champion={champion}
+                  character={character}
+                  pack={pack}
+                  fableId={fableId}
+                  realmId={realmId}
+                  onDonateSuccess={() => {
+                    getGroup(fableId, realmId, group.id).then(setGroup)
+                    getPlayState(fableId, realmId, character.id).then((ps) => onCharacterUpdate(ps.character))
+                  }}
+                />
+                <GuildRaids
+                  fableId={fableId}
+                  realmId={realmId}
+                  groupId={group.id}
+                  group={group}
+                  character={character}
+                  pack={pack}
+                  onUpdate={() => getGroup(fableId, realmId, group.id).then(setGroup)}
+                />
+              </Box>
             </Box>
           </>
         ) : (

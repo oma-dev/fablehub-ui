@@ -22,6 +22,7 @@ import StorefrontIcon from '@mui/icons-material/Storefront'
 import GroupsIcon from '@mui/icons-material/Groups'
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi'
 import CastleIcon from '@mui/icons-material/Castle'
+import MilitaryTechIcon from '@mui/icons-material/MilitaryTech'
 import PersonIcon from '@mui/icons-material/Person'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import BoltIcon from '@mui/icons-material/Bolt'
@@ -47,6 +48,7 @@ import ShopTab from './tabs/ShopTab'
 import GuildTab from './tabs/GuildTab'
 import PvPTab from './tabs/PvPTab'
 import DungeonsTab from './tabs/DungeonsTab'
+import RaidsTab from './tabs/RaidsTab'
 
 /* ------------------------------------------------------------------ */
 /*  Sidebar Character Card                                            */
@@ -354,13 +356,14 @@ function EquipRow({ label, item, emptyText }: { label: string; item?: { name: st
 
 /* ------------------------------------------------------------------ */
 
-type Tab = 'tavern' | 'shop' | 'guild' | 'dungeons' | 'pvp'
+type Tab = 'tavern' | 'shop' | 'guild' | 'dungeons' | 'raids' | 'pvp'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'tavern', label: 'Tavern', icon: <LocalBarIcon /> },
   { id: 'shop', label: 'Shop', icon: <StorefrontIcon /> },
   { id: 'guild', label: 'Guild', icon: <GroupsIcon /> },
   { id: 'dungeons', label: 'Dungeons', icon: <CastleIcon /> },
+  { id: 'raids', label: 'Raids', icon: <MilitaryTechIcon /> },
   { id: 'pvp', label: 'PvP', icon: <SportsKabaddiIcon /> },
 ]
 
@@ -586,11 +589,15 @@ export default function FableIdleRPG() {
         {displayCharacter && pack && <SidebarCharacterCard character={displayCharacter} pack={pack} />}
 
         <List sx={{ flex: 1, pt: 2, px: 1 }}>
-          {TABS.map((tab) => (
+          {TABS.map((tab) => {
+            const isRaidsNoGuild = tab.id === 'raids' && !displayCharacter?.groupId
+            return (
+            <Tooltip key={tab.id} title={isRaidsNoGuild ? 'A guild is required' : ''}>
+              <span>
             <ListItemButton
-              key={tab.id}
               selected={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => !isRaidsNoGuild && setActiveTab(tab.id)}
+              disabled={isRaidsNoGuild}
               sx={{ mb: 0.5, py: 1.5 }}
             >
               <ListItemIcon sx={{ minWidth: 42, color: activeTab === tab.id ? 'primary.main' : 'text.secondary' }}>
@@ -601,7 +608,9 @@ export default function FableIdleRPG() {
                 primaryTypographyProps={{ fontWeight: activeTab === tab.id ? 700 : 500, fontSize: '1rem' }}
               />
             </ListItemButton>
-          ))}
+              </span>
+            </Tooltip>
+          )})}
         </List>
 
         <Box sx={{ p: 1.5, borderTop: '1px solid rgba(168,85,247,0.1)' }}>
@@ -649,6 +658,16 @@ export default function FableIdleRPG() {
                 realmId={realm.id}
                 character={displayCharacter}
                 pack={pack}
+                onCharacterUpdate={handleCharacterUpdate}
+              />
+            )}
+            {activeTab === 'raids' && displayCharacter && realm && pack && displayCharacter.groupId && (
+              <RaidsTab
+                fableId={fableId}
+                realmId={realm.id}
+                character={displayCharacter}
+                pack={pack}
+                groupId={displayCharacter.groupId}
                 onCharacterUpdate={handleCharacterUpdate}
               />
             )}

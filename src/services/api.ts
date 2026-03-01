@@ -149,6 +149,7 @@ export interface IdleRpgPackV1 {
   items: ItemTemplate[]
   quests: Quest[]
   dungeons?: Dungeon[]
+  raids?: Raid[]
   merchant: { listings: MerchantListing[] }
   lootTables: LootTable[]
 }
@@ -241,6 +242,11 @@ export interface Dungeon {
   bossCreatureId: string
 }
 
+/** Raid: dungeon-like guild encounter; cost paid from guild stock. */
+export interface Raid extends Dungeon {
+  requiredCurrencyCost: { currencyId: string; amount: number }
+}
+
 /** Dungeon with resolved boss and per-character completion/cooldown (from getDungeons). */
 export interface DungeonWithBoss {
   id: string
@@ -252,6 +258,32 @@ export interface DungeonWithBoss {
   boss: CreatureTemplate | null
   completed: boolean
   cooldownUntil?: number
+}
+
+/** Raid with resolved boss and guild stock/canAfford (from getRaids). */
+export interface RaidWithBoss {
+  id: string
+  name: string
+  description?: string
+  imageUrl?: string
+  requiredLevel: number
+  bossCreatureId: string
+  requiredCurrencyCost: { currencyId: string; amount: number }
+  boss: CreatureTemplate | null
+  guildStock: number
+  canAfford: boolean
+}
+
+/** Pending raid replay payload (unviewed last raid result for this character). */
+export interface RaidReplayPayload {
+  combat: CombatResult
+  raidId: string
+  raidName: string
+  bossCreatureId: string
+  partyOrder: string[]
+  victory: boolean
+  partyMaxHp?: Record<string, number>
+  bossMaxHp?: number
 }
 
 export interface MerchantListing {
@@ -461,6 +493,12 @@ export function fightDungeonBoss(fableId: string, realmId: string, characterId: 
   )
 }
 
+export function getRaids(fableId: string, realmId: string, characterId: string) {
+  return get<{ raids: RaidWithBoss[]; pendingReplay?: RaidReplayPayload }>(
+    `${charBase(fableId, realmId)}/${characterId}/raids`,
+  )
+}
+
 export function getGuildMemberPlayState(
   fableId: string,
   realmId: string,
@@ -529,6 +567,8 @@ export interface IdleRpgGroupMember {
   name: string
   level: number
   classId: string
+  /** Character portrait; use class icon as fallback when not set. */
+  portraitUrl?: string | null
 }
 
 export interface IdleRpgGroup {
@@ -539,6 +579,11 @@ export interface IdleRpgGroup {
   memberIds: string[]
   leaderId?: string | null
   memberRanks?: Record<string, number>
+  stockBalances?: Record<string, number>
+  memberDonations?: Record<string, Record<string, number>>
+  currentRaidCall?: { raidId: string; preparedAt: number; readyCharacterIds: string[] } | null
+  /** Last raid combat result (for replay history). Present when the guild has completed at least one raid. */
+  lastRaidCombatResult?: RaidReplayPayload | null
   createdAt: string
   members: IdleRpgGroupMember[]
 }
@@ -597,6 +642,69 @@ export function sendGroupMessage(
   return post<GroupMessage>(`${groupsBase(fableId, realmId)}/${groupId}/messages`, { body })
 }
 
+export function donateToGuild(
+  fableId: string,
+  realmId: string,
+  groupId: string,
+  body: { characterId: string; currencyId: string; amount: number },
+) {
+  return post<IdleRpgGroup>(`${groupsBase(fableId, realmId)}/${groupId}/donate`, { body })
+}
+
+export interface RaidCallResponse {
+  raidId: string
+  preparedAt: number
+  readyCharacterIds: string[]
+  raid: Raid | null
+  boss: CreatureTemplate | null
+}
+
+export function getRaidCall(fableId: string, realmId: string, groupId: string) {
+  return get<RaidCallResponse | null>(`${groupsBase(fableId, realmId)}/${groupId}/raid-call`)
+}
+
+export function prepareRaidCall(
+  fableId: string,
+  realmId: string,
+  groupId: string,
+  body: { raidId: string; characterId: string },
+) {
+  return post<RaidCallResponse>(`${groupsBase(fableId, realmId)}/${groupId}/raid-call/prepare`, { body })
+}
+
+export function setRaidReady(
+  fableId: string,
+  realmId: string,
+  groupId: string,
+  body: { characterId: string },
+) {
+  return post<RaidCallResponse>(`${groupsBase(fableId, realmId)}/${groupId}/raid-call/ready`, { body })
+}
+
+export interface StartRaidResult {
+  combat: CombatResult
+  victory: boolean
+  partyOrder: string[]
+}
+
+export function startRaid(
+  fableId: string,
+  realmId: string,
+  groupId: string,
+  body: { characterId: string },
+) {
+  return post<StartRaidResult>(`${groupsBase(fableId, realmId)}/${groupId}/raid-call/start`, { body })
+}
+
+export function markRaidReplayViewed(
+  fableId: string,
+  realmId: string,
+  groupId: string,
+  body: { characterId: string },
+) {
+  return post<{ ok: boolean }>(`${groupsBase(fableId, realmId)}/${groupId}/raid-call/mark-viewed`, { body })
+}
+
 // --- Grouped exports ---
 
 export const api = {
@@ -621,5 +729,12 @@ export const api = {
     joinGroup,
     getGroupMessages,
     sendGroupMessage,
+    donateToGuild,
+    getRaidCall,
+    prepareRaidCall,
+    setRaidReady,
+    startRaid,
+    markRaidReplayViewed,
   },
+  getRaids,
 }

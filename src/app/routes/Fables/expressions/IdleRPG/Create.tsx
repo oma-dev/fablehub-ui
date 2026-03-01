@@ -34,6 +34,7 @@ import type {
   LootTable,
   MerchantListing,
   Quest,
+  Raid,
 } from '../../../../../services/api'
 import { RARITY_NAME_TO_NUMBER } from '../../../../../services/api'
 import { exampleFormState } from './examplePack'
@@ -92,6 +93,7 @@ type CreatureForm = { id: string; name: string; role: 'quest' | 'boss'; level: s
 type ItemForm = { id: string; name: string; rarity: string; slot: string; tags: string; stats: string; iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string }
 type QuestForm = { id: string; name: string; creatureId: string; durationSec: string; iconUrl: string; rewardXp: string; rewardCurrency: string; lootTableId: string }
 type DungeonForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string }
+type RaidForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string; currencyId: string; costAmount: string }
 type LootEntryForm = { itemId: string; weight: string; classId: string }
 
 const emptyXp = (): XpEntry => ({ level: '', xp: '' })
@@ -107,6 +109,7 @@ const emptyCreature = (): CreatureForm => ({ id: '', name: '', role: 'quest', le
 const emptyItem = (): ItemForm => ({ id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '', iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '' })
 const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', durationSec: '60', iconUrl: '', rewardXp: '10', rewardCurrency: '', lootTableId: '' })
 const emptyDungeon = (): DungeonForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '' })
+const emptyRaid = (): RaidForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '', currencyId: '', costAmount: '0' })
 const emptyLootEntry = (): LootEntryForm => ({ itemId: '', weight: '1', classId: '' })
 
 export default function IdleRpgCreate() {
@@ -132,6 +135,7 @@ export default function IdleRpgCreate() {
   const [items, setItems] = useState<ItemForm[]>([])
   const [quests, setQuests] = useState<QuestForm[]>([])
   const [dungeons, setDungeons] = useState<DungeonForm[]>([])
+  const [raids, setRaids] = useState<RaidForm[]>([])
   const [listings, setListings] = useState<MerchantListing[]>([])
   const [lootTables, setLootTables] = useState<{ id: string; entries: LootEntryForm[] }[]>([])
 
@@ -161,6 +165,16 @@ export default function IdleRpgCreate() {
       imageUrl: d.imageUrl ?? '',
       requiredLevel: String(d.requiredLevel),
       bossCreatureId: d.bossCreatureId,
+    })))
+    setRaids((ex.raids ?? []).map((r) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description ?? '',
+      imageUrl: r.imageUrl ?? '',
+      requiredLevel: String(r.requiredLevel),
+      bossCreatureId: r.bossCreatureId,
+      currencyId: r.requiredCurrencyCost?.currencyId ?? '',
+      costAmount: String(r.requiredCurrencyCost?.amount ?? 0),
     })))
     setListings(ex.listings)
     setLootTables(ex.lootTables)
@@ -299,6 +313,18 @@ export default function IdleRpgCreate() {
         bossCreatureId: d.bossCreatureId.trim(),
       }))
 
+    const raidList: Raid[] = raids
+      .filter((r) => r.id.trim() && r.name.trim() && r.bossCreatureId.trim() && r.currencyId.trim())
+      .map((r) => ({
+        id: r.id.trim(),
+        name: r.name.trim(),
+        ...(r.description.trim() ? { description: r.description.trim() } : {}),
+        ...(r.imageUrl?.trim() ? { imageUrl: r.imageUrl.trim() } : {}),
+        requiredLevel: Number(r.requiredLevel) || 1,
+        bossCreatureId: r.bossCreatureId.trim(),
+        requiredCurrencyCost: { currencyId: r.currencyId.trim(), amount: Number(r.costAmount) || 0 },
+      }))
+
     const lootTableList: LootTable[] = lootTables
       .filter((t) => t.id.trim())
       .map((t) => ({
@@ -328,6 +354,7 @@ export default function IdleRpgCreate() {
       items: itemList,
       quests: questList,
       ...(dungeonList.length > 0 ? { dungeons: dungeonList } : {}),
+      ...(raidList.length > 0 ? { raids: raidList } : {}),
       merchant: { listings },
       lootTables: lootTableList,
     }
@@ -648,6 +675,45 @@ export default function IdleRpgCreate() {
                 </Box>
               ))}
               <Button type="button" size="small" variant="outlined" onClick={() => setDungeons((p) => [...p, emptyDungeon()])}>+ Add dungeon</Button>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Raids</Typography></AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Raids are guild encounters. Cost is paid from guild stock when the leader prepares the raid. Add at least one currency in Economy first.
+              </Typography>
+              {raids.map((r, i) => (
+                <Box key={i} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
+                  <TextField size="small" label="ID" value={r.id} onChange={(e) => setRaids((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} sx={{ width: 100 }} />
+                  <TextField size="small" label="Name" value={r.name} onChange={(e) => setRaids((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 120 }} />
+                  <TextField size="small" label="Description" value={r.description} onChange={(e) => setRaids((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} placeholder="Optional" sx={{ width: 180 }} />
+                  <TextField size="small" label="Image URL" value={r.imageUrl} onChange={(e) => setRaids((p) => p.map((x, j) => j === i ? { ...x, imageUrl: e.target.value } : x))} placeholder="Raid card image" sx={{ width: 200 }} />
+                  <TextField size="small" label="Required level" type="number" value={r.requiredLevel} onChange={(e) => setRaids((p) => p.map((x, j) => j === i ? { ...x, requiredLevel: e.target.value } : x))} inputProps={{ min: 1 }} sx={{ width: 110 }} />
+                  <FormControl size="small" sx={{ minWidth: 160 }}>
+                    <InputLabel>Boss creature</InputLabel>
+                    <Select value={r.bossCreatureId} label="Boss creature" onChange={(e) => setRaids((p) => p.map((x, j) => j === i ? { ...x, bossCreatureId: e.target.value } : x))} displayEmpty>
+                      <MenuItem value="">— Select —</MenuItem>
+                      {creatures.filter((c) => c.id.trim()).map((c) => (
+                        <MenuItem key={c.id} value={c.id}>{c.name || c.id} {c.role === 'boss' ? '(boss)' : ''}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                    <InputLabel>Cost currency</InputLabel>
+                    <Select value={r.currencyId} label="Cost currency" onChange={(e) => setRaids((p) => p.map((x, j) => j === i ? { ...x, currencyId: e.target.value } : x))} displayEmpty>
+                      <MenuItem value="">— Select —</MenuItem>
+                      {currencies.filter((c) => c.id.trim()).map((c) => (
+                        <MenuItem key={c.id} value={c.id}>{c.name || c.id}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <TextField size="small" label="Cost amount" type="number" value={r.costAmount} onChange={(e) => setRaids((p) => p.map((x, j) => j === i ? { ...x, costAmount: e.target.value } : x))} inputProps={{ min: 0 }} sx={{ width: 100 }} />
+                  <IconButton size="small" color="error" onClick={() => setRaids((p) => p.filter((_, j) => j !== i))}>−</IconButton>
+                </Box>
+              ))}
+              <Button type="button" size="small" variant="outlined" onClick={() => setRaids((p) => [...p, emptyRaid()])}>+ Add raid</Button>
             </AccordionDetails>
           </Accordion>
 
