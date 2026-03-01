@@ -208,8 +208,8 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
         const targetCls = pack.classes.find((c) => c.id === combatResult!.targetProfile.character.classId)
         const targetWeaponId = combatResult!.targetProfile.character.equipment?.attack_source
         const targetWeaponDef = targetWeaponId ? pack.items.find((i) => i.id === targetWeaponId) : undefined
-        const playerAbility = pack.abilities?.find((a) => a.primaryAttack?.styleId === cls?.primaryAttack?.styleId)
-        const targetAbility = pack.abilities?.find((a) => a.primaryAttack?.styleId === targetCls?.primaryAttack?.styleId)
+        const playerAbility = pack.abilities?.find((a) => a.id === cls?.primaryAttackId && a.abilityType === 'primary')
+        const targetAbility = pack.abilities?.find((a) => a.id === targetCls?.primaryAttackId && a.abilityType === 'primary')
         const playerResolvedFrames = resolveAnimationFrames(playerAbility?.animationFrames, weaponDef?.iconUrl, weaponDef?.animationUrl, weaponDef?.projectileUrl, weaponDef?.impactUrl)
         const creatureResolvedFrames = resolveAnimationFrames(targetAbility?.animationFrames, targetWeaponDef?.iconUrl, targetWeaponDef?.animationUrl, targetWeaponDef?.projectileUrl, targetWeaponDef?.impactUrl)
         const playerResource = resolveCharacterResource(pack, character.classId)
@@ -226,7 +226,6 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
                 ap: playerStats.ap,
                 arm: playerStats.arm,
                 portraitUrl: character.portraitUrl ?? cls?.iconUrl,
-                styleId: cls?.primaryAttack?.styleId,
                 weaponUrl: weaponDef?.iconUrl,
                 animationFrames: playerResolvedFrames ?? playerAbility?.animationFrames,
                 resource: playerResource,
@@ -238,7 +237,6 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
                 ap: targetStats.ap,
                 arm: targetStats.arm,
                 portraitUrl: combatResult.targetProfile.character.portraitUrl ?? targetCls?.iconUrl,
-                styleId: targetCls?.primaryAttack?.styleId,
                 weaponUrl: targetWeaponDef?.iconUrl,
                 animationFrames: creatureResolvedFrames ?? targetAbility?.animationFrames,
                 resource: targetResource,

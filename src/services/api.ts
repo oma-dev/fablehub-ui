@@ -223,14 +223,11 @@ export interface Ability {
   effects?: Effect[]
   /** @deprecated Use effects[] instead. */
   effect?: unknown
-  delivery?: { target?: 'self' | 'ally' | 'enemy'; timing?: string; hitRule?: string }
   cooldownTurns: number
   scaling?: unknown
   cost?: { cooldownTurns?: number; resourceCost?: { resourceId: string; amount: number }; usePerFight?: number }
   requirements?: { equippedTagsAny?: string[]; forbiddenTagsAny?: string[]; minLevel?: number }
   presentation?: { name?: string; description?: string; iconUrl?: string; colorHex?: string }
-  /** When abilityType is 'primary': defines the class primary attack. */
-  primaryAttack?: { delivery: string; styleId: string }
   iconUrl?: string
   /** Optional animation frames (weapon / projectile / impact / block PNGs). */
   animationFrames?: AnimationFrames
@@ -274,7 +271,8 @@ export interface ClassBlock {
   /** When true, only one character per realm may pick this class. */
   isHeroClass?: boolean
   scaling: { damageMainStat: string; secondaryBenefits?: Record<string, string[]> }
-  primaryAttack: { delivery: string; styleId: string }
+  /** ID of the primary attack Ability from pack.abilities (abilityType 'primary'). */
+  primaryAttackId: string
   slots: Record<string, { required: boolean; allowEmpty: boolean; allowedTagsAny: string[] }>
   resourceId?: string
   passives?: string[]

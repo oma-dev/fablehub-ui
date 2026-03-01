@@ -306,7 +306,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
         const cls = pack.classes.find((c) => c.id === character.classId)
         const weaponItemId = character.equipment?.['attack_source']
         const weaponDef = weaponItemId ? pack.items.find((i) => i.id === weaponItemId) : undefined
-        const primaryAbility = pack.abilities?.find((a) => a.primaryAttack?.styleId === cls?.primaryAttack?.styleId)
+        const primaryAbility = pack.abilities?.find((a) => a.id === cls?.primaryAttackId && a.abilityType === 'primary')
         const resolvedFrames = resolveAnimationFrames(
           primaryAbility?.animationFrames,
           weaponDef?.iconUrl,
@@ -329,7 +329,6 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                 ap: playerStats.ap,
                 arm: playerStats.arm,
                 portraitUrl: character.portraitUrl ?? cls?.iconUrl,
-                styleId: cls?.primaryAttack?.styleId,
                 weaponUrl: weaponDef?.iconUrl,
                 animationFrames: resolvedFrames ?? primaryAbility?.animationFrames,
                 resource: playerResource,
@@ -341,7 +340,6 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                 ap: creatureDef?.ap ?? 1,
                 arm: creatureDef?.arm ?? 0,
                 portraitUrl: creatureDef?.iconUrl,
-                styleId: 'melee_slash',
                 resource: creatureResource,
               }}
               victory={combatData.victory}

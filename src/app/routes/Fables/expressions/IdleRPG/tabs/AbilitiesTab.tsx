@@ -59,7 +59,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
 
   const primaryAbility =
     (pack.abilities ?? []).find(
-      (a) => a.abilityType === 'primary' && a.primaryAttack?.styleId === cls?.primaryAttack.styleId,
+      (a) => a.abilityType === 'primary' && a.id === cls?.primaryAttackId,
     ) ?? (pack.abilities ?? []).find((a) => a.abilityType === 'primary')
 
   // --- slot math ---

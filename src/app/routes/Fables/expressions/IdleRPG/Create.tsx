@@ -72,20 +72,7 @@ function serializeStats(stats: Partial<Record<string, number>> | undefined): str
   if (!stats) return ''
   return Object.entries(stats).filter(([, v]) => v != null && v !== 0).map(([k, v]) => `${k}:${v}`).join(', ')
 }
-function normalizeDelivery(v: string): (typeof DELIVERIES)[number] {
-  if (v && DELIVERIES.includes(v as (typeof DELIVERIES)[number])) return v as (typeof DELIVERIES)[number]
-  if (v === 'ranged') return 'projectile_straight'
-  return 'melee'
-}
-function normalizeStyleId(v: string): (typeof STYLE_IDS)[number] {
-  if (v && STYLE_IDS.includes(v as (typeof STYLE_IDS)[number])) return v as (typeof STYLE_IDS)[number]
-  if (v === 'melee_flail') return 'melee_slash'
-  return 'melee_slash'
-}
-
 const STAT_IDS = ['STR', 'DEX', 'INT', 'LCK', 'HP', 'ARM'] as const
-const DELIVERIES = ['melee', 'projectile_straight', 'projectile_arced', 'instant'] as const
-const STYLE_IDS = ['melee_slash', 'melee_punch', 'projectile_arrow', 'projectile_bolt', 'instant_slash'] as const
 const SLOTS = ['attack_source', 'defense_layer'] as const
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
 const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate', 'reactive']
@@ -95,7 +82,7 @@ const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal'] 
 type XpEntry = { level: string; xp: string }
 type ResourceForm = { id: string; name: string; description: string; colorHex: string; isGenerative: boolean; max: string; regenPerTurn: string; gainOnHit: string }
 type AbilityForm = {
-  id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string; delivery: string; styleId: string
+  id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string
   cooldownTurns: string; resourceCostId: string; resourceCostAmount: string; unlockCost: string; minLevel: string
   effectKind: string; effectAmount: string; effectPercentage: string; effectLifestealPct: string
   animFrames: AbilityAnimFrames
@@ -129,7 +116,7 @@ type LootEntryForm = { itemId: string; weight: string; classId: string }
 const emptyXp = (): XpEntry => ({ level: '', xp: '' })
 const emptyResource = (): ResourceForm => ({ id: '', name: '', description: '', colorHex: '#3b82f6', isGenerative: false, max: '100', regenPerTurn: '5', gainOnHit: '0' })
 const emptyAbility = (): AbilityForm => ({
-  id: '', name: '', abilityType: 'regular', description: '', iconUrl: '', delivery: 'melee', styleId: 'melee_slash',
+  id: '', name: '', abilityType: 'regular', description: '', iconUrl: '',
   cooldownTurns: '0', resourceCostId: '', resourceCostAmount: '0', unlockCost: '1', minLevel: '1',
   effectKind: 'damage', effectAmount: '0', effectPercentage: '0', effectLifestealPct: '0',
   animFrames: emptyAnimFrames(),
@@ -208,8 +195,6 @@ export default function IdleRpgCreate() {
     setAbilities((pack.abilities ?? []).map((a) => ({
       id: a.id, name: a.name, abilityType: a.abilityType, description: a.description ?? '',
       iconUrl: a.iconUrl ?? '',
-      delivery: normalizeDelivery(a.primaryAttack?.delivery ?? 'melee'),
-      styleId: normalizeStyleId(a.primaryAttack?.styleId ?? 'melee_slash'),
       cooldownTurns: String((a as any).cooldownTurns ?? 0),
       resourceCostId: (a as any).cost?.resourceCost?.resourceId ?? '',
       resourceCostAmount: String((a as any).cost?.resourceCost?.amount ?? 0),
@@ -225,14 +210,11 @@ export default function IdleRpgCreate() {
       reactiveScalingCoeff: String((a as any).reactiveConfig?.scalingCoeff ?? 0),
     })))
     setClasses(pack.classes.map((c) => {
-      const primaryAbility = (pack.abilities ?? []).find(
-        (a) => a.abilityType === 'primary' && normalizeDelivery(a.primaryAttack?.delivery ?? 'melee') === normalizeDelivery(c.primaryAttack.delivery) && normalizeStyleId(a.primaryAttack?.styleId ?? 'melee_slash') === normalizeStyleId(c.primaryAttack.styleId),
-      )
       return {
         id: c.id, name: c.name, description: c.description ?? '', iconUrl: c.iconUrl ?? '',
         isHeroClass: c.isHeroClass ?? false,
         damageMainStat: c.scaling.damageMainStat ?? 'STR',
-        primaryAttackAbilityId: primaryAbility?.id ?? '',
+        primaryAttackAbilityId: c.primaryAttackId ?? '',
         attackTags: c.slots?.attack_source?.allowedTagsAny?.join(', ') ?? '',
         attackRequired: c.slots?.attack_source?.required ?? true,
         attackAllowEmpty: c.slots?.attack_source?.allowEmpty ?? false,
@@ -415,12 +397,6 @@ export default function IdleRpgCreate() {
             ...(a.effectKind === 'lifesteal' && Number(a.effectLifestealPct) > 0 ? { lifestealPercent: Number(a.effectLifestealPct) } : {}),
           }] } : {}),
         }
-        if (a.abilityType === 'primary') {
-          def.primaryAttack = {
-            delivery: a.delivery || 'melee',
-            styleId: a.styleId || 'melee_slash',
-          }
-        }
         const animationFrames = buildAnimationFrames(a.animFrames)
         if (animationFrames) def.animationFrames = animationFrames
         if (a.abilityType === 'reactive') {
@@ -433,15 +409,9 @@ export default function IdleRpgCreate() {
         return def
       })
 
-    const primaryAbilities = abilityList.filter((a) => a.abilityType === 'primary')
     const classBlocks: ClassBlock[] = classes
       .filter((c) => c.id.trim() && c.name.trim())
       .map((c) => {
-        const primaryAbility = c.primaryAttackAbilityId.trim()
-          ? primaryAbilities.find((a) => a.id === c.primaryAttackAbilityId.trim())
-          : null
-        const delivery = primaryAbility?.primaryAttack?.delivery ?? 'melee'
-        const styleId = primaryAbility?.primaryAttack?.styleId ?? 'melee_slash'
         return {
           id: c.id.trim(),
           name: c.name.trim(),
@@ -449,7 +419,7 @@ export default function IdleRpgCreate() {
           ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
           ...(c.isHeroClass ? { isHeroClass: true } : {}),
           scaling: { damageMainStat: c.damageMainStat },
-          primaryAttack: { delivery, styleId },
+          primaryAttackId: c.primaryAttackAbilityId.trim() || '',
         slots: {
           attack_source: {
             required: c.attackRequired,
@@ -761,7 +731,7 @@ export default function IdleRpgCreate() {
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Abilities</Typography></AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Define abilities here. Use type <strong>primary</strong> for basic attacks (set delivery &amp; style); then in Classes assign only primary abilities as the class primary attack. Regular/ultimate IDs are assigned in the class ability access fields.
+                Define abilities here. Use type <strong>primary</strong> for basic attacks; then in Classes assign the primary ability ID. Regular/ultimate IDs are assigned in the class ability access fields.
               </Typography>
               {abilities.map((a, i) => (
                 <Box key={i} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1 }}>
@@ -773,22 +743,6 @@ export default function IdleRpgCreate() {
                       {ABILITY_TYPES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
                     </Select>
                   </FormControl>
-                  {a.abilityType === 'primary' && (
-                    <>
-                      <FormControl size="small" sx={{ minWidth: 140 }}>
-                        <InputLabel>Delivery</InputLabel>
-                        <Select value={a.delivery} label="Delivery" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, delivery: e.target.value } : x))}>
-                          {DELIVERIES.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
-                        </Select>
-                      </FormControl>
-                      <FormControl size="small" sx={{ minWidth: 140 }}>
-                        <InputLabel>Style</InputLabel>
-                        <Select value={a.styleId} label="Style" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, styleId: e.target.value } : x))}>
-                          {STYLE_IDS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-                        </Select>
-                      </FormControl>
-                    </>
-                  )}
                   <TextField size="small" label="Description" value={a.description} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} sx={{ flex: 1, minWidth: 140 }} />
                   <TextField size="small" label="Icon URL" value={a.iconUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 140 }} />
                   <IconButton size="small" color="error" onClick={() => setAbilities((p) => p.filter((_, j) => j !== i))}>−</IconButton>

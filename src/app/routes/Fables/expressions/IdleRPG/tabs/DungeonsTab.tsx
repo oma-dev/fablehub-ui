@@ -111,7 +111,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
   const cls = pack.classes.find((c) => c.id === character.classId)
   const weaponItemId = character.equipment?.['attack_source']
   const weaponDef = weaponItemId ? pack.items.find((i) => i.id === weaponItemId) : undefined
-  const primaryAbility = pack.abilities?.find((a) => a.primaryAttack?.styleId === cls?.primaryAttack?.styleId)
+  const primaryAbility = pack.abilities?.find((a) => a.id === cls?.primaryAttackId && a.abilityType === 'primary')
   const resolvedFrames = resolveAnimationFrames(
     primaryAbility?.animationFrames,
     weaponDef?.iconUrl,
@@ -451,7 +451,6 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
               ap: playerStats.ap,
               arm: playerStats.arm,
               portraitUrl: character.portraitUrl ?? cls?.iconUrl,
-              styleId: cls?.primaryAttack?.styleId,
               weaponUrl: weaponDef?.iconUrl,
               animationFrames: resolvedFrames ?? primaryAbility?.animationFrames,
               resource: playerResource,
@@ -463,7 +462,6 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
               ap: boss.ap,
               arm: boss.arm,
               portraitUrl: boss.iconUrl ?? undefined,
-              styleId: 'melee_slash',
               resource: resolveCreatureResource(pack, boss.resourceId),
             }}
             victory={combatResult.victory}
