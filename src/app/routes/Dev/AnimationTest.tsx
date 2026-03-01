@@ -139,6 +139,7 @@ interface BlockFrameForm {
   imageSource: AnimationFrameImageSource
   url: string
   delayMs: number
+  startBeforeImpactMs: number
   showMs: number
   vanishMs: number
   lifetimeMs: number
@@ -152,6 +153,7 @@ const defaultBlockFrame = (): BlockFrameForm => ({
   imageSource: 'url',
   url: '',
   delayMs: 0,
+  startBeforeImpactMs: 0,
   showMs: 320,
   vanishMs: 480,
   lifetimeMs: 800,
@@ -232,6 +234,7 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   activeBlockFrames?: ActiveBlockFrameEntry[]
   cardRef?: React.Ref<HTMLDivElement>
   side: 'player' | 'creature'
+  portraitUrl?: string
 }>(function CombatantCard({
   label,
   variant,
@@ -246,6 +249,7 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   activeBlockFrames,
   cardRef,
   side,
+  portraitUrl,
 }, ref) {
   const isPlayer = side === 'player'
   const borderColor = isPlayer ? 'rgba(99,102,241,0.45)' : 'rgba(239,68,68,0.4)'
@@ -279,7 +283,11 @@ const CombatantCard = forwardRef<HTMLDivElement, {
               boxShadow: '0 0 36px rgba(168,85,247,0.2), inset 0 0 24px rgba(0,0,0,0.3)',
             }}
           >
-            <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
+            {portraitUrl ? (
+              <img src={portraitUrl} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
+            )}
           </Box>
           {(activeWeaponFrames ?? []).map(f => (
             <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
@@ -524,6 +532,8 @@ export default function AnimationTest() {
   const [weaponAnimationUrl, setWeaponAnimationUrl] = useState('https://bg3.wiki/w/images/0/0f/Quarterstaff_Unfaded.png')
   const [weaponProjectileUrl, setWeaponProjectileUrl] = useState('')
   const [weaponImpactUrl, setWeaponImpactUrl] = useState('')
+  const [playerPortraitUrl, setPlayerPortraitUrl] = useState('')
+  const [creaturePortraitUrl, setCreaturePortraitUrl] = useState('')
   const [trajectoryOverride, setTrajectoryOverride] = useState<'auto' | 'straight' | 'arc'>('auto')
   const [playing, setPlaying] = useState(false)
   const [logLines, setLogLines] = useState<string[]>([])
@@ -560,6 +570,184 @@ export default function AnimationTest() {
   // Impact gallery state
   const [galleryKey, setGalleryKey] = useState(0)
   const [galleryPlaying, setGalleryPlaying] = useState(false)
+
+  // Ability properties (for JSON export)
+  const [abilityId, setAbilityId] = useState('my_ability')
+  const [abilityName, setAbilityName] = useState('My Ability')
+  const [abilityType, setAbilityType] = useState<'primary' | 'regular' | 'passive' | 'ultimate' | 'reactive'>('regular')
+  const [abilityDescription, setAbilityDescription] = useState('')
+  const [abilityIconUrl, setAbilityIconUrl] = useState('')
+  const [cooldownTurns, setCooldownTurns] = useState(0)
+  const [resourceCostId, setResourceCostId] = useState('')
+  const [resourceCostAmount, setResourceCostAmount] = useState(0)
+  const [unlockCost, setUnlockCost] = useState(1)
+  const [minLevel, setMinLevel] = useState(1)
+  const [effectKind, setEffectKind] = useState<'damage' | 'heal' | 'apply_status' | 'execute' | 'lifesteal'>('damage')
+  const [effectAmount, setEffectAmount] = useState(0)
+  const [effectPercentage, setEffectPercentage] = useState(0)
+  const [effectLifestealPct, setEffectLifestealPct] = useState(0)
+  const [reactiveBaseChance, setReactiveBaseChance] = useState(0.2)
+  const [reactiveScalingStat, setReactiveScalingStat] = useState('')
+  const [reactiveScalingCoeff, setReactiveScalingCoeff] = useState(0)
+  const [jsonImportText, setJsonImportText] = useState('')
+
+  const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal'] as const
+  const STAT_IDS = ['STR', 'DEX', 'INT', 'LCK', 'HP', 'ARM'] as const
+  const ABILITY_TYPES: typeof abilityType[] = ['primary', 'regular', 'passive', 'ultimate', 'reactive']
+
+  const buildAbilityJson = useCallback(() => {
+    const buildFrames = () => {
+      const w = weaponFrames.filter(f => f.enabled).map(f => ({
+        ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
+        ...(f.url.trim() ? { url: f.url.trim() } : {}),
+        ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
+        ...(f.fadeInMs !== 200 ? { fadeInMs: f.fadeInMs } : {}),
+        ...(f.lifetimeMs > 0 ? { lifetimeMs: f.lifetimeMs } : {}),
+        startSizePx: f.startSizePx, endSizePx: f.endSizePx,
+        ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
+        ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
+      }))
+      const p = projectileFrames.filter(f => f.enabled).map(f => ({
+        ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
+        ...(f.url.trim() ? { url: f.url.trim() } : {}),
+        ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
+        trajectory: f.trajectory,
+        ...(f.lifetimeMs > 0 ? { lifetimeMs: f.lifetimeMs } : {}),
+        startSizePx: f.startSizePx, endSizePx: f.endSizePx,
+        ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
+        ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
+      }))
+      const im = impactFrames.filter(f => f.enabled).map(f => ({
+        ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
+        ...(f.url.trim() ? { url: f.url.trim() } : {}),
+        ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
+        ...(f.showMs > 0 ? { showMs: f.showMs } : {}),
+        ...(f.vanishMs > 0 ? { vanishMs: f.vanishMs } : {}),
+        ...(f.lifetimeMs > 0 ? { lifetimeMs: f.lifetimeMs } : {}),
+        startSizePx: f.startSizePx, endSizePx: f.endSizePx,
+        ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
+        ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
+      }))
+      const b = blockFrames.filter(f => f.enabled).map(f => ({
+        ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
+        ...(f.url.trim() ? { url: f.url.trim() } : {}),
+        ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
+        ...(f.startBeforeImpactMs > 0 ? { startBeforeImpactMs: f.startBeforeImpactMs } : {}),
+        ...(f.showMs > 0 ? { showMs: f.showMs } : {}),
+        ...(f.vanishMs > 0 ? { vanishMs: f.vanishMs } : {}),
+        ...(f.lifetimeMs > 0 ? { lifetimeMs: f.lifetimeMs } : {}),
+        startSizePx: f.startSizePx, endSizePx: f.endSizePx,
+        ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
+        ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
+      }))
+      if (!w.length && !p.length && !im.length && !b.length) return undefined
+      return {
+        ...(w.length ? { weapon: w } : {}),
+        ...(p.length ? { projectile: p } : {}),
+        ...(im.length ? { impact: im } : {}),
+        ...(b.length ? { block: b } : {}),
+      }
+    }
+    const ability: Record<string, unknown> = {
+      id: abilityId.trim() || 'my_ability',
+      name: abilityName.trim() || 'My Ability',
+      abilityType,
+      cooldownTurns,
+      ...(abilityDescription.trim() ? { description: abilityDescription.trim() } : {}),
+      ...(abilityIconUrl.trim() ? { iconUrl: abilityIconUrl.trim() } : {}),
+      ...(resourceCostId.trim() && resourceCostAmount > 0 ? {
+        cost: { cooldownTurns, resourceCost: { resourceId: resourceCostId.trim(), amount: resourceCostAmount } }
+      } : {}),
+      ...(unlockCost > 0 ? { unlockCost } : {}),
+      ...(minLevel > 1 ? { requirements: { minLevel } } : {}),
+      effects: [{
+        kind: effectKind,
+        ...(effectAmount > 0 ? { amount: effectAmount } : {}),
+        ...(effectPercentage > 0 ? { percentage: effectPercentage } : {}),
+        ...(effectKind === 'lifesteal' && effectLifestealPct > 0 ? { lifestealPercent: effectLifestealPct } : {}),
+      }],
+    }
+    if (abilityType === 'reactive') {
+      ability.reactiveConfig = {
+        baseChance: reactiveBaseChance,
+        ...(reactiveScalingStat ? { scalingStat: reactiveScalingStat } : {}),
+        ...(reactiveScalingCoeff > 0 ? { scalingCoeff: reactiveScalingCoeff } : {}),
+      }
+    }
+    const frames = buildFrames()
+    if (frames) ability.animationFrames = frames
+    return ability
+  }, [abilityId, abilityName, abilityType, abilityDescription, abilityIconUrl, cooldownTurns,
+    resourceCostId, resourceCostAmount, unlockCost, minLevel, effectKind, effectAmount,
+    effectPercentage, effectLifestealPct, reactiveBaseChance, reactiveScalingStat, reactiveScalingCoeff,
+    weaponFrames, projectileFrames, impactFrames, blockFrames])
+
+  const handleExportJson = useCallback(() => {
+    const json = JSON.stringify(buildAbilityJson(), null, 2)
+    navigator.clipboard.writeText(json)
+    alert('Ability JSON copied to clipboard!')
+  }, [buildAbilityJson])
+
+  const handleImportJson = useCallback(() => {
+    try {
+      const data = JSON.parse(jsonImportText)
+      if (data.id) setAbilityId(data.id)
+      if (data.name) setAbilityName(data.name)
+      if (data.abilityType) setAbilityType(data.abilityType)
+      if (data.description) setAbilityDescription(data.description)
+      if (data.iconUrl) setAbilityIconUrl(data.iconUrl)
+      setCooldownTurns(data.cooldownTurns ?? data.cost?.cooldownTurns ?? 0)
+      setResourceCostId(data.cost?.resourceCost?.resourceId ?? '')
+      setResourceCostAmount(data.cost?.resourceCost?.amount ?? 0)
+      setUnlockCost(data.unlockCost ?? 0)
+      setMinLevel(data.requirements?.minLevel ?? 1)
+      const eff = data.effects?.[0] ?? data.effect
+      if (eff) {
+        setEffectKind(eff.kind ?? 'damage')
+        setEffectAmount(eff.amount ?? 0)
+        setEffectPercentage(eff.percentage ?? 0)
+        setEffectLifestealPct(eff.lifestealPercent ?? 0)
+      }
+      if (data.reactiveConfig) {
+        setReactiveBaseChance(data.reactiveConfig.baseChance ?? 0.2)
+        setReactiveScalingStat(data.reactiveConfig.scalingStat ?? '')
+        setReactiveScalingCoeff(data.reactiveConfig.scalingCoeff ?? 0)
+      }
+      const af = data.animationFrames
+      if (af) {
+        setWeaponFrames((af.weapon ?? []).map((f: any) => ({
+          enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
+          delayMs: f.delayMs ?? 0, fadeInMs: f.fadeInMs ?? 200, lifetimeMs: f.lifetimeMs ?? 0,
+          startSizePx: f.startSizePx ?? f.sizePx ?? 80, endSizePx: f.endSizePx ?? f.sizePx ?? 120,
+          offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+        })))
+        setProjectileFrames((af.projectile ?? []).map((f: any) => ({
+          enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
+          delayMs: f.delayMs ?? 0, lifetimeMs: f.lifetimeMs ?? f.speedMs ?? 400,
+          trajectory: f.trajectory ?? 'arc',
+          startSizePx: f.startSizePx ?? f.sizePx ?? 120, endSizePx: f.endSizePx ?? f.sizePx ?? 300,
+          offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+        })))
+        setImpactFrames((af.impact ?? []).map((f: any) => ({
+          enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
+          delayMs: f.delayMs ?? 0, showMs: f.showMs ?? 90, vanishMs: f.vanishMs ?? 510,
+          lifetimeMs: f.lifetimeMs ?? 600,
+          startSizePx: f.startSizePx ?? f.sizePx ?? 60, endSizePx: f.endSizePx ?? f.sizePx ?? 140,
+          offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+        })))
+        setBlockFrames((af.block ?? []).map((f: any) => ({
+          enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
+          delayMs: f.delayMs ?? 0, startBeforeImpactMs: f.startBeforeImpactMs ?? 0,
+          showMs: f.showMs ?? 320, vanishMs: f.vanishMs ?? 480, lifetimeMs: f.lifetimeMs ?? 800,
+          startSizePx: f.startSizePx ?? f.sizePx ?? 100, endSizePx: f.endSizePx ?? f.sizePx ?? 140,
+          offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+        })))
+      }
+      setJsonImportText('')
+    } catch {
+      alert('Invalid JSON')
+    }
+  }, [jsonImportText])
 
   const attackerAnim = getAttackAnimationConfig(attackerStyle)
   const defenderAnim = getAttackAnimationConfig(defenderStyle)
@@ -842,6 +1030,18 @@ export default function AnimationTest() {
         </Box>
       </Paper>
 
+      {/* Portrait URLs */}
+      <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+        <TextField size="small" label="Player portrait URL" value={playerPortraitUrl} onChange={(e) => setPlayerPortraitUrl(e.target.value)} sx={{ minWidth: 280, flex: 1 }} />
+        <TextField size="small" label="Creature portrait URL" value={creaturePortraitUrl} onChange={(e) => setCreaturePortraitUrl(e.target.value)} sx={{ minWidth: 280, flex: 1 }} />
+        {(playerPortraitUrl || creaturePortraitUrl) && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+            {playerPortraitUrl && <img src={playerPortraitUrl} alt="player" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} />}
+            {creaturePortraitUrl && <img src={creaturePortraitUrl} alt="creature" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} />}
+          </Box>
+        )}
+      </Paper>
+
       {/* Weapon URLs */}
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <TextField size="small" label="Weapon icon URL" value={weaponUrl} onChange={(e) => setWeaponUrl(e.target.value)} sx={{ minWidth: 280, flex: 1 }} helperText='Used when frame uses "Weapon icon".' />
@@ -957,6 +1157,88 @@ export default function AnimationTest() {
         </Box>
       </Paper>
 
+      {/* Ability Properties */}
+      <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Typography variant="subtitle1" fontWeight={700}>Ability Properties</Typography>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+          <TextField size="small" label="ID" value={abilityId} onChange={(e) => setAbilityId(e.target.value)} sx={{ width: 160 }} />
+          <TextField size="small" label="Name" value={abilityName} onChange={(e) => setAbilityName(e.target.value)} sx={{ width: 180 }} />
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Type</InputLabel>
+            <Select value={abilityType} label="Type" onChange={(e) => setAbilityType(e.target.value as typeof abilityType)}>
+              {ABILITY_TYPES.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <TextField size="small" label="Description" value={abilityDescription} onChange={(e) => setAbilityDescription(e.target.value)} sx={{ flex: 1, minWidth: 200 }} />
+          <TextField size="small" label="Icon URL" value={abilityIconUrl} onChange={(e) => setAbilityIconUrl(e.target.value)} sx={{ width: 200 }} />
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+          <NumField label="Cooldown (turns)" value={cooldownTurns} onChange={(v) => setCooldownTurns(Math.max(0, v))} min={0} max={20} step={1} />
+          <TextField size="small" label="Resource cost ID" value={resourceCostId} onChange={(e) => setResourceCostId(e.target.value)} sx={{ width: 140 }} />
+          <NumField label="Cost amount" value={resourceCostAmount} onChange={(v) => setResourceCostAmount(Math.max(0, v))} min={0} max={999} step={1} />
+          <NumField label="Unlock cost (AP)" value={unlockCost} onChange={(v) => setUnlockCost(Math.max(0, v))} min={0} max={20} step={1} />
+          <NumField label="Min level" value={minLevel} onChange={(v) => setMinLevel(Math.max(1, v))} min={1} max={99} step={1} />
+        </Box>
+        <Divider />
+        <Typography variant="subtitle2" fontWeight={600} color="text.secondary">Effect</Typography>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+          <FormControl size="small" sx={{ minWidth: 130 }}>
+            <InputLabel>Effect kind</InputLabel>
+            <Select value={effectKind} label="Effect kind" onChange={(e) => setEffectKind(e.target.value as typeof effectKind)}>
+              {EFFECT_KINDS.map(k => <MenuItem key={k} value={k}>{k}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <NumField label="Amount" value={effectAmount} onChange={(v) => setEffectAmount(Math.max(0, v))} min={0} max={9999} step={1} width={110} />
+          <NumField label="Percentage" value={effectPercentage} onChange={(v) => setEffectPercentage(Math.max(0, v))} min={0} max={100} step={1} width={110} />
+          {effectKind === 'lifesteal' && (
+            <NumField label="Lifesteal %" value={effectLifestealPct} onChange={(v) => setEffectLifestealPct(Math.max(0, v))} min={0} max={100} step={1} width={110} />
+          )}
+        </Box>
+        {abilityType === 'reactive' && (
+          <>
+            <Divider />
+            <Typography variant="subtitle2" fontWeight={600} color="text.secondary">Reactive Config</Typography>
+            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+              <NumField label="Base chance (0-1)" value={reactiveBaseChance} onChange={(v) => setReactiveBaseChance(Math.max(0, Math.min(1, v)))} min={0} max={1} step={0.05} width={140} />
+              <FormControl size="small" sx={{ minWidth: 110 }}>
+                <InputLabel>Scaling stat</InputLabel>
+                <Select value={reactiveScalingStat} label="Scaling stat" onChange={(e) => setReactiveScalingStat(e.target.value)} displayEmpty>
+                  <MenuItem value="">— None —</MenuItem>
+                  {STAT_IDS.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <NumField label="Scaling coeff" value={reactiveScalingCoeff} onChange={(v) => setReactiveScalingCoeff(v)} min={0} max={1} step={0.001} width={120} />
+            </Box>
+          </>
+        )}
+      </Paper>
+
+      {/* Import / Export JSON */}
+      <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Typography variant="subtitle1" fontWeight={700}>Import / Export JSON</Typography>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <Button variant="contained" color="primary" onClick={handleExportJson}>Copy Ability JSON to Clipboard</Button>
+          <Button variant="outlined" onClick={() => {
+            const json = JSON.stringify(buildAbilityJson(), null, 2)
+            setJsonImportText(json)
+          }}>Preview JSON</Button>
+        </Box>
+        <TextField
+          multiline
+          minRows={3}
+          maxRows={12}
+          size="small"
+          label="Paste ability JSON here to import"
+          value={jsonImportText}
+          onChange={(e) => setJsonImportText(e.target.value)}
+          sx={{ fontFamily: 'monospace', fontSize: 12 }}
+          InputProps={{ sx: { fontFamily: 'monospace', fontSize: 12 } }}
+        />
+        {jsonImportText.trim() && (
+          <Button variant="contained" color="secondary" onClick={handleImportJson} sx={{ alignSelf: 'flex-start' }}>Import JSON</Button>
+        )}
+      </Paper>
+
       {/* Arena */}
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#0d0b14', display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Typography variant="subtitle2" fontWeight={700} color="text.secondary">Arena</Typography>
@@ -996,6 +1278,7 @@ export default function AnimationTest() {
             activeWeaponFrames={playerActiveWeapon}
             activeImpactFrames={playerActiveImpact}
             activeBlockFrames={activeBlockFrames.filter(f => f.side === 'player')}
+            portraitUrl={playerPortraitUrl || undefined}
           />
 
           <Box sx={{ alignSelf: 'center', width: VS_WIDTH, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1029,6 +1312,7 @@ export default function AnimationTest() {
             activeWeaponFrames={creatureActiveWeapon}
             activeImpactFrames={creatureActiveImpact}
             activeBlockFrames={activeBlockFrames.filter(f => f.side === 'creature')}
+            portraitUrl={creaturePortraitUrl || undefined}
           />
         </Box>
 
