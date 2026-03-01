@@ -16,6 +16,7 @@ import ImpactFrame from './vfx/ImpactFrame'
 import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from './vfx/Projectile'
 import WeaponFrame from './vfx/WeaponFrame'
 
+import charBackground from '../../../../../../assets/backgrounds/charBackground.png'
 import dungeonBg from '../../../../../../assets/backgrounds/dungeon.png'
 
 // Match CombatReplay layout and styling (same scale, card design, HpBar, Portrait)
@@ -78,6 +79,9 @@ function RaidPortrait({ url, size }: { url?: string | null; size: number }) {
           borderRadius: PORTRAIT_BORDER_RADIUS,
           overflow: 'hidden',
           bgcolor: '#14121f',
+          backgroundImage: `url(${charBackground})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -86,7 +90,7 @@ function RaidPortrait({ url, size }: { url?: string | null; size: number }) {
         }}
       >
         {url ? (
-          <Box component="img" src={url} alt="portrait" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <Box component="img" src={url} alt="portrait" sx={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))' }} />
         ) : (
           <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
         )}

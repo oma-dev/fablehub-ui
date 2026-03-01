@@ -31,6 +31,7 @@ import ImpactEffect from '../../routes/Fables/expressions/IdleRPG/components/vfx
 import ImpactFrame from '../../routes/Fables/expressions/IdleRPG/components/vfx/ImpactFrame'
 import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from '../../routes/Fables/expressions/IdleRPG/components/vfx/Projectile'
 import WeaponFrame from '../../routes/Fables/expressions/IdleRPG/components/vfx/WeaponFrame'
+import charBackground from '../../../assets/backgrounds/charBackground.png'
 
 const styleIds = [...STYLE_IDS]
 const ALL_IMPACT_STYLES: ImpactStyle[] = ['slash', 'punch', 'flail', 'arrow', 'bolt', 'generic']
@@ -276,6 +277,9 @@ const CombatantCard = forwardRef<HTMLDivElement, {
               borderRadius: PORTRAIT_BORDER_RADIUS,
               overflow: 'hidden',
               bgcolor: '#14121f',
+              backgroundImage: `url(${charBackground})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -284,7 +288,7 @@ const CombatantCard = forwardRef<HTMLDivElement, {
             }}
           >
             {portraitUrl ? (
-              <img src={portraitUrl} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={portraitUrl} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))' }} />
             ) : (
               <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
             )}

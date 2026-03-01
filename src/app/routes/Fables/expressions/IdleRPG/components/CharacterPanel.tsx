@@ -12,6 +12,7 @@ import PersonIcon from '@mui/icons-material/Person'
 import ShieldIcon from '@mui/icons-material/Shield'
 import SwordIcon from '@mui/icons-material/SportsMartialArts'
 import type { CharacterState, IdleRpgPackV1, ItemTemplate } from '../../../../../../services/api'
+import charBackground from '../../../../../../assets/backgrounds/charBackground.png'
 import { allocateStat, equipItem } from '../../../../../../services/api'
 import ItemView from './ItemView'
 
@@ -225,18 +226,19 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
             height: 250,
             borderRadius: '50%',
             overflow: 'hidden',
-            border: '3px solid transparent',
-            background: 'linear-gradient(135deg, #a855f7, #6366f1, #a855f7) border-box',
+            border: '3px solid rgba(168,85,247,0.45)',
             boxShadow: '0 0 24px 4px rgba(168,85,247,0.25), inset 0 0 16px rgba(0,0,0,0.4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: '#0c0a14',
+            backgroundImage: `url(${charBackground})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
             flexShrink: 0,
           }}
         >
           {(character.portraitUrl ?? cls?.iconUrl) ? (
-            <Box component="img" src={character.portraitUrl ?? cls?.iconUrl} alt={character.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <Box component="img" src={character.portraitUrl ?? cls?.iconUrl} alt={character.name} sx={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))' }} />
           ) : (
             <PersonIcon sx={{ fontSize: 60, color: 'rgba(168,85,247,0.3)' }} />
           )}

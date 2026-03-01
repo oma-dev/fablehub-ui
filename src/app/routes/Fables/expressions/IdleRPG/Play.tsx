@@ -51,6 +51,7 @@ import PvPTab from './tabs/PvPTab'
 import DungeonsTab from './tabs/DungeonsTab'
 import RaidsTab from './tabs/RaidsTab'
 import AbilitiesTab from './tabs/AbilitiesTab'
+import charBackground from '../../../../../assets/backgrounds/charBackground.png'
 
 /* ------------------------------------------------------------------ */
 /*  Sidebar Character Card                                            */
@@ -118,13 +119,14 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
             height: 130,
             borderRadius: '50%',
             overflow: 'hidden',
-            border: '3px solid transparent',
-            background: 'linear-gradient(135deg, #a855f7, #6366f1, #a855f7) border-box',
+            border: '3px solid rgba(168,85,247,0.45)',
             boxShadow: '0 0 28px 6px rgba(168,85,247,0.3), inset 0 0 20px rgba(0,0,0,0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: '#0c0a14',
+            backgroundImage: `url(${charBackground})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
             flexShrink: 0,
           }}
         >
@@ -133,7 +135,7 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
               component="img"
               src={character.portraitUrl ?? cls?.iconUrl}
               alt={character.name}
-              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              sx={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.6)) drop-shadow(0 0 14px rgba(168,85,247,0.3))' }}
             />
           ) : (
             <PersonIcon sx={{ fontSize: 72, color: 'rgba(168,85,247,0.35)' }} />
@@ -531,6 +533,9 @@ export default function FableIdleRPG() {
                         borderRadius: 2,
                         overflow: 'hidden',
                         bgcolor: '#14121f',
+                        backgroundImage: `url(${charBackground})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -543,7 +548,7 @@ export default function FableIdleRPG() {
                           component="img"
                           src={selectedClass.iconUrl}
                           alt={selectedClass.name}
-                          sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          sx={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))' }}
                         />
                       ) : (
                         <PersonIcon sx={{ fontSize: 64, color: 'rgba(168,85,247,0.25)' }} />
