@@ -160,6 +160,49 @@ function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'ri
   }
 }
 
+// --- Active VFX entry types ---
+interface ActiveWeaponFrame {
+  key: number
+  side: 'player' | 'creature'
+  url: string
+  fadeInMs: number
+  /** When set, the component self-animates fade-out; when absent, stays until sequence end cleanup. */
+  lifetimeMs?: number
+  sizePx?: number
+  startSizePx?: number
+  endSizePx?: number
+  offsetX: number
+  offsetY: number
+}
+
+interface ActiveProjectileEntry {
+  key: number
+  direction: 'left-to-right' | 'right-to-left'
+  imageUrl: string | null
+  from: ProjectilePos
+  to: ProjectilePos
+  trajectory: 'straight' | 'arc'
+  durationMs?: number
+  sizePx?: number
+  startSizePx?: number
+  endSizePx?: number
+  color: string
+  show: boolean
+}
+
+interface ActiveImpactFrame {
+  key: number
+  side: 'player' | 'creature'
+  url: string
+  showMs: number
+  vanishMs: number
+  sizePx?: number
+  startSizePx?: number
+  endSizePx?: number
+  offsetX: number
+  offsetY: number
+}
+
 export default function CombatReplay({ combat, player, creature, victory, onFinish, leftCharacterId }: Props) {
   const [playerHp, setPlayerHp] = useState(player.maxHp)
   const [creatureHp, setCreatureHp] = useState(creature.maxHp)
@@ -176,21 +219,16 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const [creatureVariant, setCreatureVariant] = useState<string>('idle')
   const [showPlayerImpact, setShowPlayerImpact] = useState(false)
   const [showCreatureImpact, setShowCreatureImpact] = useState(false)
-  const [showProjectile, setShowProjectile] = useState<'left-to-right' | 'right-to-left' | null>(null)
-  const [projectileAttacker, setProjectileAttacker] = useState<'player' | 'creature'>('player')
-  const [projFrom, setProjFrom] = useState<ProjectilePos>({ x: 0, y: 0 })
-  const [projTo, setProjTo] = useState<ProjectilePos>({ x: 0, y: 0 })
-  const [projectileImageUrl, setProjectileImageUrl] = useState<string | null>(null)
-  const [projectileDurationMs, setProjectileDurationMs] = useState<number | undefined>(undefined)
-  const [showWeaponFrame, setShowWeaponFrame] = useState<'player' | 'creature' | null>(null)
-  const [weaponFrameConfig, setWeaponFrameConfig] = useState<{ url: string; fadeInMs: number; sizePx?: number; startSizePx?: number; endSizePx?: number } | null>(null)
-  const [impactFrameConfig, setImpactFrameConfig] = useState<{ url: string; showMs: number; vanishMs: number; sizePx?: number; startSizePx?: number; endSizePx?: number } | null>(null)
-  const [projectileSizePx, setProjectileSizePx] = useState<number | undefined>(undefined)
-  const [projectileStartSizePx, setProjectileStartSizePx] = useState<number | undefined>(undefined)
-  const [projectileEndSizePx, setProjectileEndSizePx] = useState<number | undefined>(undefined)
+
+  // Multi-frame VFX arrays
+  const [activeWeaponFrames, setActiveWeaponFrames] = useState<ActiveWeaponFrame[]>([])
+  const [activeProjectiles, setActiveProjectiles] = useState<ActiveProjectileEntry[]>([])
+  const [activeImpactFrames, setActiveImpactFrames] = useState<ActiveImpactFrame[]>([])
+
   const [playerDmg, setPlayerDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
   const [creatureDmg, setCreatureDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
   const dmgKeyRef = useRef(0)
+  const vfxKeyRef = useRef(0)
 
   const playerAnim = getAttackAnimationConfig(player.styleId, player.animationFrames)
   const creatureAnim = getAttackAnimationConfig(creature.styleId, creature.animationFrames)
@@ -227,70 +265,120 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     setAttackerVariant('cast')
     await sleep(160)
 
-    const weaponFrameUrl = frames?.weapon?.url?.trim()
-    if (frames?.weapon && weaponFrameUrl) {
-      const weaponDelay = Math.max(0, frames.weapon.delayMs ?? 0)
-      if (weaponDelay) await sleep(weaponDelay)
-      setWeaponFrameConfig({ url: weaponFrameUrl, fadeInMs: frames.weapon.fadeInMs ?? 200, sizePx: frames.weapon.sizePx, startSizePx: frames.weapon.startSizePx, endSizePx: frames.weapon.endSizePx })
-      setShowWeaponFrame(attackerSide)
-      await sleep(frames.weapon.fadeInMs ?? 200)
+    // --- Weapon frames (all fired concurrently) ---
+    // Sequence timing waits only for the fade-in phase. Each particle's lifetimeMs controls when it
+    // fades out independently — a particle without lifetimeMs stays until sequence-end cleanup.
+    const weaponFrames = (frames?.weapon ?? []).filter(f => f.url?.trim())
+    if (weaponFrames.length > 0) {
+      const maxWeaponMs = Math.max(...weaponFrames.map(f => (f.delayMs ?? 0) + (f.fadeInMs ?? 200)))
+      weaponFrames.forEach(async (f) => {
+        if (f.delayMs) await sleep(f.delayMs)
+        const entry: ActiveWeaponFrame = {
+          key: ++vfxKeyRef.current,
+          side: attackerSide,
+          url: f.url!.trim(),
+          fadeInMs: f.fadeInMs ?? 200,
+          lifetimeMs: f.lifetimeMs,  // undefined = stay until sequence-end cleanup
+          sizePx: f.sizePx,
+          startSizePx: f.startSizePx,
+          endSizePx: f.endSizePx,
+          offsetX: f.offsetX ?? 0,
+          offsetY: f.offsetY ?? 0,
+        }
+        setActiveWeaponFrames(prev => [...prev, entry])
+        if (f.lifetimeMs != null) {
+          // Auto-remove after explicit lifetime; WeaponFrame component handles the fade-out animation
+          await sleep(f.lifetimeMs + 100)
+          setActiveWeaponFrames(prev => prev.filter(e => e.key !== entry.key))
+        }
+        // else: cleaned up at sequence end via setActiveWeaponFrames([])
+      })
+      await sleep(maxWeaponMs)
     }
 
-    // Only show projectile when the ability has a projectile frame configured (no weapon fallback when unchecked)
-    if (anim.projectile && frames?.projectile) {
-      const projDelay = Math.max(0, frames.projectile.delayMs ?? 0)
-      if (projDelay) await sleep(projDelay)
-      const dir = attackerSide === 'player' ? 'left-to-right' : 'right-to-left'
+    // --- Projectile frames (all fired concurrently; lifetimeMs takes precedence over speedMs) ---
+    const projFrames = frames?.projectile ?? []
+    if (anim.projectile && projFrames.length > 0) {
       const srcRef = attackerSide === 'player' ? playerPortraitRef : creaturePortraitRef
       const tgtRef = attackerSide === 'player' ? creaturePortraitRef : playerPortraitRef
-      setProjFrom(getPortraitPos(srcRef))
-      setProjTo(getPortraitPos(tgtRef))
-      setProjectileAttacker(attackerSide)
+      const tgtPos = getPortraitPos(tgtRef)
       const weaponUrlFallback = attackerSide === 'player' ? player.weaponUrl : creature.weaponUrl
-      const projUrl = (frames.projectile.url?.trim()) ?? weaponUrlFallback ?? null
-      const projDurationMs = frames?.projectile?.speedMs
-      setProjectileImageUrl(projUrl)
-      setProjectileDurationMs(projDurationMs)
-      setProjectileSizePx(frames?.projectile?.sizePx)
-      setProjectileStartSizePx(frames?.projectile?.startSizePx)
-      setProjectileEndSizePx(frames?.projectile?.endSizePx)
-      setShowProjectile(dir)
-      const flightMs = projDurationMs ?? (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
-      await sleep(flightMs)
-      setShowProjectile(null)
+      const dir = attackerSide === 'player' ? 'left-to-right' as const : 'right-to-left' as const
+      const defaultFlight = (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
+      const resolveFlightMs = (f: typeof projFrames[0]) => f.lifetimeMs ?? f.speedMs ?? defaultFlight
+      const maxProjMs = Math.max(...projFrames.map(f => (f.delayMs ?? 0) + resolveFlightMs(f)))
+      projFrames.forEach(async (f) => {
+        if (f.delayMs) await sleep(f.delayMs)
+        const srcPos = getPortraitPos(srcRef)
+        const key = ++vfxKeyRef.current
+        const flightMs = resolveFlightMs(f)
+        const entry: ActiveProjectileEntry = {
+          key,
+          direction: dir,
+          imageUrl: f.url?.trim() ?? weaponUrlFallback ?? null,
+          from: { x: srcPos.x + (f.offsetX ?? 0), y: srcPos.y + (f.offsetY ?? 0) },
+          to: tgtPos,
+          trajectory: f.trajectory,
+          durationMs: flightMs,
+          sizePx: f.sizePx,
+          startSizePx: f.startSizePx,
+          endSizePx: f.endSizePx,
+          color: anim.impactColor,
+          show: true,
+        }
+        setActiveProjectiles(prev => [...prev, entry])
+        await sleep(flightMs)
+        setActiveProjectiles(prev => prev.map(p => p.key === key ? { ...p, show: false } : p))
+        setTimeout(() => setActiveProjectiles(prev => prev.filter(p => p.key !== key)), 400)
+      })
+      await sleep(maxProjMs)
     }
 
     if (abortRef.current) return
 
-    const impactUrl = frames?.impact?.url?.trim()
-    if (frames?.impact && impactUrl) {
-      const impactDelay = Math.max(0, frames.impact.delayMs ?? 0)
-      if (impactDelay) await sleep(impactDelay)
-      setImpactFrameConfig({
-        url: impactUrl,
-        showMs: frames.impact.showMs ?? 100,
-        vanishMs: frames.impact.vanishMs ?? 500,
-        sizePx: frames.impact.sizePx,
-        startSizePx: frames.impact.startSizePx,
-        endSizePx: frames.impact.endSizePx,
+    // --- Impact frames (all fired concurrently; lifetimeMs shorthand overrides showMs/vanishMs) ---
+    const impactFrames = (frames?.impact ?? []).filter(f => f.url?.trim())
+    const resolveImpactTiming = (f: typeof impactFrames[0]) => {
+      if (f.showMs != null && f.vanishMs != null) return { showMs: f.showMs, vanishMs: f.vanishMs }
+      const lt = f.lifetimeMs ?? (f.showMs != null ? f.showMs + (f.vanishMs ?? 500) : 600)
+      return { showMs: Math.floor(lt * 0.15), vanishMs: Math.ceil(lt * 0.85) }
+    }
+    const maxImpactMs = impactFrames.length > 0
+      ? Math.max(...impactFrames.map(f => {
+          const { showMs, vanishMs } = resolveImpactTiming(f)
+          return (f.delayMs ?? 0) + showMs + vanishMs
+        }))
+      : 350
+
+    if (impactFrames.length > 0) {
+      impactFrames.forEach(async (f) => {
+        if (f.delayMs) await sleep(f.delayMs)
+        const { showMs, vanishMs } = resolveImpactTiming(f)
+        const entry: ActiveImpactFrame = {
+          key: ++vfxKeyRef.current,
+          side: attackerSide === 'player' ? 'creature' : 'player',
+          url: f.url!.trim(),
+          showMs,
+          vanishMs,
+          sizePx: f.sizePx,
+          startSizePx: f.startSizePx,
+          endSizePx: f.endSizePx,
+          offsetX: f.offsetX ?? 0,
+          offsetY: f.offsetY ?? 0,
+        }
+        setActiveImpactFrames(prev => [...prev, entry])
       })
     }
+
     setTargetImpact(true)
     setTargetVariant('hit')
     dmgKeyRef.current++
     setTargetDmg({ value: event.value, type: event.type, key: dmgKeyRef.current })
     setTargetHp(Math.max(0, event.targetHpAfter))
-    const impactDuration = frames?.impact
-      ? (frames.impact.showMs ?? 100) + (frames.impact.vanishMs ?? 500)
-      : 350
-    await sleep(impactDuration)
+    await sleep(maxImpactMs)
 
-    setShowWeaponFrame(null)
-    setWeaponFrameConfig(null)
-    setImpactFrameConfig(null)
-    setProjectileSizePx(undefined)
-    setProjectileStartSizePx(undefined)
-    setProjectileEndSizePx(undefined)
+    setActiveWeaponFrames([])  // clean up any weapon particles that had no explicit lifetimeMs
+    setActiveImpactFrames([])
     setTargetImpact(false)
     setAttackerVariant('return')
     setTargetVariant('idle')
@@ -298,7 +386,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
 
     setAttackerVariant('idle')
     setTargetDmg(null)
-  }, [playerId, player.weaponUrl, creature.weaponUrl])
+  }, [playerId, player.weaponUrl, creature.weaponUrl, getPortraitPos])
 
   useEffect(() => {
     if (combat.turns.length === 0) {
@@ -337,14 +425,9 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     setCreatureVariant('idle')
     setShowPlayerImpact(false)
     setShowCreatureImpact(false)
-    setShowProjectile(null)
-    setProjectileAttacker('player')
-    setShowWeaponFrame(null)
-    setWeaponFrameConfig(null)
-    setImpactFrameConfig(null)
-    setProjectileSizePx(undefined)
-    setProjectileStartSizePx(undefined)
-    setProjectileEndSizePx(undefined)
+    setActiveWeaponFrames([])
+    setActiveProjectiles([])
+    setActiveImpactFrames([])
     setPlayerDmg(null)
     setCreatureDmg(null)
 
@@ -374,24 +457,25 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
       {/* Arena */}
       <Box ref={arenaRef} sx={{ display: 'flex', gap: 3, justifyContent: 'center', alignItems: 'flex-start', position: 'relative' }}>
 
-        {/* Projectile layer */}
+        {/* Projectile layer — all active projectiles */}
         <AnimatePresence>
-          {showProjectile && (
+          {activeProjectiles.map(p => (
             <Projectile
-              show
-              color={showProjectile === 'left-to-right' ? playerAnim.impactColor : creatureAnim.impactColor}
-              direction={showProjectile}
-              id={`proj-${dmgKeyRef.current}`}
-              weaponUrl={projectileImageUrl ?? (projectileAttacker === 'player' ? player.weaponUrl : creature.weaponUrl)}
-              trajectory={projectileAttacker === 'player' ? playerAnim.projectile : creatureAnim.projectile}
-              durationMs={projectileDurationMs}
-              sizePx={projectileSizePx}
-              startSizePx={projectileStartSizePx}
-              endSizePx={projectileEndSizePx}
-              from={projFrom}
-              to={projTo}
+              key={p.key}
+              show={p.show}
+              color={p.color}
+              direction={p.direction}
+              id={p.key}
+              weaponUrl={p.imageUrl}
+              trajectory={p.trajectory}
+              durationMs={p.durationMs}
+              sizePx={p.sizePx}
+              startSizePx={p.startSizePx}
+              endSizePx={p.endSizePx}
+              from={p.from}
+              to={p.to}
             />
-          )}
+          ))}
         </AnimatePresence>
 
         {/* Player card */}
@@ -412,28 +496,22 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           >
             <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
               <Portrait url={player.portraitUrl} weaponUrl={player.weaponUrl} />
-              {showWeaponFrame === 'player' && weaponFrameConfig && (
-                <WeaponFrame show url={weaponFrameConfig.url} fadeInMs={weaponFrameConfig.fadeInMs} sizePx={weaponFrameConfig.sizePx} startSizePx={weaponFrameConfig.startSizePx} endSizePx={weaponFrameConfig.endSizePx} id="player-weapon" />
-              )}
-              {showPlayerImpact && impactFrameConfig ? (
-                <ImpactFrame
-                  show
-                  url={impactFrameConfig.url}
-                  showMs={impactFrameConfig.showMs}
-                  vanishMs={impactFrameConfig.vanishMs}
-                  sizePx={impactFrameConfig.sizePx}
-                  startSizePx={impactFrameConfig.startSizePx}
-                  endSizePx={impactFrameConfig.endSizePx}
-                  id={`p-impact-${dmgKeyRef.current}`}
-                />
-              ) : (
-                <ImpactEffect
-                  show={showPlayerImpact}
-                  style={'generic' as const}
-                  color={creatureAnim.impactColor}
-                  id={`p-impact-${dmgKeyRef.current}`}
-                />
-              )}
+              {activeWeaponFrames.filter(f => f.side === 'player').map(f => (
+                <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+              ))}
+              {showPlayerImpact && activeImpactFrames.filter(f => f.side === 'player').length > 0
+                ? activeImpactFrames.filter(f => f.side === 'player').map(f => (
+                  <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                ))
+                : (
+                  <ImpactEffect
+                    show={showPlayerImpact}
+                    style={'generic' as const}
+                    color={creatureAnim.impactColor}
+                    id={`p-impact-${dmgKeyRef.current}`}
+                  />
+                )
+              }
               <AnimatePresence>
                 {playerDmg && (
                   <DamageNumber value={playerDmg.value} type={playerDmg.type} id={playerDmg.key} />
@@ -491,28 +569,22 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           >
             <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
               <Portrait url={creature.portraitUrl} weaponUrl={creature.weaponUrl} />
-              {showWeaponFrame === 'creature' && weaponFrameConfig && (
-                <WeaponFrame show url={weaponFrameConfig.url} fadeInMs={weaponFrameConfig.fadeInMs} sizePx={weaponFrameConfig.sizePx} startSizePx={weaponFrameConfig.startSizePx} endSizePx={weaponFrameConfig.endSizePx} id="creature-weapon" />
-              )}
-              {showCreatureImpact && impactFrameConfig ? (
-                <ImpactFrame
-                  show
-                  url={impactFrameConfig.url}
-                  showMs={impactFrameConfig.showMs}
-                  vanishMs={impactFrameConfig.vanishMs}
-                  sizePx={impactFrameConfig.sizePx}
-                  startSizePx={impactFrameConfig.startSizePx}
-                  endSizePx={impactFrameConfig.endSizePx}
-                  id={`c-impact-${dmgKeyRef.current}`}
-                />
-              ) : (
-                <ImpactEffect
-                  show={showCreatureImpact}
-                  style={'generic' as const}
-                  color={playerAnim.impactColor}
-                  id={`c-impact-${dmgKeyRef.current}`}
-                />
-              )}
+              {activeWeaponFrames.filter(f => f.side === 'creature').map(f => (
+                <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+              ))}
+              {showCreatureImpact && activeImpactFrames.filter(f => f.side === 'creature').length > 0
+                ? activeImpactFrames.filter(f => f.side === 'creature').map(f => (
+                  <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                ))
+                : (
+                  <ImpactEffect
+                    show={showCreatureImpact}
+                    style={'generic' as const}
+                    color={playerAnim.impactColor}
+                    id={`c-impact-${dmgKeyRef.current}`}
+                  />
+                )
+              }
               <AnimatePresence>
                 {creatureDmg && (
                   <DamageNumber value={creatureDmg.value} type={creatureDmg.type} id={creatureDmg.key} />

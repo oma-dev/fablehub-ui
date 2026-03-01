@@ -55,59 +55,80 @@ export interface IdleRpgRealm {
 /** Source for frame image: custom URL or resolve from equipped weapon at runtime. */
 export type AnimationFrameImageSource = 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact'
 
-/** Optional weapon frame: pops at caster portrait center, fades in, stays until animation end. */
+/** Optional weapon frame: pops at caster portrait center, fades in, then vanishes after lifetimeMs. */
 export interface AnimationWeaponFrame {
-  /** When imageSource is 'url', use this; otherwise resolved from attacker's weapon. */
   url?: string
   imageSource?: AnimationFrameImageSource
-  /** Delay in ms before this frame starts. */
+  /** Delay in ms before this frame starts (allows staggering multiple weapon frames). */
   delayMs?: number
+  /** Fade-in duration in ms. Default 200. */
   fadeInMs?: number
+  /** Total lifetime in ms (post-delay): from appearance to fully gone. Default: fadeInMs + 600. */
+  lifetimeMs?: number
   /** Display size in px (width & height). */
   sizePx?: number
   /** Start size in px; animates to endSizePx over fadeInMs. */
   startSizePx?: number
   /** End size in px. */
   endSizePx?: number
+  /** Horizontal offset in px from caster portrait center (positive = right). */
+  offsetX?: number
+  /** Vertical offset in px from caster portrait center (positive = down). */
+  offsetY?: number
 }
 
 /** Optional projectile frame: flies from caster to target (straight or arc). */
 export interface AnimationProjectileFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
-  /** Delay in ms before this frame starts. */
+  /** Delay in ms before this frame starts (allows staggering multiple projectiles). */
   delayMs?: number
   trajectory: 'straight' | 'arc'
+  /** Flight duration in ms. Alias: lifetimeMs. */
   speedMs?: number
+  /** Total lifetime of the particle in ms. Equivalent to speedMs; takes precedence if both set. */
+  lifetimeMs?: number
   /** Display size in px (width & height). */
   sizePx?: number
   /** Start size in px; animates to endSizePx over flight. */
   startSizePx?: number
   /** End size in px. */
   endSizePx?: number
+  /** Horizontal offset in px applied to the start (caster) position. Target stays fixed. */
+  offsetX?: number
+  /** Vertical offset in px applied to the start (caster) position. Target stays fixed. */
+  offsetY?: number
 }
 
 /** Optional impact frame: pops at target center after projectile vanishes, then fades out. */
 export interface AnimationImpactFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
-  /** Delay in ms before this frame starts. */
+  /** Delay in ms before this frame starts (allows staggering multiple impact frames). */
   delayMs?: number
+  /** Hold time before fade-out. Used when lifetimeMs is not set. */
   showMs?: number
+  /** Fade-out duration. Used when lifetimeMs is not set. */
   vanishMs?: number
+  /** Total lifetime shorthand. Overrides showMs/vanishMs with 15%/85% split when both not explicitly set. */
+  lifetimeMs?: number
   /** Display size in px (width & height). */
   sizePx?: number
   /** Start size in px; animates to endSizePx over show+vanish. */
   startSizePx?: number
   /** End size in px. */
   endSizePx?: number
+  /** Horizontal offset in px from target portrait center (positive = right). */
+  offsetX?: number
+  /** Vertical offset in px from target portrait center (positive = down). */
+  offsetY?: number
 }
 
-/** Attack animation as three optional PNG frames: weapon (caster), projectile, impact (target). */
+/** Attack animation as arrays of optional PNG frames per phase. Multiple entries play concurrently. */
 export interface AnimationFrames {
-  weapon?: AnimationWeaponFrame
-  projectile?: AnimationProjectileFrame
-  impact?: AnimationImpactFrame
+  weapon?: AnimationWeaponFrame[]
+  projectile?: AnimationProjectileFrame[]
+  impact?: AnimationImpactFrame[]
 }
 
 /** Ability (matches backend); optional fields allow minimal pack catalog entries from the create form. */

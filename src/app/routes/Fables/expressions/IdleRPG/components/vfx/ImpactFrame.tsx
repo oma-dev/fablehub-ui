@@ -15,12 +15,18 @@ interface Props {
   startSizePx?: number
   /** End size in px. */
   endSizePx?: number
+  /** Horizontal offset in px from target portrait center (positive = right). */
+  offsetX?: number
+  /** Vertical offset in px from target portrait center (positive = down). */
+  offsetY?: number
   id: string | number
 }
 
-export default function ImpactFrame({ show, url, showMs = 100, vanishMs = 500, sizePx, startSizePx, endSizePx, id }: Props) {
+export default function ImpactFrame({ show, url, showMs = 100, vanishMs = 500, sizePx, startSizePx, endSizePx, offsetX = 0, offsetY = 0, id }: Props) {
   const totalSec = showMs / 1000 + vanishMs / 1000
-  const fadeStart = showMs / 1000 / totalSec
+  let fadeStart = showMs / 1000 / totalSec
+  // Keyframe times must be monotonically non-decreasing (Web Animations API requirement)
+  if (fadeStart < 0.08) fadeStart = 0.08
   const startSize = startSizePx ?? sizePx ?? DEFAULT_SIZE
   const endSize = endSizePx ?? sizePx ?? DEFAULT_SIZE
   const baseSize = Math.max(startSize, endSize, 1)
@@ -50,8 +56,8 @@ export default function ImpactFrame({ show, url, showMs = 100, vanishMs = 500, s
             position: 'absolute',
             top: '50%',
             left: '50%',
-            marginTop: -baseSize / 2,
-            marginLeft: -baseSize / 2,
+            marginTop: -baseSize / 2 + offsetY,
+            marginLeft: -baseSize / 2 + offsetX,
             width: baseSize,
             height: baseSize,
             pointerEvents: 'none',

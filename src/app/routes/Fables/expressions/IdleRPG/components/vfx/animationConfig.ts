@@ -6,58 +6,86 @@
 /** Source for frame image: custom URL or resolve from equipped weapon at runtime. */
 export type AnimationFrameImageSource = 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact'
 
-/** Optional weapon frame (pops at caster, fades in, stays until end). */
+/** Optional weapon frame (pops at caster, fades in, then vanishes after lifetimeMs). */
 export interface AnimationWeaponFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
-  /** Delay in ms before this frame starts. */
+  /** Delay in ms before this frame starts (allows staggering multiple weapon frames). */
   delayMs?: number
+  /** Fade-in duration in ms. Default 200. */
   fadeInMs?: number
+  /**
+   * Total lifetime of the particle in ms (post-delay), from appearance to fully gone.
+   * Controls when it fades out. Default: fadeInMs + 600.
+   */
+  lifetimeMs?: number
   /** Display size in px (width & height). */
   sizePx?: number
   /** Start size in px; animates to endSizePx over fadeInMs. */
   startSizePx?: number
   /** End size in px. */
   endSizePx?: number
+  /** Horizontal offset in px from caster portrait center (positive = right). */
+  offsetX?: number
+  /** Vertical offset in px from caster portrait center (positive = down). */
+  offsetY?: number
 }
 
 /** Optional projectile frame (flies caster → target). */
 export interface AnimationProjectileFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
-  /** Delay in ms before this frame starts. */
+  /** Delay in ms before this frame starts (allows staggering multiple projectiles). */
   delayMs?: number
   trajectory: 'straight' | 'arc'
+  /** Flight duration in ms. Alias: lifetimeMs. */
   speedMs?: number
+  /** Total lifetime of the particle in ms. Equivalent to speedMs; takes precedence if both set. */
+  lifetimeMs?: number
   /** Display size in px (width & height). */
   sizePx?: number
   /** Start size in px; animates to endSizePx over flight. */
   startSizePx?: number
   /** End size in px. */
   endSizePx?: number
+  /** Horizontal offset in px applied to the start (caster) position. Target stays fixed. */
+  offsetX?: number
+  /** Vertical offset in px applied to the start (caster) position. Target stays fixed. */
+  offsetY?: number
 }
 
 /** Optional impact frame (pops at target, fades out). */
 export interface AnimationImpactFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
-  /** Delay in ms before this frame starts. */
+  /** Delay in ms before this frame starts (allows staggering multiple impact frames). */
   delayMs?: number
+  /** How long fully visible before starting fade-out. Used when lifetimeMs is not set. */
   showMs?: number
+  /** Fade-out duration in ms. Used when lifetimeMs is not set. */
   vanishMs?: number
+  /**
+   * Total lifetime shorthand (showMs + vanishMs). When set, overrides showMs/vanishMs
+   * with a 15%/85% split. Ignored when both showMs and vanishMs are explicitly set.
+   */
+  lifetimeMs?: number
   /** Display size in px (width & height). */
   sizePx?: number
   /** Start size in px; animates to endSizePx over show+vanish. */
   startSizePx?: number
   /** End size in px. */
   endSizePx?: number
+  /** Horizontal offset in px from target portrait center (positive = right). */
+  offsetX?: number
+  /** Vertical offset in px from target portrait center (positive = down). */
+  offsetY?: number
 }
 
-/** Attack animation as three optional PNG frames. Matches API AnimationFrames. */
+/** Attack animation as arrays of optional PNG frames per phase. Multiple entries play concurrently. */
 export interface AnimationFrames {
-  weapon?: AnimationWeaponFrame
-  projectile?: AnimationProjectileFrame
-  impact?: AnimationImpactFrame
+  weapon?: AnimationWeaponFrame[]
+  projectile?: AnimationProjectileFrame[]
+  impact?: AnimationImpactFrame[]
 }
 
 export type ProjectileType = 'straight' | 'arc' | null
@@ -69,7 +97,7 @@ export type ImpactStyle = 'slash' | 'punch' | 'flail' | 'arrow' | 'bolt' | 'gene
 export interface AttackAnimationConfig {
   /** When AnimationFrames is used */
   frames: AnimationFrames | null
-  /** Projectile trajectory (from frames.projectile or styleId fallback) */
+  /** Projectile trajectory (from first frames.projectile entry or styleId fallback) */
   projectile: ProjectileType
   /** For damage number color when no frames.impact */
   impactColor: string
@@ -119,9 +147,14 @@ export function getAttackAnimationConfig(
       }
     : DEFAULT_FALLBACK
 
-  if (animationFrames && (animationFrames.weapon || animationFrames.projectile || animationFrames.impact)) {
-    const projectile: ProjectileType = animationFrames.projectile
-      ? animationFrames.projectile.trajectory
+  const hasWeapon = (animationFrames?.weapon?.length ?? 0) > 0
+  const hasProjectile = (animationFrames?.projectile?.length ?? 0) > 0
+  const hasImpact = (animationFrames?.impact?.length ?? 0) > 0
+
+  if (animationFrames && (hasWeapon || hasProjectile || hasImpact)) {
+    // Use trajectory from first projectile frame, else fallback
+    const projectile: ProjectileType = hasProjectile
+      ? animationFrames.projectile![0].trajectory
       : fallback.projectile
     return {
       frames: animationFrames,
@@ -153,7 +186,7 @@ function resolveFrameUrl(
 
 /**
  * Resolve ability animation frames with equipped weapon URLs.
- * Call before passing to CombatReplay so playback only reads Ability's frame URLs.
+ * Call before passing to CombatReplay so playback only reads resolved URLs.
  */
 export function resolveAnimationFrames(
   frames: AnimationFrames | null | undefined,
@@ -164,21 +197,37 @@ export function resolveAnimationFrames(
 ): AnimationFrames | null {
   if (!frames) return null
   const result: AnimationFrames = {}
-  if (frames.weapon) {
-    const url = resolveFrameUrl(frames.weapon, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
-    if (url) result.weapon = { ...frames.weapon, url }
-    else if (frames.weapon.url?.trim()) result.weapon = { ...frames.weapon }
+
+  if (frames.weapon?.length) {
+    const resolved = frames.weapon.flatMap((f) => {
+      const url = resolveFrameUrl(f, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
+      if (url) return [{ ...f, url }]
+      if (f.url?.trim()) return [{ ...f }]
+      return []
+    })
+    if (resolved.length) result.weapon = resolved
   }
-  if (frames.projectile) {
-    const url = resolveFrameUrl(frames.projectile, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
-    if (url) result.projectile = { ...frames.projectile, url }
-    else if (frames.projectile.url?.trim()) result.projectile = { ...frames.projectile }
+
+  if (frames.projectile?.length) {
+    const resolved = frames.projectile.flatMap((f) => {
+      const url = resolveFrameUrl(f, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
+      if (url) return [{ ...f, url }]
+      if (f.url?.trim()) return [{ ...f }]
+      return []
+    })
+    if (resolved.length) result.projectile = resolved
   }
-  if (frames.impact) {
-    const url = resolveFrameUrl(frames.impact, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
-    if (url) result.impact = { ...frames.impact, url }
-    else if (frames.impact.url?.trim()) result.impact = { ...frames.impact }
+
+  if (frames.impact?.length) {
+    const resolved = frames.impact.flatMap((f) => {
+      const url = resolveFrameUrl(f, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
+      if (url) return [{ ...f, url }]
+      if (f.url?.trim()) return [{ ...f }]
+      return []
+    })
+    if (resolved.length) result.impact = resolved
   }
+
   if (!result.weapon && !result.projectile && !result.impact) return null
   return result
 }
