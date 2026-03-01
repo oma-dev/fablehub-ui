@@ -30,12 +30,15 @@ import ShieldIcon from '@mui/icons-material/Shield'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
+import LockIcon from '@mui/icons-material/Lock'
+import StarIcon from '@mui/icons-material/Star'
 import IconButton from '@mui/material/IconButton'
 import {
   getIdleRpgRealms,
   getMyCharacters,
   getPlayState,
   createCharacter,
+  getRealmRoster,
 } from '../../../../../services/api'
 import type {
   CharacterState,
@@ -390,6 +393,7 @@ export default function FableIdleRPG() {
   const [charName, setCharName] = useState('')
   const [charClassIndex, setCharClassIndex] = useState(0)
   const [creating, setCreating] = useState(false)
+  const [takenHeroClassIds, setTakenHeroClassIds] = useState<Set<string>>(new Set())
 
   const pack: IdleRpgPackV1 | null = playState?.pack ?? realm?.pack ?? null
   const displayCharacter = playState?.character ?? character
@@ -417,6 +421,18 @@ export default function FableIdleRPG() {
         } else {
           setCharClassIndex(0)
           setShowCreateChar(true)
+          const heroClassIds = new Set(
+            (selectedRealm.pack?.classes ?? []).filter(c => c.isHeroClass).map(c => c.id),
+          )
+          if (heroClassIds.size > 0) {
+            try {
+              const roster = await getRealmRoster(fableId, selectedRealm.id)
+              if (!cancelled) {
+                const taken = new Set(roster.filter(r => heroClassIds.has(r.classId)).map(r => r.classId))
+                setTakenHeroClassIds(taken)
+              }
+            } catch { /* roster fetch optional */ }
+          }
         }
       } catch (err: unknown) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load realm')
@@ -523,45 +539,94 @@ export default function FableIdleRPG() {
             </IconButton>
             <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
               <Box sx={{ width: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', px: 2 }}>
-                {selectedClass && (
-                  <>
-                    <Box
-                      sx={{
-                        width: 300,
-                        height: 300,
-                        flexShrink: 0,
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                        bgcolor: '#14121f',
-                        backgroundImage: `url(${charBackground})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: '3px solid rgba(168,85,247,0.35)',
-                        boxShadow: '0 0 36px rgba(168,85,247,0.2), inset 0 0 24px rgba(0,0,0,0.3)',
-                      }}
-                    >
-                      {selectedClass.iconUrl ? (
+                {selectedClass && (() => {
+                  const isHero = selectedClass.isHeroClass
+                  const isTaken = isHero && takenHeroClassIds.has(selectedClass.id)
+                  const borderColor = isHero
+                    ? 'rgba(255,193,69,0.6)'
+                    : 'rgba(168,85,247,0.35)'
+                  const glowColor = isHero
+                    ? '0 0 36px rgba(255,193,69,0.3), inset 0 0 24px rgba(0,0,0,0.3)'
+                    : '0 0 36px rgba(168,85,247,0.2), inset 0 0 24px rgba(0,0,0,0.3)'
+                  const dropShadow = isHero
+                    ? 'drop-shadow(0 0 8px rgba(255,193,69,0.6)) drop-shadow(0 0 20px rgba(255,193,69,0.3))'
+                    : 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))'
+                  return (
+                    <>
+                      <Box sx={{ position: 'relative' }}>
                         <Box
-                          component="img"
-                          src={selectedClass.iconUrl}
-                          alt={selectedClass.name}
-                          sx={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))' }}
+                          sx={{
+                            width: 300,
+                            height: 300,
+                            flexShrink: 0,
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                            bgcolor: '#14121f',
+                            backgroundImage: `url(${charBackground})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: `3px solid ${borderColor}`,
+                            boxShadow: glowColor,
+                            ...(isTaken ? { opacity: 0.45, filter: 'grayscale(0.5)' } : {}),
+                          }}
+                        >
+                          {selectedClass.iconUrl ? (
+                            <Box
+                              component="img"
+                              src={selectedClass.iconUrl}
+                              alt={selectedClass.name}
+                              sx={{ width: '100%', height: '100%', objectFit: 'cover', filter: dropShadow }}
+                            />
+                          ) : (
+                            <PersonIcon sx={{ fontSize: 64, color: isHero ? 'rgba(255,193,69,0.35)' : 'rgba(168,85,247,0.25)' }} />
+                          )}
+                        </Box>
+                        {isTaken && (
+                          <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                            <LockIcon sx={{ fontSize: 64, color: 'rgba(255,193,69,0.8)' }} />
+                          </Box>
+                        )}
+                      </Box>
+                      {isHero && (
+                        <Chip
+                          icon={<StarIcon sx={{ color: '#ffc145 !important', fontSize: 16 }} />}
+                          label={isTaken ? 'Hero Class — Taken' : 'Hero Class'}
+                          size="small"
+                          sx={{
+                            mt: 1,
+                            fontWeight: 700,
+                            background: 'linear-gradient(135deg, #ffc145, #ff6b35)',
+                            color: '#1b1b2f',
+                            border: 'none',
+                            ...(isTaken ? { opacity: 0.7 } : {}),
+                          }}
                         />
-                      ) : (
-                        <PersonIcon sx={{ fontSize: 64, color: 'rgba(168,85,247,0.25)' }} />
                       )}
-                    </Box>
-                    <Typography variant="h6" sx={{ mt: 1.5 }}>{selectedClass.name}</Typography>
-                    {selectedClass.description && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 360 }}>
-                        {selectedClass.description}
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          mt: 1,
+                          ...(isHero ? {
+                            background: 'linear-gradient(135deg, #ffc145, #ff6b35)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            fontWeight: 800,
+                          } : {}),
+                        }}
+                      >
+                        {selectedClass.name}
                       </Typography>
-                    )}
-                  </>
-                )}
+                      {selectedClass.description && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 360 }}>
+                          {selectedClass.description}
+                        </Typography>
+                      )}
+                    </>
+                  )
+                })()}
               </Box>
             </Box>
             <IconButton
@@ -577,9 +642,13 @@ export default function FableIdleRPG() {
         </DialogContent>
         <DialogActions>
           <Button component={Link} to={`/fables/${fableId}`} disabled={creating}>Cancel</Button>
-          <Button variant="contained" onClick={handleCreateCharacter} disabled={creating || !charName.trim() || !selectedClassId}>
-            {creating ? 'Creating...' : 'Create'}
-          </Button>
+          <Tooltip title={selectedClass?.isHeroClass && takenHeroClassIds.has(selectedClassId) ? 'This Hero Class is already taken by another player' : ''}>
+            <span>
+              <Button variant="contained" onClick={handleCreateCharacter} disabled={creating || !charName.trim() || !selectedClassId || (selectedClass?.isHeroClass === true && takenHeroClassIds.has(selectedClassId))}>
+                {creating ? 'Creating...' : 'Create'}
+              </Button>
+            </span>
+          </Tooltip>
         </DialogActions>
       </Dialog>
 

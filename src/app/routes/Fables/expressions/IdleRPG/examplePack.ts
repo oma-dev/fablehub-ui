@@ -30,6 +30,7 @@ export type ExampleClassForm = {
   name: string
   description: string
   iconUrl: string
+  isHeroClass?: boolean
   damageMainStat: string
   primaryAttackAbilityId: string
   attackTags: string

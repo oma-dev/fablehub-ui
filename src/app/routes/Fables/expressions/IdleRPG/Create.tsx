@@ -106,6 +106,7 @@ type ClassForm = {
   name: string
   description: string
   iconUrl: string
+  isHeroClass: boolean
   damageMainStat: string
   primaryAttackAbilityId: string
   attackTags: string
@@ -135,7 +136,7 @@ const emptyAbility = (): AbilityForm => ({
   reactiveBaseChance: '0.2', reactiveScalingStat: '', reactiveScalingCoeff: '0',
 })
 const emptyClass = (): ClassForm => ({
-  id: '', name: '', description: '', iconUrl: '',
+  id: '', name: '', description: '', iconUrl: '', isHeroClass: false,
   damageMainStat: 'STR', primaryAttackAbilityId: '',
   attackTags: '', attackRequired: true, attackAllowEmpty: false,
   defenseTags: '', defenseRequired: false, defenseAllowEmpty: true,
@@ -229,6 +230,7 @@ export default function IdleRpgCreate() {
       )
       return {
         id: c.id, name: c.name, description: c.description ?? '', iconUrl: c.iconUrl ?? '',
+        isHeroClass: c.isHeroClass ?? false,
         damageMainStat: c.scaling.damageMainStat ?? 'STR',
         primaryAttackAbilityId: primaryAbility?.id ?? '',
         attackTags: c.slots?.attack_source?.allowedTagsAny?.join(', ') ?? '',
@@ -337,7 +339,7 @@ export default function IdleRpgCreate() {
       reactiveScalingStat: (a as any).reactiveScalingStat ?? '',
       reactiveScalingCoeff: (a as any).reactiveScalingCoeff ?? '0',
     })))
-    setClasses(ex.classes.map((c) => ({ ...c, resourceId: c.resourceId ?? '' })))
+    setClasses(ex.classes.map((c) => ({ ...c, isHeroClass: c.isHeroClass ?? false, resourceId: c.resourceId ?? '' })))
     setCreatures(ex.creatures.map((c) => ({ ...c, abilityIds: c.abilityIds ?? '', resourceId: c.resourceId ?? '', resourceMax: c.resourceMax ?? '' })))
     setItems(ex.items)
     setQuests(ex.quests)
@@ -445,6 +447,7 @@ export default function IdleRpgCreate() {
           name: c.name.trim(),
           ...(c.description.trim() ? { description: c.description.trim() } : {}),
           ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
+          ...(c.isHeroClass ? { isHeroClass: true } : {}),
           scaling: { damageMainStat: c.damageMainStat },
           primaryAttack: { delivery, styleId },
         slots: {
@@ -851,6 +854,7 @@ export default function IdleRpgCreate() {
                     <TextField size="small" label="Name" value={c.name} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 120 }} />
                     <TextField size="small" label="Description" value={c.description} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} sx={{ flex: 1 }} />
                     <TextField size="small" label="Icon URL" value={c.iconUrl} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 180 }} />
+                    <FormControlLabel control={<Checkbox size="small" checked={c.isHeroClass} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, isHeroClass: e.target.checked } : x))} />} label={<Typography variant="body2" sx={{ color: c.isHeroClass ? '#ffc145' : 'text.secondary', fontWeight: c.isHeroClass ? 700 : 400 }}>Hero Class</Typography>} />
                   </Box>
                   <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1 }}>
                     <FormControl size="small" sx={{ minWidth: 100 }}>

@@ -271,6 +271,8 @@ export interface ClassBlock {
   name: string
   description?: string
   iconUrl?: string
+  /** When true, only one character per realm may pick this class. */
+  isHeroClass?: boolean
   scaling: { damageMainStat: string; secondaryBenefits?: Record<string, string[]> }
   primaryAttack: { delivery: string; styleId: string }
   slots: Record<string, { required: boolean; allowEmpty: boolean; allowedTagsAny: string[] }>
