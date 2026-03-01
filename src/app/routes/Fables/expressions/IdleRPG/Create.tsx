@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import Accordion from '@mui/material/Accordion'
 import AccordionDetails from '@mui/material/AccordionDetails'
@@ -36,7 +36,7 @@ import type {
   Quest,
   Raid,
 } from '../../../../../services/api'
-import { RARITY_NAME_TO_NUMBER } from '../../../../../services/api'
+import { RARITY_NAME_TO_NUMBER, RARITY_NAMES } from '../../../../../services/api'
 import { exampleFormState } from './examplePack'
 
 // --- Helpers ---
@@ -61,6 +61,25 @@ function parseKeyValueNumber(s: string): Record<string, number> {
       }
     })
   return out
+}
+
+function serializeKeyValueNumber(obj: Record<string, number> | undefined): string {
+  if (!obj) return ''
+  return Object.entries(obj).map(([k, v]) => `${k}:${v}`).join(', ')
+}
+function serializeStats(stats: Partial<Record<string, number>> | undefined): string {
+  if (!stats) return ''
+  return Object.entries(stats).filter(([, v]) => v != null && v !== 0).map(([k, v]) => `${k}:${v}`).join(', ')
+}
+function normalizeDelivery(v: string): (typeof DELIVERIES)[number] {
+  if (v && DELIVERIES.includes(v as (typeof DELIVERIES)[number])) return v as (typeof DELIVERIES)[number]
+  if (v === 'ranged') return 'projectile_straight'
+  return 'melee'
+}
+function normalizeStyleId(v: string): (typeof STYLE_IDS)[number] {
+  if (v && STYLE_IDS.includes(v as (typeof STYLE_IDS)[number])) return v as (typeof STYLE_IDS)[number]
+  if (v === 'melee_flail') return 'melee_slash'
+  return 'melee_slash'
 }
 
 const STAT_IDS = ['STR', 'DEX', 'INT', 'LCK', 'HP', 'ARM'] as const
@@ -158,6 +177,128 @@ export default function IdleRpgCreate() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [showExampleModal, setShowExampleModal] = useState(true)
+  const importFileRef = useRef<HTMLInputElement>(null)
+
+  const importFromPack = (pack: IdleRpgPackV1) => {
+    const xpTable = pack.rules.xpTable ?? {}
+    setMaxLevel(pack.rules.maxLevel ?? 10)
+    setCombatPresetId((pack.rules as any).combatPresetId ?? 'combat_v1_simple')
+    setXpEntries(
+      Object.entries(xpTable)
+        .filter(([lvl]) => lvl !== '1')
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([level, xp]) => ({ level, xp: String(xp) })),
+    )
+    setStatPointsPerLevel((pack.rules as any).statPointsPerLevel ?? 3)
+    setAbilityPointsPerLevel(String((pack.rules as any).abilityPointsPerLevel ?? 1))
+    const absMap = (pack.rules as any).abilitySlotsByLevel as Record<number, number> | undefined
+    setAbilitySlotsByLevel(absMap ? Object.entries(absMap).map(([k, v]) => `${k}:${v}`).join(',') : '')
+    setCurrencies(pack.economy.currencies.map((c) => ({ id: c.id, name: c.name, iconUrl: c.iconUrl })))
+    setResources((pack.resources ?? []).map((r: any) => ({
+      id: r.id, name: r.name, description: r.description ?? '',
+      colorHex: r.colorHex ?? '#3b82f6', isGenerative: r.isGenerative ?? false,
+      max: String(r.max ?? 100), regenPerTurn: String(r.regenPerTurn ?? 5), gainOnHit: String(r.gainOnHit ?? 0),
+    })))
+    setAbilities((pack.abilities ?? []).map((a) => ({
+      id: a.id, name: a.name, abilityType: a.abilityType, description: a.description ?? '',
+      iconUrl: a.iconUrl ?? '',
+      delivery: normalizeDelivery(a.primaryAttack?.delivery ?? 'melee'),
+      styleId: normalizeStyleId(a.primaryAttack?.styleId ?? 'melee_slash'),
+      cooldownTurns: String((a as any).cooldownTurns ?? 0),
+      resourceCostId: (a as any).cost?.resourceCost?.resourceId ?? '',
+      resourceCostAmount: String((a as any).cost?.resourceCost?.amount ?? 0),
+      unlockCost: String((a as any).unlockCost ?? 1),
+      minLevel: String((a as any).requirements?.minLevel ?? 1),
+      effectKind: (a as any).effects?.[0]?.kind ?? 'damage',
+      effectAmount: String((a as any).effects?.[0]?.amount ?? 0),
+      effectPercentage: String((a as any).effects?.[0]?.percentage ?? 0),
+      effectLifestealPct: String((a as any).effects?.[0]?.lifestealPercent ?? 0),
+      animWeaponSource: (a.animationFrames?.weapon?.[0]?.imageSource ?? 'url') as any,
+      animWeaponUrl: a.animationFrames?.weapon?.[0]?.url ?? '',
+      animWeaponDelayMs: String(a.animationFrames?.weapon?.[0]?.delayMs ?? 0),
+      animProjectileSource: (a.animationFrames?.projectile?.[0]?.imageSource ?? 'url') as any,
+      animProjectileUrl: a.animationFrames?.projectile?.[0]?.url ?? '',
+      animProjectileTrajectory: (a.animationFrames?.projectile?.[0]?.trajectory ?? 'arc') as 'straight' | 'arc',
+      animProjectileDelayMs: String(a.animationFrames?.projectile?.[0]?.delayMs ?? 0),
+      animImpactSource: (a.animationFrames?.impact?.[0]?.imageSource ?? 'url') as any,
+      animImpactUrl: a.animationFrames?.impact?.[0]?.url ?? '',
+      animImpactDelayMs: String(a.animationFrames?.impact?.[0]?.delayMs ?? 0),
+    })))
+    setClasses(pack.classes.map((c) => {
+      const primaryAbility = (pack.abilities ?? []).find(
+        (a) => a.abilityType === 'primary' && normalizeDelivery(a.primaryAttack?.delivery ?? 'melee') === normalizeDelivery(c.primaryAttack.delivery) && normalizeStyleId(a.primaryAttack?.styleId ?? 'melee_slash') === normalizeStyleId(c.primaryAttack.styleId),
+      )
+      return {
+        id: c.id, name: c.name, description: c.description ?? '', iconUrl: c.iconUrl ?? '',
+        damageMainStat: c.scaling.damageMainStat ?? 'STR',
+        primaryAttackAbilityId: primaryAbility?.id ?? '',
+        attackTags: c.slots?.attack_source?.allowedTagsAny?.join(', ') ?? '',
+        attackRequired: c.slots?.attack_source?.required ?? true,
+        attackAllowEmpty: c.slots?.attack_source?.allowEmpty ?? false,
+        defenseTags: c.slots?.defense_layer?.allowedTagsAny?.join(', ') ?? '',
+        defenseRequired: c.slots?.defense_layer?.required ?? false,
+        defenseAllowEmpty: c.slots?.defense_layer?.allowEmpty ?? true,
+        regularAbilityIds: c.abilities?.regular?.join(', ') ?? '',
+        ultimateAbilityId: c.abilities?.ultimate ?? '',
+        resourceId: (c as any).resourceId ?? '',
+      }
+    }))
+    setCreatures(pack.creatures.map((c) => ({
+      id: c.id, name: c.name, role: c.role,
+      level: String(c.level), hp: String(c.hp), ap: String(c.ap), arm: String(c.arm),
+      iconUrl: c.iconUrl ?? '', tags: c.tags?.join(', ') ?? '',
+      abilityIds: (c as any).abilityIds?.join(', ') ?? '',
+      resourceId: (c as any).resourceId ?? '',
+      resourceMax: (c as any).resourceMax != null ? String((c as any).resourceMax) : '',
+    })))
+    setItems(pack.items.map((i) => ({
+      id: i.id, name: i.name,
+      rarity: RARITY_NAMES[typeof i.rarity === 'number' ? i.rarity : 1] ?? 'common',
+      slot: i.slot, tags: i.tags?.join(', ') ?? '', stats: serializeStats(i.stats),
+      iconUrl: i.iconUrl ?? '', animationUrl: i.animationUrl ?? '',
+      projectileUrl: i.projectileUrl ?? '', impactUrl: i.impactUrl ?? '',
+      priceCurrencyId: i.price?.currencyId ?? '',
+      priceAmount: i.price?.amount != null ? String(i.price.amount) : '',
+    })))
+    setQuests(pack.quests.map((q) => ({
+      id: q.id, name: q.name, creatureId: q.creatureId, durationSec: String(q.durationSec),
+      iconUrl: q.iconUrl ?? '', rewardXp: String(q.rewards.xp),
+      rewardCurrency: serializeKeyValueNumber(q.rewards.currency),
+      lootTableId: q.rewards.lootTableId ?? '',
+    })))
+    setDungeons((pack.dungeons ?? []).map((d) => ({
+      id: d.id, name: d.name, description: d.description ?? '', imageUrl: d.imageUrl ?? '',
+      requiredLevel: String(d.requiredLevel), bossCreatureId: d.bossCreatureId ?? '',
+    })))
+    setRaids((pack.raids ?? []).map((r) => ({
+      id: r.id, name: r.name, description: r.description ?? '', imageUrl: r.imageUrl ?? '',
+      requiredLevel: String(r.requiredLevel), bossCreatureId: r.bossCreatureId ?? '',
+      currencyId: r.requiredCurrencyCost?.currencyId ?? '',
+      costAmount: String(r.requiredCurrencyCost?.amount ?? 0),
+    })))
+    setListings(pack.merchant?.listings ?? [])
+    setLootTables(pack.lootTables.map((t) => ({
+      id: t.id,
+      entries: t.entries.map((e) => ({ itemId: e.itemId, weight: String(e.weight), classId: e.conditions?.classId ?? '' })),
+    })))
+    setShowExampleModal(false)
+  }
+
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const pack = JSON.parse(ev.target?.result as string) as IdleRpgPackV1
+        importFromPack(pack)
+      } catch {
+        setError('Invalid JSON file. Please upload a valid IdleRpgPackV1 JSON.')
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
 
   const fillWithExampleData = () => {
     const ex = exampleFormState
@@ -439,6 +580,17 @@ export default function IdleRpgCreate() {
       merchant: { listings },
       lootTables: lootTableList,
     }
+  }
+
+  const handleExportJson = () => {
+    const pack = buildPack()
+    const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'idlerpg-pack.json'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -924,6 +1076,13 @@ export default function IdleRpgCreate() {
             <Button type="submit" variant="contained" color="primary" disabled={submitting}>
               {submitting ? 'Creating…' : 'Create realm'}
             </Button>
+            <Button type="button" variant="outlined" color="secondary" onClick={handleExportJson}>
+              Export JSON
+            </Button>
+            <Button type="button" variant="outlined" color="secondary" disabled={submitting} onClick={() => importFileRef.current?.click()}>
+              Import JSON
+            </Button>
+            <input ref={importFileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={handleImportJson} />
             <Button component={Link} to={`/fables/${fableId}`} variant="outlined" color="primary" disabled={submitting}>Cancel</Button>
           </Box>
         </form>

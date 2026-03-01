@@ -427,6 +427,7 @@ export interface CombatTurnEvent {
   abilityId?: string
   abilityName?: string
   statusEffectId?: string
+  resourceAfter?: { current: number; max: number }
   statusEffectName?: string
 }
 
@@ -434,6 +435,7 @@ export interface CombatTurn {
   turnIndex: number
   events: CombatTurnEvent[]
   activeStatusEffects?: Record<string, ActiveStatusEffect[]>
+  resources?: Record<string, { current: number; max: number }>
 }
 
 export interface CombatResult {

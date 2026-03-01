@@ -1,5 +1,12 @@
 import type { CharacterState, IdleRpgPackV1 } from '../../../../../../services/api'
 
+export interface ResourceInfo {
+  name: string
+  colorHex: string
+  max: number
+  isGenerative: boolean
+}
+
 /** Compute player combat stats (max HP, AP, ARM) from character + pack. */
 export function computePlayerCombatStats(
   character: CharacterState,
@@ -25,4 +32,22 @@ export function computePlayerCombatStats(
   const ap = Math.max(1, character.level * 2 + (base[mainStat] ?? 0))
   const arm = Math.max(0, base.ARM ?? 0)
   return { maxHp, ap, arm }
+}
+
+/** Resolve resource info for a character's class (returns null if class has no resource). */
+export function resolveCharacterResource(pack: IdleRpgPackV1, classId?: string | null): ResourceInfo | null {
+  if (!classId) return null
+  const cls = pack.classes?.find((c) => c.id === classId)
+  if (!cls?.resourceId) return null
+  const res = (pack.resources ?? []).find((r) => r.id === cls.resourceId)
+  if (!res) return null
+  return { name: res.name, colorHex: res.colorHex, max: res.max, isGenerative: res.isGenerative }
+}
+
+/** Resolve resource info for a creature by its resourceId (returns null if none). */
+export function resolveCreatureResource(pack: IdleRpgPackV1, resourceId?: string | null): ResourceInfo | null {
+  if (!resourceId) return null
+  const res = (pack.resources ?? []).find((r) => r.id === resourceId)
+  if (!res) return null
+  return { name: res.name, colorHex: res.colorHex, max: res.max, isGenerative: res.isGenerative }
 }

@@ -15,6 +15,13 @@ import ImpactFrame from './vfx/ImpactFrame'
 import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from './vfx/Projectile'
 import WeaponFrame from './vfx/WeaponFrame'
 
+interface ResourceInfo {
+  name: string
+  colorHex: string
+  max: number
+  isGenerative: boolean
+}
+
 interface CombatantInfo {
   name: string
   level: number
@@ -27,6 +34,8 @@ interface CombatantInfo {
   weaponUrl?: string | null
   /** Pre-resolved animation frames (Ability + weapon URLs already resolved by caller). */
   animationFrames?: AnimationFrames | null
+  /** Optional resource (mana, rage, etc.) to display below HP bar. */
+  resource?: ResourceInfo | null
 }
 
 interface Props {
@@ -148,6 +157,36 @@ function HpBar({ current, max }: { current: number; max: number }) {
   )
 }
 
+function ResourceBar({ current, max, name, colorHex }: { current: number; max: number; name: string; colorHex: string }) {
+  const pct = Math.max(0, Math.min(100, (current / max) * 100))
+  const color = colorHex.startsWith('#') ? colorHex : `#${colorHex}`
+  return (
+    <Box sx={{ width: '100%' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE, color }}>{name}</Typography>
+        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE }}>{current} / {max}</Typography>
+      </Box>
+      <LinearProgress
+        variant="determinate"
+        value={pct}
+        sx={{
+          height: HP_BAR_HEIGHT,
+          borderRadius: HP_BAR_RADIUS,
+          bgcolor: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          transition: 'none',
+          '& .MuiLinearProgress-bar': {
+            transition: 'transform 0.4s ease-out',
+            borderRadius: HP_BAR_RADIUS,
+            background: `linear-gradient(90deg, ${color}aa, ${color})`,
+            boxShadow: `0 0 10px ${color}55`,
+          },
+        }}
+      />
+    </Box>
+  )
+}
+
 const STATUS_ICON_SIZE = 24
 const STATUS_EFFECT_COLORS: Record<string, string> = {
   dot: '#ce93d8', hot: '#66bb6a', stun: '#ffa726', buff: '#64b5f6', debuff: '#ef5350',
@@ -251,6 +290,12 @@ interface ActiveImpactFrame {
 export default function CombatReplay({ combat, player, creature, victory, onFinish, leftCharacterId }: Props) {
   const [playerHp, setPlayerHp] = useState(player.maxHp)
   const [creatureHp, setCreatureHp] = useState(creature.maxHp)
+  const [playerResourceCurrent, setPlayerResourceCurrent] = useState<number | null>(
+    player.resource ? (player.resource.isGenerative ? 0 : player.resource.max) : null
+  )
+  const [creatureResourceCurrent, setCreatureResourceCurrent] = useState<number | null>(
+    creature.resource ? (creature.resource.isGenerative ? 0 : creature.resource.max) : null
+  )
   const [done, setDone] = useState(false)
   const [currentTurn, setCurrentTurn] = useState(-1)
   const abortRef = useRef(false)
@@ -299,23 +344,35 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
 
   const animateAttack = useCallback(async (
     attackerSide: 'player' | 'creature',
-    event: CombatTurnEvent,
+    events: CombatTurnEvent[],
     anim: AttackAnimationConfig,
   ) => {
-    if (abortRef.current) return
+    if (abortRef.current || events.length === 0) return
     const setAttackerVariant = attackerSide === 'player' ? setPlayerVariant : setCreatureVariant
     const setTargetImpact = attackerSide === 'player' ? setShowCreatureImpact : setShowPlayerImpact
-    const setTargetDmg = attackerSide === 'player' ? setCreatureDmg : setPlayerDmg
-    const setTargetHp = event.targetId === playerId ? setPlayerHp : setCreatureHp
     const setTargetVariant = attackerSide === 'player' ? setCreatureVariant : setPlayerVariant
     const frames = anim.frames
 
+    // Step 1: Spend resource BEFORE the animation fires — standard gaming feel
+    const hasResourceCost = events.some(ev => ev.type === 'resource_change' && ev.resourceAfter)
+    if (hasResourceCost) {
+      for (const ev of events) {
+        if (ev.type === 'resource_change' && ev.resourceAfter) {
+          const isPlayerSource = ev.sourceId === playerId
+          if (isPlayerSource) setPlayerResourceCurrent(ev.resourceAfter.current)
+          else setCreatureResourceCurrent(ev.resourceAfter.current)
+        }
+      }
+      // Brief pause so the bar animation is visible before the ability fires
+      await sleep(350)
+      if (abortRef.current) return
+    }
+
+    // Step 2: Cast animation begins
     setAttackerVariant('cast')
     await sleep(160)
 
     // --- Weapon frames (all fired concurrently) ---
-    // Sequence timing waits only for the fade-in phase. Each particle's lifetimeMs controls when it
-    // fades out independently — a particle without lifetimeMs stays until sequence-end cleanup.
     const weaponFrames = (frames?.weapon ?? []).filter(f => f.url?.trim())
     if (weaponFrames.length > 0) {
       const maxWeaponMs = Math.max(...weaponFrames.map(f => (f.delayMs ?? 0) + (f.fadeInMs ?? 200)))
@@ -326,7 +383,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           side: attackerSide,
           url: f.url!.trim(),
           fadeInMs: f.fadeInMs ?? 200,
-          lifetimeMs: f.lifetimeMs,  // undefined = stay until sequence-end cleanup
+          lifetimeMs: f.lifetimeMs,
           sizePx: f.sizePx,
           startSizePx: f.startSizePx,
           endSizePx: f.endSizePx,
@@ -335,16 +392,14 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
         }
         setActiveWeaponFrames(prev => [...prev, entry])
         if (f.lifetimeMs != null) {
-          // Auto-remove after explicit lifetime; WeaponFrame component handles the fade-out animation
           await sleep(f.lifetimeMs + 100)
           setActiveWeaponFrames(prev => prev.filter(e => e.key !== entry.key))
         }
-        // else: cleaned up at sequence end via setActiveWeaponFrames([])
       })
       await sleep(maxWeaponMs)
     }
 
-    // --- Projectile frames (all fired concurrently; lifetimeMs takes precedence over speedMs) ---
+    // --- Projectile frames ---
     const projFrames = frames?.projectile ?? []
     if (anim.projectile && projFrames.length > 0) {
       const srcRef = attackerSide === 'player' ? playerPortraitRef : creaturePortraitRef
@@ -384,7 +439,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
 
     if (abortRef.current) return
 
-    // --- Impact frames (all fired concurrently; lifetimeMs shorthand overrides showMs/vanishMs) ---
+    // --- Impact frames ---
     const impactFrames = (frames?.impact ?? []).filter(f => f.url?.trim())
     const resolveImpactTiming = (f: typeof impactFrames[0]) => {
       if (f.showMs != null && f.vanishMs != null) return { showMs: f.showMs, vanishMs: f.vanishMs }
@@ -418,14 +473,46 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
       })
     }
 
+    // Combat events (damage/heal/execute) — split into target-side (shown at impact) and self-side
+    // (lifesteal heal shown 200ms later so it reads: "hit enemy → drain life → heal self")
+    const combatEvents = events.filter(ev => ev.type !== 'resource_change')
+    const targetEvents = combatEvents.filter(ev => ev.targetId !== ev.sourceId || ev.type !== 'heal')
+    const selfHealEvents = combatEvents.filter(ev => ev.targetId === ev.sourceId && ev.type === 'heal')
+
     setTargetImpact(true)
     setTargetVariant('hit')
-    dmgKeyRef.current++
-    setTargetDmg({ value: event.value, type: event.type, key: dmgKeyRef.current, abilityName: event.abilityName })
-    setTargetHp(Math.max(0, event.targetHpAfter))
+    for (const ev of targetEvents) {
+      const isOnPlayer = ev.targetId === playerId
+      dmgKeyRef.current++
+      if (isOnPlayer) {
+        setPlayerDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+        setPlayerHp(Math.max(0, ev.targetHpAfter))
+      } else {
+        setCreatureDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+        setCreatureHp(Math.max(0, ev.targetHpAfter))
+      }
+    }
+
+    // Self-heals (lifesteal) shown 200ms after the hit for visual clarity
+    if (selfHealEvents.length > 0) {
+      sleep(200).then(() => {
+        for (const ev of selfHealEvents) {
+          const isOnPlayer = ev.targetId === playerId
+          dmgKeyRef.current++
+          if (isOnPlayer) {
+            setPlayerDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+            setPlayerHp(Math.max(0, ev.targetHpAfter))
+          } else {
+            setCreatureDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+            setCreatureHp(Math.max(0, ev.targetHpAfter))
+          }
+        }
+      })
+    }
+
     await sleep(maxImpactMs)
 
-    setActiveWeaponFrames([])  // clean up any weapon particles that had no explicit lifetimeMs
+    setActiveWeaponFrames([])
     setActiveImpactFrames([])
     setTargetImpact(false)
     setAttackerVariant('return')
@@ -433,7 +520,8 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     await sleep(280)
 
     setAttackerVariant('idle')
-    setTargetDmg(null)
+    setPlayerDmg(null)
+    setCreatureDmg(null)
   }, [playerId, player.weaponUrl, creature.weaponUrl, getPortraitPos])
 
   useEffect(() => {
@@ -450,19 +538,34 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
         const turn = combat.turns[i]
         setCurrentTurn(turn.turnIndex)
 
+        // Group consecutive events with the same sourceId+abilityId into one animation
+        const groups: CombatTurnEvent[][] = []
         for (const ev of turn.events) {
-          if (abortRef.current) return
-          const attackerSide = ev.sourceId === playerId ? 'player' : 'creature'
-          const anim = attackerSide === 'player' ? playerAnim : creatureAnim
-
-          await animateAttack(attackerSide, ev, anim)
+          const prev = groups[groups.length - 1]
+          if (prev && prev[0].sourceId === ev.sourceId && ev.abilityId && prev[0].abilityId === ev.abilityId) {
+            prev.push(ev)
+          } else {
+            groups.push([ev])
+          }
         }
-        // Update status effect icons after each turn
+        for (const group of groups) {
+          if (abortRef.current) return
+          // Pure resource_change groups (regen events with no abilityId) are handled by turn snapshot
+          if (group.every(ev => ev.type === 'resource_change')) continue
+          const attackerSide = group[0].sourceId === playerId ? 'player' : 'creature'
+          const anim = attackerSide === 'player' ? playerAnim : creatureAnim
+          await animateAttack(attackerSide, group, anim)
+        }
+        // Update status effects and resources after each turn
+        const creatureId = combat.turns[0]?.events?.find(e => e.sourceId !== playerId)?.sourceId
+          ?? combat.turns[0]?.events?.find(e => e.targetId !== playerId)?.targetId ?? ''
         if (turn.activeStatusEffects) {
           setPlayerStatusEffects(turn.activeStatusEffects[playerId] ?? [])
-          const creatureId = combat.turns[0]?.events?.find(e => e.sourceId !== playerId)?.sourceId
-            ?? combat.turns[0]?.events?.find(e => e.targetId !== playerId)?.targetId ?? ''
           setCreatureStatusEffects(turn.activeStatusEffects[creatureId] ?? [])
+        }
+        if (turn.resources) {
+          if (turn.resources[playerId]) setPlayerResourceCurrent(turn.resources[playerId].current)
+          if (turn.resources[creatureId]) setCreatureResourceCurrent(turn.resources[creatureId].current)
         }
         if (!abortRef.current) await sleep(300)
       }
@@ -496,7 +599,15 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     }
     setPlayerHp(pHp)
     setCreatureHp(cHp)
-    setCurrentTurn(combat.turns[combat.turns.length - 1]?.turnIndex ?? 0)
+    // Jump resources to final state
+    const lastTurn = combat.turns[combat.turns.length - 1]
+    if (lastTurn?.resources) {
+      const creatureId = combat.turns[0]?.events?.find(e => e.sourceId !== playerId)?.sourceId
+        ?? combat.turns[0]?.events?.find(e => e.targetId !== playerId)?.targetId ?? ''
+      if (lastTurn.resources[playerId]) setPlayerResourceCurrent(lastTurn.resources[playerId].current)
+      if (lastTurn.resources[creatureId]) setCreatureResourceCurrent(lastTurn.resources[creatureId].current)
+    }
+    setCurrentTurn(lastTurn?.turnIndex ?? 0)
     setDone(true)
   }
 
@@ -578,6 +689,9 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {player.level}</Typography>
             </Box>
             <HpBar current={playerHp} max={player.maxHp} />
+            {player.resource && playerResourceCurrent !== null && (
+              <ResourceBar current={playerResourceCurrent} max={player.resource.max} name={player.resource.name} colorHex={player.resource.colorHex} />
+            )}
             <StatusEffectIcons effects={playerStatusEffects} />
             <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
               {STAT_LABELS.map(({ key, label }) => (
@@ -652,6 +766,9 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {creature.level}</Typography>
             </Box>
             <HpBar current={creatureHp} max={creature.maxHp} />
+            {creature.resource && creatureResourceCurrent !== null && (
+              <ResourceBar current={creatureResourceCurrent} max={creature.resource.max} name={creature.resource.name} colorHex={creature.resource.colorHex} />
+            )}
             <StatusEffectIcons effects={creatureStatusEffects} />
             <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
               {STAT_LABELS.map(({ key, label }) => (

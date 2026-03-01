@@ -23,7 +23,7 @@ import type {
 import { RARITY_NAMES } from '../../../../../../services/api'
 import CombatReplay from '../components/CombatReplay'
 import { resolveAnimationFrames } from '../components/vfx/animationConfig'
-import { computePlayerCombatStats } from '../utils/combatStats'
+import { computePlayerCombatStats, resolveCharacterResource, resolveCreatureResource } from '../utils/combatStats'
 
 import dungeonBg from '../../../../../../assets/backgrounds/dungeon.png'
 
@@ -120,6 +120,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
     weaponDef?.impactUrl,
   )
   const playerStats = computePlayerCombatStats(character, pack)
+  const playerResource = resolveCharacterResource(pack, character.classId)
   const boss = currentDungeon?.boss
 
   return (
@@ -453,6 +454,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
               styleId: cls?.primaryAttack?.styleId,
               weaponUrl: weaponDef?.iconUrl,
               animationFrames: resolvedFrames ?? primaryAbility?.animationFrames,
+              resource: playerResource,
             }}
             creature={{
               name: boss.name,
@@ -462,6 +464,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
               arm: boss.arm,
               portraitUrl: boss.iconUrl ?? undefined,
               styleId: 'melee_slash',
+              resource: resolveCreatureResource(pack, boss.resourceId),
             }}
             victory={combatResult.victory}
             onFinish={handleCombatFinish}

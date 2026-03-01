@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../../../contexts/AuthContext'
 import Accordion from '@mui/material/Accordion'
@@ -322,6 +322,7 @@ export default function IdleRpgEdit() {
   const [lootTables, setLootTables] = useState<{ id: string; entries: LootEntryForm[] }[]>([])
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const importFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!fableId || !realmId || authLoading) return
@@ -604,6 +605,56 @@ export default function IdleRpgEdit() {
       merchant: { listings },
       lootTables: lootTableList,
     }
+  }
+
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const pack = JSON.parse(ev.target?.result as string) as IdleRpgPackV1
+        const xpTable = pack.rules.xpTable ?? {}
+        setMaxLevel(pack.rules.maxLevel ?? 10)
+        setCombatPresetId((pack.rules as any).combatPresetId ?? 'combat_v1_simple')
+        setXpEntries(
+          Object.entries(xpTable)
+            .filter(([lvl]) => lvl !== '1')
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([level, xp]) => ({ level, xp: String(xp) })),
+        )
+        setStatPointsPerLevel((pack.rules as any).statPointsPerLevel ?? 3)
+        setAbilityPointsPerLevel(String((pack.rules as any).abilityPointsPerLevel ?? 1))
+        const absMap = (pack.rules as any).abilitySlotsByLevel as Record<number, number> | undefined
+        setAbilitySlotsByLevel(absMap ? Object.entries(absMap).map(([k, v]) => `${k}:${v}`).join(',') : '')
+        setCurrencies(pack.economy.currencies.map((c) => ({ id: c.id, name: c.name, iconUrl: c.iconUrl })))
+        setResources(hydrateResources(pack))
+        setAbilities(hydrateAbilities(pack))
+        setClasses(hydrateClasses(pack).length > 0 ? hydrateClasses(pack) : [emptyClass()])
+        setCreatures(hydrateCreatures(pack))
+        setItems(hydrateItems(pack))
+        setQuests(hydrateQuests(pack))
+        setDungeons(hydrateDungeons(pack))
+        setRaids(hydrateRaids(pack))
+        setListings(pack.merchant?.listings ?? [])
+        setLootTables(hydrateLootTables(pack))
+      } catch {
+        setError('Invalid JSON file. Please upload a valid IdleRpgPackV1 JSON.')
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  const handleExportJson = () => {
+    const pack = buildPack()
+    const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'idlerpg-pack.json'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1134,6 +1185,13 @@ export default function IdleRpgEdit() {
             <Button type="submit" variant="contained" color="primary" disabled={submitting}>
               {submitting ? 'Saving…' : 'Save changes'}
             </Button>
+            <Button type="button" variant="outlined" color="secondary" onClick={handleExportJson}>
+              Export JSON
+            </Button>
+            <Button type="button" variant="outlined" color="secondary" disabled={submitting} onClick={() => importFileRef.current?.click()}>
+              Import JSON
+            </Button>
+            <input ref={importFileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={handleImportJson} />
             <Button component={Link} to={`/fables/${fableId}`} variant="outlined" color="primary" disabled={submitting}>Cancel</Button>
           </Box>
         </form>

@@ -15,7 +15,7 @@ import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import CombatReplay from '../components/CombatReplay'
 import { resolveAnimationFrames } from '../components/vfx/animationConfig'
-import { computePlayerCombatStats } from '../utils/combatStats'
+import { computePlayerCombatStats, resolveCharacterResource, resolveCreatureResource } from '../utils/combatStats'
 import { startQuest, claimQuest } from '../../../../../../services/api'
 import type { CharacterState, CombatResult, IdleRpgPackV1, Quest } from '../../../../../../services/api'
 
@@ -315,6 +315,8 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
           weaponDef?.impactUrl
         )
         const playerStats = computePlayerCombatStats(character, pack)
+        const playerResource = resolveCharacterResource(pack, character.classId)
+        const creatureResource = resolveCreatureResource(pack, creatureDef?.resourceId)
         return (
           <Box sx={{ flex: 1 }}>
             <CombatReplay
@@ -330,6 +332,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                 styleId: cls?.primaryAttack?.styleId,
                 weaponUrl: weaponDef?.iconUrl,
                 animationFrames: resolvedFrames ?? primaryAbility?.animationFrames,
+                resource: playerResource,
               }}
               creature={{
                 name: creatureDef?.name ?? 'Creature',
@@ -339,6 +342,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                 arm: creatureDef?.arm ?? 0,
                 portraitUrl: creatureDef?.iconUrl,
                 styleId: 'melee_slash',
+                resource: creatureResource,
               }}
               victory={combatData.victory}
               onFinish={handleCombatFinish}

@@ -133,6 +133,36 @@ function RaidHpBar({ current, max }: { current: number; max: number }) {
   )
 }
 
+function RaidResourceBar({ current, max, name, colorHex }: { current: number; max: number; name: string; colorHex: string }) {
+  const pct = Math.max(0, Math.min(100, (current / max) * 100))
+  const color = colorHex.startsWith('#') ? colorHex : `#${colorHex}`
+  return (
+    <Box sx={{ width: '100%' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE, color }}>{name}</Typography>
+        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE }}>{current} / {max}</Typography>
+      </Box>
+      <LinearProgress
+        variant="determinate"
+        value={pct}
+        sx={{
+          height: HP_BAR_HEIGHT,
+          borderRadius: HP_BAR_RADIUS,
+          bgcolor: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          transition: 'none',
+          '& .MuiLinearProgress-bar': {
+            transition: 'transform 0.4s ease-out',
+            borderRadius: HP_BAR_RADIUS,
+            background: `linear-gradient(90deg, ${color}aa, ${color})`,
+            boxShadow: `0 0 10px ${color}55`,
+          },
+        }}
+      />
+    </Box>
+  )
+}
+
 interface Props {
   replay: RaidReplayPayload
   group: IdleRpgGroup | null
@@ -431,6 +461,13 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                       </Typography>
                     </Box>
                     <RaidHpBar current={hp} max={maxHp} />
+                    {(() => {
+                      const memberCls = pack.classes?.find((c) => c.id === member?.classId)
+                      const resDef = memberCls?.resourceId ? (pack.resources ?? []).find((r) => r.id === memberCls.resourceId) : null
+                      if (!resDef) return null
+                      const resCurrent = resDef.isGenerative ? 0 : resDef.max
+                      return <RaidResourceBar current={resCurrent} max={resDef.max} name={resDef.name} colorHex={resDef.colorHex} />
+                    })()}
                     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                       {STAT_LABELS.map(({ key, label }) => (
                         <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
@@ -560,6 +597,12 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                   </Typography>
                 </Box>
                 <RaidHpBar current={currentHp[bossId] ?? 0} max={bossMaxHp} />
+                {(() => {
+                  const bossResDef = boss.resourceId ? (pack.resources ?? []).find((r) => r.id === boss.resourceId) : null
+                  if (!bossResDef) return null
+                  const resCurrent = bossResDef.isGenerative ? 0 : bossResDef.max
+                  return <RaidResourceBar current={resCurrent} max={bossResDef.max} name={bossResDef.name} colorHex={bossResDef.colorHex} />
+                })()}
                 <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                   {STAT_LABELS.map(({ key, label }) => (
                     <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>

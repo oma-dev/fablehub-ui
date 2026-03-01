@@ -24,7 +24,7 @@ import type {
   PvpHistoryEntry,
   RealmRosterEntry,
 } from '../../../../../../services/api'
-import { computePlayerCombatStats } from '../utils/combatStats'
+import { computePlayerCombatStats, resolveCharacterResource } from '../utils/combatStats'
 import CharacterCardModal from '../components/CharacterCardModal'
 import CombatReplay from '../components/CombatReplay'
 import { resolveAnimationFrames } from '../components/vfx/animationConfig'
@@ -212,6 +212,8 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
         const targetAbility = pack.abilities?.find((a) => a.primaryAttack?.styleId === targetCls?.primaryAttack?.styleId)
         const playerResolvedFrames = resolveAnimationFrames(playerAbility?.animationFrames, weaponDef?.iconUrl, weaponDef?.animationUrl, weaponDef?.projectileUrl, weaponDef?.impactUrl)
         const creatureResolvedFrames = resolveAnimationFrames(targetAbility?.animationFrames, targetWeaponDef?.iconUrl, targetWeaponDef?.animationUrl, targetWeaponDef?.projectileUrl, targetWeaponDef?.impactUrl)
+        const playerResource = resolveCharacterResource(pack, character.classId)
+        const targetResource = resolveCharacterResource(pack, combatResult.targetProfile.character.classId)
         return (
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, overflow: 'auto' }}>
             <CombatReplay
@@ -227,6 +229,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
                 styleId: cls?.primaryAttack?.styleId,
                 weaponUrl: weaponDef?.iconUrl,
                 animationFrames: playerResolvedFrames ?? playerAbility?.animationFrames,
+                resource: playerResource,
               }}
               creature={{
                 name: combatResult.targetProfile.character.name,
@@ -238,6 +241,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
                 styleId: targetCls?.primaryAttack?.styleId,
                 weaponUrl: targetWeaponDef?.iconUrl,
                 animationFrames: creatureResolvedFrames ?? targetAbility?.animationFrames,
+                resource: targetResource,
               }}
               victory={combatResult.victory}
               onFinish={handleCombatFinish}
