@@ -5,26 +5,21 @@ const DEFAULT_SIZE = 140
 interface Props {
   show: boolean
   url: string
-  /** Which side the defender is on — determines which card border the block anchors to. */
   side: 'player' | 'creature'
   showMs?: number
   vanishMs?: number
   sizePx?: number
   startSizePx?: number
   endSizePx?: number
-  /** Horizontal offset from the card border (positive = inward). */
   offsetX?: number
-  /** Vertical offset from portrait center (positive = down). */
   offsetY?: number
   id: string | number
 }
 
 /**
- * Block animation frame: positioned at the defender's card border (the edge facing the attacker).
- * Player card is on the left → block anchors at right edge.
- * Creature card is on the right → block anchors at left edge.
+ * Block animation frame: centered on the defender's portrait.
  */
-export default function BlockFrame({ show, url, side, showMs = 100, vanishMs = 500, sizePx, startSizePx, endSizePx, offsetX = 0, offsetY = 0, id }: Props) {
+export default function BlockFrame({ show, url, showMs = 100, vanishMs = 500, sizePx, startSizePx, endSizePx, offsetX = 0, offsetY = 0, id }: Props) {
   const totalSec = showMs / 1000 + vanishMs / 1000
   let fadeStart = showMs / 1000 / totalSec
   if (fadeStart < 0.08) fadeStart = 0.08
@@ -33,11 +28,6 @@ export default function BlockFrame({ show, url, side, showMs = 100, vanishMs = 5
   const baseSize = Math.max(startSize, endSize, 1)
   const initialScale = startSize / baseSize
   const finalScale = endSize / baseSize
-
-  const isPlayer = side === 'player'
-  const anchor: React.CSSProperties = isPlayer
-    ? { right: -baseSize / 2 + offsetX, top: '50%', marginTop: -baseSize / 2 + offsetY }
-    : { left: -baseSize / 2 + offsetX, top: '50%', marginTop: -baseSize / 2 + offsetY }
 
   return (
     <AnimatePresence>
@@ -60,7 +50,10 @@ export default function BlockFrame({ show, url, side, showMs = 100, vanishMs = 5
           exit={{ opacity: 0 }}
           style={{
             position: 'absolute',
-            ...anchor,
+            left: '50%',
+            top: '50%',
+            marginLeft: -baseSize / 2 + offsetX,
+            marginTop: -baseSize / 2 + offsetY,
             width: baseSize,
             height: baseSize,
             pointerEvents: 'none',

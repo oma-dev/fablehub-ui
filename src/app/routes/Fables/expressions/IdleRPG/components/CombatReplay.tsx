@@ -316,8 +316,8 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const arenaRef = useRef<HTMLDivElement>(null)
   const playerPortraitRef = useRef<HTMLDivElement>(null)
   const creaturePortraitRef = useRef<HTMLDivElement>(null)
-  const playerCardRef = useRef<HTMLDivElement>(null)
-  const creatureCardRef = useRef<HTMLDivElement>(null)
+  const playerCardRef = useRef<HTMLDivElement>(null)   // kept for potential future use
+  const creatureCardRef = useRef<HTMLDivElement>(null) // kept for potential future use
 
   const playerId = leftCharacterId ?? combat.turns[0]?.events[0]?.sourceId ?? 'player'
 
@@ -355,21 +355,6 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
       x: eRect.left + eRect.width / 2 - aRect.left,
       y: eRect.top + eRect.height / 2 - aRect.top,
     }
-  }, [])
-
-  const getCardBorderPos = useCallback((cardRef: React.RefObject<HTMLDivElement | null>, portraitRef: React.RefObject<HTMLDivElement | null>, side: 'player' | 'creature'): ProjectilePos => {
-    const arena = arenaRef.current
-    const card = cardRef.current
-    const portrait = portraitRef.current
-    if (!arena || !card) return { x: 0, y: 0 }
-    const aRect = arena.getBoundingClientRect()
-    const cRect = card.getBoundingClientRect()
-    const pRect = portrait?.getBoundingClientRect()
-    const y = pRect ? pRect.top + pRect.height / 2 - aRect.top : cRect.top + cRect.height / 2 - aRect.top
-    const x = side === 'creature'
-      ? cRect.left - aRect.left
-      : cRect.right - aRect.left
-    return { x, y }
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
@@ -440,12 +425,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     if (anim.projectile && projFrames.length > 0) {
       const srcRef = attackerSide === 'player' ? playerPortraitRef : creaturePortraitRef
       const tgtRef = attackerSide === 'player' ? creaturePortraitRef : playerPortraitRef
-      const defenderSide: 'player' | 'creature' = attackerSide === 'player' ? 'creature' : 'player'
-      const defenderCardRef = defenderSide === 'player' ? playerCardRef : creatureCardRef
-      const defenderPortraitRef = defenderSide === 'player' ? playerPortraitRef : creaturePortraitRef
-      const tgtPos = isBlocked
-        ? getCardBorderPos(defenderCardRef, defenderPortraitRef, defenderSide)
-        : getPortraitPos(tgtRef)
+      const tgtPos = getPortraitPos(tgtRef)
       const weaponUrlFallback = attackerSide === 'player' ? player.weaponUrl : creature.weaponUrl
       const dir = attackerSide === 'player' ? 'left-to-right' as const : 'right-to-left' as const
       const defaultFlight = (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
@@ -480,7 +460,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
 
     if (abortRef.current) return
 
-    // --- Block frames (shown at defender card border when blocked) ---
+    // --- Block frames (shown at defender portrait center when blocked) ---
     if (isBlocked && blockEvent) {
       const defenderSide: 'player' | 'creature' = attackerSide === 'player' ? 'creature' : 'player'
       const resolveBlockTiming = (f: AnimationBlockFrame) => {
@@ -618,7 +598,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     setAttackerVariant('idle')
     setPlayerDmg(null)
     setCreatureDmg(null)
-  }, [playerId, player.weaponUrl, creature.weaponUrl, getPortraitPos, getCardBorderPos])
+  }, [playerId, player.weaponUrl, creature.weaponUrl, getPortraitPos])
 
   useEffect(() => {
     if (combat.turns.length === 0) {

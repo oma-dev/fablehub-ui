@@ -14,7 +14,6 @@ import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
 import Typography from '@mui/material/Typography'
 import PersonIcon from '@mui/icons-material/Person'
-import SmartToyIcon from '@mui/icons-material/SmartToy'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -35,6 +34,19 @@ import WeaponFrame from '../../routes/Fables/expressions/IdleRPG/components/vfx/
 
 const styleIds = [...STYLE_IDS]
 const ALL_IMPACT_STYLES: ImpactStyle[] = ['slash', 'punch', 'flail', 'arrow', 'bolt', 'generic']
+
+// --- Mirror CombatReplay layout constants for accurate previewing ---
+const SCALE = 1.2
+const PORTRAIT_SIZE = Math.round(380 * SCALE)
+const PORTRAIT_BORDER_RADIUS = 3 * SCALE
+const PORTRAIT_BORDER = Math.round(3 * SCALE)
+const PERSON_ICON_SIZE = Math.round(100 * SCALE)
+const NAME_FONT_SIZE = `${1.1 * SCALE}rem`
+const CARD_GAP = 1.5 * SCALE
+const CARD_PADDING = 2.5 * SCALE
+const CARD_RADIUS = 3 * SCALE
+const CARD_MAX_WIDTH = Math.round(380 * SCALE)
+const VS_WIDTH = Math.round(70 * SCALE)
 const IMAGE_SOURCE_OPTIONS: { value: AnimationFrameImageSource; label: string }[] = [
   { value: 'url', label: 'Custom URL' },
   { value: 'weaponIcon', label: 'Weapon icon' },
@@ -208,7 +220,6 @@ function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'ri
 
 const CombatantCard = forwardRef<HTMLDivElement, {
   label: string
-  icon: React.ReactNode
   variant: string
   variants: ReturnType<typeof getMotionVariants>
   showImpact: boolean
@@ -216,7 +227,6 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   impactColor: string
   impactKey: number
   dmg: { value: number; type: 'damage' | 'heal' | 'block'; key: number } | null
-  accentGradient: string
   activeWeaponFrames?: ActiveWeaponFrameEntry[]
   activeImpactFrames?: ActiveImpactFrameEntry[]
   activeBlockFrames?: ActiveBlockFrameEntry[]
@@ -224,7 +234,6 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   side: 'player' | 'creature'
 }>(function CombatantCard({
   label,
-  icon,
   variant,
   variants,
   showImpact,
@@ -232,33 +241,45 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   impactColor,
   impactKey,
   dmg,
-  accentGradient,
   activeWeaponFrames,
   activeImpactFrames,
   activeBlockFrames,
   cardRef,
   side,
 }, ref) {
+  const isPlayer = side === 'player'
+  const borderColor = isPlayer ? 'rgba(99,102,241,0.45)' : 'rgba(239,68,68,0.4)'
+  const glowColor = isPlayer ? 'rgba(99,102,241,0.12)' : 'rgba(239,68,68,0.1)'
   return (
-    <motion.div variants={variants} animate={variant} style={{ width: 220, position: 'relative' }}>
+    <motion.div variants={variants} animate={variant} style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}>
       <Paper
         ref={cardRef}
         variant="outlined"
         sx={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
-          gap: 1.5, p: 2.5, borderRadius: 2, background: accentGradient,
+          gap: CARD_GAP, p: CARD_PADDING, pt: 0, borderRadius: CARD_RADIUS,
+          bgcolor: isPlayer ? '#14121f' : '#1a1414',
+          borderColor,
+          boxShadow: `0 0 24px rgba(0,0,0,0.4), 0 0 20px ${glowColor}`,
           position: 'relative', overflow: 'visible',
         }}
       >
-        <Box ref={ref} sx={{ position: 'relative', width: 100, height: 100 }}>
+        <Box ref={ref} sx={{ position: 'relative', width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, flexShrink: 0 }}>
           <Box
             sx={{
-              width: 100, height: 100, borderRadius: 1.5, bgcolor: 'rgba(0,0,0,0.12)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: '2px solid', borderColor: 'divider',
+              width: PORTRAIT_SIZE,
+              height: PORTRAIT_SIZE,
+              borderRadius: PORTRAIT_BORDER_RADIUS,
+              overflow: 'hidden',
+              bgcolor: '#14121f',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: `${PORTRAIT_BORDER}px solid rgba(168,85,247,0.35)`,
+              boxShadow: '0 0 36px rgba(168,85,247,0.2), inset 0 0 24px rgba(0,0,0,0.3)',
             }}
           >
-            {icon}
+            <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
           </Box>
           {(activeWeaponFrames ?? []).map(f => (
             <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
@@ -273,7 +294,7 @@ const CombatantCard = forwardRef<HTMLDivElement, {
             {dmg && <DamageNumber value={dmg.value} type={dmg.type} id={dmg.key} />}
           </AnimatePresence>
         </Box>
-        <Typography variant="subtitle1" fontWeight={700}>{label}</Typography>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ fontSize: NAME_FONT_SIZE }}>{label}</Typography>
         {(activeBlockFrames ?? []).map(f => (
           <BlockFrame key={f.key} show url={f.url} side={side} showMs={f.showMs} vanishMs={f.vanishMs} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
         ))}
@@ -557,19 +578,6 @@ export default function AnimationTest() {
     }
   }, [])
 
-  const getCardBorderPos = useCallback((cardRef: React.RefObject<HTMLDivElement | null>, defenderSide: 'player' | 'creature'): ProjectilePos => {
-    const arena = arenaRef.current
-    const el = cardRef.current
-    if (!arena || !el) return { x: 0, y: 0 }
-    const aRect = arena.getBoundingClientRect()
-    const eRect = el.getBoundingClientRect()
-    const y = eRect.top + eRect.height / 2 - aRect.top
-    const x = defenderSide === 'creature'
-      ? eRect.left - aRect.left
-      : eRect.right - aRect.left
-    return { x, y }
-  }, [])
-
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
   const resolveFrameUrl = useCallback((source: AnimationFrameImageSource, customUrl: string): string => {
@@ -597,7 +605,7 @@ export default function AnimationTest() {
     const setAttackerWeapon = side === 'player' ? setPlayerActiveWeapon : setCreatureActiveWeapon
     const setTargetImpactFrames = side === 'player' ? setCreatureActiveImpact : setPlayerActiveImpact
     const sideLabel = side === 'player' ? 'Player' : 'Creature'
-    const defenderCardRefUsed = side === 'player' ? creatureCardRef : playerCardRef
+
 
     const isBlocked = simulateBlock && blockFrames.some(f => f.enabled)
     log(`${sideLabel} attacks with "${styleId}"${isBlocked ? ' (BLOCKED!)' : ''}`)
@@ -640,7 +648,7 @@ export default function AnimationTest() {
       const dir = side === 'player' ? 'left-to-right' as const : 'right-to-left' as const
       const srcRef = side === 'player' ? playerPortraitRef : creaturePortraitRef
       const tgtRef = side === 'player' ? creaturePortraitRef : playerPortraitRef
-      const tgtPos = isBlocked ? getCardBorderPos(defenderCardRefUsed, defenderSide) : getPortraitPos(tgtRef)
+      const tgtPos = getPortraitPos(tgtRef)
       const maxProjMs = Math.max(...activeProjForms.map(f => f.delayMs + f.lifetimeMs))
       log(`  Projectile frames: ${activeProjForms.length}`)
       activeProjForms.forEach(async (f) => {
@@ -674,7 +682,7 @@ export default function AnimationTest() {
         const srcRef = side === 'player' ? playerPortraitRef : creaturePortraitRef
         const tgtRef = side === 'player' ? creaturePortraitRef : playerPortraitRef
         const key = ++vfxKeyRef.current
-        const tgtPos = isBlocked ? getCardBorderPos(defenderCardRefUsed, defenderSide) : getPortraitPos(tgtRef)
+        const tgtPos = getPortraitPos(tgtRef)
         const entry: ActiveProjectileEntry = {
           key, direction: dir, imageUrl: null,
           from: getPortraitPos(srcRef), to: tgtPos,
@@ -768,7 +776,7 @@ export default function AnimationTest() {
     setAttVar('idle')
     setTgtDmg(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [log, weaponFrames, projectileFrames, impactFrames, blockFrames, simulateBlock, trajectoryOverride, resolveFrameUrl, getPortraitPos, getCardBorderPos])
+  }, [log, weaponFrames, projectileFrames, impactFrames, blockFrames, simulateBlock, trajectoryOverride, resolveFrameUrl, getPortraitPos])
 
   const handlePlay = useCallback(async () => {
     if (playing) return
@@ -950,9 +958,9 @@ export default function AnimationTest() {
       </Paper>
 
       {/* Arena */}
-      <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: 'grey.50', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#0d0b14', display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Typography variant="subtitle2" fontWeight={700} color="text.secondary">Arena</Typography>
-        <Box ref={arenaRef} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, py: 2, position: 'relative' }}>
+        <Box ref={arenaRef} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 3, position: 'relative' }}>
           {/* Projectile layer */}
           <AnimatePresence>
             {activeProjectiles.map(p => (
@@ -978,7 +986,6 @@ export default function AnimationTest() {
             cardRef={playerCardRef}
             side="player"
             label="Player"
-            icon={<PersonIcon sx={{ fontSize: 48, color: 'rgba(33,150,243,0.5)' }} />}
             variant={playerVariant}
             variants={playerVariants}
             showImpact={showPlayerImpact}
@@ -986,14 +993,25 @@ export default function AnimationTest() {
             impactColor={defenderAnim.impactColor}
             impactKey={dmgKeyRef.current}
             dmg={playerDmg}
-            accentGradient="linear-gradient(135deg, rgba(33,150,243,0.08) 0%, rgba(33,150,243,0.02) 100%)"
             activeWeaponFrames={playerActiveWeapon}
             activeImpactFrames={playerActiveImpact}
             activeBlockFrames={activeBlockFrames.filter(f => f.side === 'player')}
           />
 
-          <Box sx={{ width: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Typography variant="h4" fontWeight={900} color="text.disabled" sx={{ userSelect: 'none' }}>VS</Typography>
+          <Box sx={{ alignSelf: 'center', width: VS_WIDTH, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Typography
+              variant="h3"
+              fontWeight={900}
+              sx={{
+                fontSize: `${2 * SCALE}rem`,
+                userSelect: 'none',
+                background: 'linear-gradient(135deg, rgba(168,85,247,0.4), rgba(99,102,241,0.3))',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              VS
+            </Typography>
           </Box>
 
           <CombatantCard
@@ -1001,7 +1019,6 @@ export default function AnimationTest() {
             cardRef={creatureCardRef}
             side="creature"
             label="Creature"
-            icon={<SmartToyIcon sx={{ fontSize: 48, color: 'rgba(244,67,54,0.5)' }} />}
             variant={creatureVariant}
             variants={creatureVariants}
             showImpact={showCreatureImpact}
@@ -1009,7 +1026,6 @@ export default function AnimationTest() {
             impactColor={attackerAnim.impactColor}
             impactKey={dmgKeyRef.current}
             dmg={creatureDmg}
-            accentGradient="linear-gradient(135deg, rgba(244,67,54,0.08) 0%, rgba(244,67,54,0.02) 100%)"
             activeWeaponFrames={creatureActiveWeapon}
             activeImpactFrames={creatureActiveImpact}
             activeBlockFrames={activeBlockFrames.filter(f => f.side === 'creature')}

@@ -255,21 +255,6 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     return getAttackAnimationConfig(undefined, ability.animationFrames)
   }, [pack.abilities])
 
-  const getCardBorderPos = useCallback((cardRef: React.RefObject<HTMLDivElement | null>, portraitRef: React.RefObject<HTMLDivElement | null>, side: 'party' | 'boss'): ProjectilePos => {
-    const arena = arenaRef.current
-    const card = cardRef.current
-    const portrait = portraitRef.current
-    if (!arena || !card) return { x: 0, y: 0 }
-    const aRect = arena.getBoundingClientRect()
-    const cRect = card.getBoundingClientRect()
-    const pRect = portrait?.getBoundingClientRect()
-    const y = pRect ? pRect.top + pRect.height / 2 - aRect.top : cRect.top + cRect.height / 2 - aRect.top
-    const x = side === 'boss'
-      ? cRect.left - aRect.left
-      : cRect.right - aRect.left
-    return { x, y }
-  }, [])
-
   const animateAttack = useCallback(
     async (attackerSide: 'party' | 'boss', events: CombatTurnEvent[], anim: AttackAnimationConfig) => {
       if (abortRef.current || events.length === 0) return
@@ -318,11 +303,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       const srcRef = attackerSide === 'party' ? partyPortraitRef : bossPortraitRef
       const tgtRef = attackerSide === 'party' ? bossPortraitRef : partyPortraitRef
       const defenderSide: 'party' | 'boss' = attackerSide === 'party' ? 'boss' : 'party'
-      const defenderCardRef = defenderSide === 'boss' ? bossCardRef : partyPortraitRef
-      const defenderPortraitRef = defenderSide === 'boss' ? bossPortraitRef : partyPortraitRef
-      const tgtPos = isBlocked
-        ? getCardBorderPos(defenderCardRef, defenderPortraitRef, defenderSide)
-        : getPortraitPos(tgtRef)
+      const tgtPos = getPortraitPos(tgtRef)
 
       const projFrames = frames?.projectile ?? []
       if (anim.projectile) {
@@ -440,7 +421,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       setAttackerVariant('idle')
       setTargetDmg(null)
     },
-    [getPortraitPos, getCardBorderPos, bossId, partyOrder, resolveAbilityAnim],
+    [getPortraitPos, bossId, partyOrder, resolveAbilityAnim],
   )
 
   useEffect(() => {

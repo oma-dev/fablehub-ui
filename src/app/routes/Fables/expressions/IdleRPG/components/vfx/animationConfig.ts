@@ -81,7 +81,7 @@ export interface AnimationImpactFrame {
   offsetY?: number
 }
 
-/** Optional block frame: pops at defender card border when a reactive block triggers. */
+/** Optional block frame: pops at defender portrait center when a reactive block triggers. */
 export interface AnimationBlockFrame {
   url?: string
   imageSource?: AnimationFrameImageSource
