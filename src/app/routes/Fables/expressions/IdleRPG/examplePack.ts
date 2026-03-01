@@ -4,6 +4,9 @@
  */
 
 export type ExampleXpEntry = { level: string; xp: string }
+export type ExampleResourceForm = {
+  id: string; name: string; description?: string; colorHex?: string; isGenerative?: boolean; max?: number; regenPerTurn?: number; gainOnHit?: number
+}
 export type ExampleAbilityForm = {
   id: string
   name: string
@@ -12,6 +15,15 @@ export type ExampleAbilityForm = {
   iconUrl: string
   delivery: string
   styleId: string
+  cooldownTurns?: string
+  resourceCostId?: string
+  resourceCostAmount?: string
+  unlockCost?: string
+  minLevel?: string
+  effectKind?: string
+  effectAmount?: string
+  effectPercentage?: string
+  effectLifestealPct?: string
 }
 export type ExampleClassForm = {
   id: string
@@ -28,6 +40,7 @@ export type ExampleClassForm = {
   defenseAllowEmpty: boolean
   regularAbilityIds: string
   ultimateAbilityId: string
+  resourceId?: string
 }
 export type ExampleCreatureForm = {
   id: string
@@ -39,6 +52,9 @@ export type ExampleCreatureForm = {
   arm: string
   iconUrl: string
   tags: string
+  abilityIds?: string
+  resourceId?: string
+  resourceMax?: string
 }
 export type ExampleItemForm = {
   id: string
@@ -75,8 +91,11 @@ export interface ExampleFormState {
   maxLevel: number
   combatPresetId: string
   statPointsPerLevel: number
+  abilityPointsPerLevel?: number
+  abilitySlotsByLevel?: string
   xpEntries: ExampleXpEntry[]
   currencies: { id: string; name: string; iconUrl?: string }[]
+  resources?: ExampleResourceForm[]
   abilities: ExampleAbilityForm[]
   classes: ExampleClassForm[]
   creatures: ExampleCreatureForm[]
@@ -88,6 +107,13 @@ export interface ExampleFormState {
   lootTables: { id: string; entries: ExampleLootEntryForm[] }[]
 }
 
+// --- Resources ---
+const resources: ExampleResourceForm[] = [
+  { id: 'mana', name: 'Mana', description: 'Magical energy for casting spells.', colorHex: '#3b82f6', isGenerative: true, max: 100, regenPerTurn: 5, gainOnHit: 0 },
+  { id: 'rage', name: 'Rage', description: 'Built up through combat hits.', colorHex: '#ef4444', isGenerative: false, max: 100, regenPerTurn: 0, gainOnHit: 10 },
+  { id: 'energy', name: 'Energy', description: 'Spent on physical abilities.', colorHex: '#eab308', isGenerative: true, max: 80, regenPerTurn: 8, gainOnHit: 0 },
+]
+
 // --- Abilities: 5 primary, 5 unique regular, 1 shared regular, 5 ultimates ---
 const abilities: ExampleAbilityForm[] = [
   { id: 'warlord_slam', name: 'Flail Slam', abilityType: 'primary', description: 'Warlord primary attack.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash' },
@@ -95,17 +121,17 @@ const abilities: ExampleAbilityForm[] = [
   { id: 'warrior_slash', name: 'Weapon Slash', abilityType: 'primary', description: 'Warrior primary attack.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash' },
   { id: 'hunter_shot', name: 'Precise Shot', abilityType: 'primary', description: 'Hunter primary attack.', iconUrl: '', delivery: 'projectile_straight', styleId: 'projectile_arrow' },
   { id: 'knifeman_stab', name: 'Dual Stab', abilityType: 'primary', description: 'Knifeman primary attack.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash' },
-  { id: 'warlord_rally', name: 'Rally', abilityType: 'regular', description: 'Warlord rallies allies.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash' },
-  { id: 'sorcerer_fireball', name: 'Fireball', abilityType: 'regular', description: 'Sorcerer casts fireball.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash' },
-  { id: 'warrior_cleave', name: 'Cleave', abilityType: 'regular', description: 'Warrior cleaves multiple foes.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash' },
-  { id: 'hunter_trap', name: 'Trap', abilityType: 'regular', description: 'Hunter sets a trap.', iconUrl: '', delivery: 'instant', styleId: 'instant_slash' },
-  { id: 'knifeman_evade', name: 'Evade', abilityType: 'regular', description: 'Knifeman evades and counterattacks.', iconUrl: '', delivery: 'instant', styleId: 'instant_slash' },
-  { id: 'power_strike', name: 'Power Strike', abilityType: 'regular', description: 'Shared heavy strike. (Warlord, Warrior)', iconUrl: '', delivery: 'melee', styleId: 'melee_slash' },
-  { id: 'warlord_rampage', name: 'Rampage', abilityType: 'ultimate', description: 'Warlord ultimate.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash' },
-  { id: 'sorcerer_meteor', name: 'Meteor', abilityType: 'ultimate', description: 'Sorcerer ultimate.', iconUrl: '', delivery: 'projectile_arced', styleId: 'projectile_bolt' },
-  { id: 'warrior_whirlwind', name: 'Whirlwind', abilityType: 'ultimate', description: 'Warrior ultimate.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash' },
-  { id: 'hunter_barrage', name: 'Barrage', abilityType: 'ultimate', description: 'Hunter ultimate.', iconUrl: '', delivery: 'projectile_straight', styleId: 'projectile_arrow' },
-  { id: 'knifeman_blur', name: 'Blur', abilityType: 'ultimate', description: 'Knifeman ultimate.', iconUrl: '', delivery: 'instant', styleId: 'instant_slash' },
+  { id: 'warlord_rally', name: 'Rally', abilityType: 'regular', description: 'Warlord rallies allies.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash', cooldownTurns: '2', resourceCostId: 'rage', resourceCostAmount: '20', unlockCost: '1', minLevel: '1', effectKind: 'heal', effectAmount: '0', effectPercentage: '15' },
+  { id: 'sorcerer_fireball', name: 'Fireball', abilityType: 'regular', description: 'Sorcerer casts fireball.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash', cooldownTurns: '1', resourceCostId: 'mana', resourceCostAmount: '25', unlockCost: '1', minLevel: '1', effectKind: 'damage', effectAmount: '30' },
+  { id: 'warrior_cleave', name: 'Cleave', abilityType: 'regular', description: 'Warrior cleaves multiple foes.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash', cooldownTurns: '1', resourceCostId: 'rage', resourceCostAmount: '15', unlockCost: '1', minLevel: '1', effectKind: 'damage', effectAmount: '20' },
+  { id: 'hunter_trap', name: 'Trap', abilityType: 'regular', description: 'Hunter sets a trap.', iconUrl: '', delivery: 'instant', styleId: 'instant_slash', cooldownTurns: '3', resourceCostId: 'energy', resourceCostAmount: '20', unlockCost: '1', minLevel: '2', effectKind: 'damage', effectAmount: '25' },
+  { id: 'knifeman_evade', name: 'Evade', abilityType: 'regular', description: 'Knifeman evades and counterattacks.', iconUrl: '', delivery: 'instant', styleId: 'instant_slash', cooldownTurns: '2', resourceCostId: 'energy', resourceCostAmount: '15', unlockCost: '1', minLevel: '1', effectKind: 'damage', effectAmount: '15' },
+  { id: 'power_strike', name: 'Power Strike', abilityType: 'regular', description: 'Shared heavy strike. (Warlord, Warrior)', iconUrl: '', delivery: 'melee', styleId: 'melee_slash', cooldownTurns: '2', resourceCostId: 'rage', resourceCostAmount: '30', unlockCost: '2', minLevel: '3', effectKind: 'damage', effectAmount: '40' },
+  { id: 'warlord_rampage', name: 'Rampage', abilityType: 'ultimate', description: 'Warlord ultimate.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash', cooldownTurns: '5', resourceCostId: 'rage', resourceCostAmount: '50', unlockCost: '3', minLevel: '5', effectKind: 'damage', effectAmount: '60' },
+  { id: 'sorcerer_meteor', name: 'Meteor', abilityType: 'ultimate', description: 'Sorcerer ultimate.', iconUrl: '', delivery: 'projectile_arced', styleId: 'projectile_bolt', cooldownTurns: '5', resourceCostId: 'mana', resourceCostAmount: '60', unlockCost: '3', minLevel: '5', effectKind: 'damage', effectAmount: '80' },
+  { id: 'warrior_whirlwind', name: 'Whirlwind', abilityType: 'ultimate', description: 'Warrior ultimate.', iconUrl: '', delivery: 'melee', styleId: 'melee_slash', cooldownTurns: '4', resourceCostId: 'rage', resourceCostAmount: '50', unlockCost: '3', minLevel: '5', effectKind: 'damage', effectAmount: '55' },
+  { id: 'hunter_barrage', name: 'Barrage', abilityType: 'ultimate', description: 'Hunter ultimate.', iconUrl: '', delivery: 'projectile_straight', styleId: 'projectile_arrow', cooldownTurns: '4', resourceCostId: 'energy', resourceCostAmount: '40', unlockCost: '3', minLevel: '5', effectKind: 'damage', effectAmount: '50' },
+  { id: 'knifeman_blur', name: 'Blur', abilityType: 'ultimate', description: 'Knifeman ultimate.', iconUrl: '', delivery: 'instant', styleId: 'instant_slash', cooldownTurns: '4', resourceCostId: 'energy', resourceCostAmount: '40', unlockCost: '3', minLevel: '5', effectKind: 'lifesteal', effectAmount: '35', effectLifestealPct: '50' },
 ]
 
 // --- Classes: warlord (flail+shield), warrior (2h sword or sword+shield), hunter (2h bow or knife), knifeman (dual knives), sorcerer (2h staff or wand+shield) ---
@@ -125,6 +151,7 @@ const classes: ExampleClassForm[] = [
     defenseAllowEmpty: false,
     regularAbilityIds: 'warlord_rally, power_strike',
     ultimateAbilityId: 'warlord_rampage',
+    resourceId: 'rage',
   },
   {
     id: 'sorcerer',
@@ -141,6 +168,7 @@ const classes: ExampleClassForm[] = [
     defenseAllowEmpty: true,
     regularAbilityIds: 'sorcerer_fireball',
     ultimateAbilityId: 'sorcerer_meteor',
+    resourceId: 'mana',
   },
   {
     id: 'warrior',
@@ -157,6 +185,7 @@ const classes: ExampleClassForm[] = [
     defenseAllowEmpty: true,
     regularAbilityIds: 'warrior_cleave, power_strike',
     ultimateAbilityId: 'warrior_whirlwind',
+    resourceId: 'rage',
   },
   {
     id: 'hunter',
@@ -173,6 +202,7 @@ const classes: ExampleClassForm[] = [
     defenseAllowEmpty: true,
     regularAbilityIds: 'hunter_trap',
     ultimateAbilityId: 'hunter_barrage',
+    resourceId: 'energy',
   },
   {
     id: 'knifeman',
@@ -189,6 +219,7 @@ const classes: ExampleClassForm[] = [
     defenseAllowEmpty: true,
     regularAbilityIds: 'knifeman_evade',
     ultimateAbilityId: 'knifeman_blur',
+    resourceId: 'energy',
   },
 ]
 
@@ -288,6 +319,8 @@ export const exampleFormState: ExampleFormState = {
   maxLevel: 10,
   combatPresetId: 'combat_v1_simple',
   statPointsPerLevel: 3,
+  abilityPointsPerLevel: 1,
+  abilitySlotsByLevel: '1:1,5:2,10:3',
   xpEntries: [
     { level: '2', xp: '100' },
     { level: '3', xp: '250' },
@@ -300,6 +333,7 @@ export const exampleFormState: ExampleFormState = {
     { level: '10', xp: '4500' },
   ],
   currencies: [{ id: 'gold', name: 'Gold' }],
+  resources,
   abilities,
   classes,
   creatures,

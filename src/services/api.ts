@@ -131,23 +131,88 @@ export interface AnimationFrames {
   impact?: AnimationImpactFrame[]
 }
 
+// ---------------------------------------------------------------------------
+// Effect system (mirrors backend ability-catalog.types.ts)
+// ---------------------------------------------------------------------------
+
+export type StatId = 'STR' | 'DEX' | 'INT' | 'LCK' | 'HP' | 'ARM'
+
+export type EffectKind = 'damage' | 'heal' | 'apply_status' | 'execute' | 'lifesteal'
+
+export interface Effect {
+  kind: EffectKind
+  amount?: number
+  percentage?: number
+  scalingStat?: StatId
+  scalingCoeff?: number
+  lifestealPercent?: number
+  statusEffect?: StatusEffectTemplate
+}
+
+export type StatusEffectKind =
+  | 'dot' | 'hot' | 'stun' | 'slow' | 'paralyze' | 'freeze'
+  | 'sleep' | 'confusion' | 'buff' | 'debuff' | 'blind'
+  | 'vulnerability' | 'anti_heal' | 'thorns' | 'barrier'
+  | 'evasion' | 'haste' | 'auto_revive'
+
+export interface StatusEffectTemplate {
+  id: string
+  kind: StatusEffectKind
+  name: string
+  description?: string
+  iconUrl?: string
+  durationTurns: number
+  tickAmount?: number
+  tickPercentage?: number
+  escalation?: number
+  statModifiers?: Partial<Record<StatId, number>>
+  chance?: number
+  damageReduction?: number
+  healReduction?: number
+  reflectPercent?: number
+  barrierAmount?: number
+}
+
+export interface Resource {
+  id: string
+  name: string
+  description?: string
+  colorHex: string
+  isGenerative: boolean
+  iconId?: string
+  iconUrl?: string
+  max: number
+  regenPerTurn?: number
+  gainOnHit?: number
+  resetsEachFight?: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Ability
+// ---------------------------------------------------------------------------
+
 /** Ability (matches backend); optional fields allow minimal pack catalog entries from the create form. */
 export interface Ability {
   id: string
   name: string
   description?: string
   abilityType: 'primary' | 'regular' | 'passive' | 'ultimate'
+  effects?: Effect[]
+  /** @deprecated Use effects[] instead. */
   effect?: unknown
-  delivery?: unknown
+  delivery?: { target?: 'self' | 'ally' | 'enemy'; timing?: string; hitRule?: string }
+  cooldownTurns: number
   scaling?: unknown
-  cost?: unknown
-  requirements?: unknown
-  presentation?: unknown
+  cost?: { cooldownTurns?: number; resourceCost?: { resourceId: string; amount: number }; usePerFight?: number }
+  requirements?: { equippedTagsAny?: string[]; forbiddenTagsAny?: string[]; minLevel?: number }
+  presentation?: { name?: string; description?: string; iconUrl?: string; colorHex?: string }
   /** When abilityType is 'primary': defines the class primary attack. */
   primaryAttack?: { delivery: string; styleId: string }
   iconUrl?: string
   /** Optional animation frames (weapon / projectile / impact PNGs). */
   animationFrames?: AnimationFrames
+  /** Ability points required to unlock this ability. */
+  unlockCost?: number
 }
 
 /** Realm pack shape (backend IdleRpgPackV1). */
@@ -157,13 +222,14 @@ export interface IdleRpgPackV1 {
     maxLevel: number
     xpTable: Record<string, number>
     combatPresetId: string
-    /** Stat points awarded per level gained. Defaults to 3. */
     statPointsPerLevel?: number
+    abilityPointsPerLevel?: number
+    abilitySlotsByLevel?: Record<number, number>
   }
   economy: {
     currencies: { id: string; name: string; iconUrl?: string }[]
   }
-  /** Optional catalog of abilities; classes reference by id for primary attack and abilities.regular / ultimate. */
+  resources?: Resource[]
   abilities?: Ability[]
   classes: ClassBlock[]
   creatures: CreatureTemplate[]
@@ -183,6 +249,7 @@ export interface ClassBlock {
   scaling: { damageMainStat: string; secondaryBenefits?: Record<string, string[]> }
   primaryAttack: { delivery: string; styleId: string }
   slots: Record<string, { required: boolean; allowEmpty: boolean; allowedTagsAny: string[] }>
+  resourceId?: string
   passives?: string[]
   abilities?: { regular?: string[]; ultimate?: string | null }
   starting?: { stats?: Record<string, number>; startingItemIds?: string[]; startingBalances?: Record<string, number> }
@@ -198,6 +265,9 @@ export interface CreatureTemplate {
   arm: number
   iconUrl?: string
   tags?: string[]
+  abilityIds?: string[]
+  resourceId?: string
+  resourceMax?: number
 }
 
 /** Backend sends rarity as number: 1=common, 2=uncommon, 3=rare, 4=epic, 5=legendary */
@@ -333,17 +403,37 @@ export interface CreateIdleRpgBody {
 
 // --- Combat types (from backend combat.types.ts) ---
 
+export type CombatEventType =
+  | 'damage' | 'heal' | 'dot_tick' | 'hot_tick'
+  | 'status_applied' | 'status_expired' | 'stun_skip'
+  | 'execute' | 'resource_change'
+
+export interface ActiveStatusEffect {
+  id: string
+  sourceAbilityId: string
+  kind: StatusEffectKind
+  name: string
+  description?: string
+  iconUrl?: string
+  remainingTurns: number
+}
+
 export interface CombatTurnEvent {
   sourceId: string
   targetId: string
-  type: 'damage' | 'heal'
+  type: CombatEventType
   value: number
   targetHpAfter: number
+  abilityId?: string
+  abilityName?: string
+  statusEffectId?: string
+  statusEffectName?: string
 }
 
 export interface CombatTurn {
   turnIndex: number
   events: CombatTurnEvent[]
+  activeStatusEffects?: Record<string, ActiveStatusEffect[]>
 }
 
 export interface CombatResult {
@@ -394,6 +484,12 @@ export interface CharacterState {
   groupId?: string | null
   /** Progression: completed dungeons, boss cooldowns. */
   progression?: { completedDungeonIds?: string[]; dungeonBossCooldowns?: Record<string, number> }
+  /** Ability IDs unlocked with ability points. */
+  unlockedAbilityIds?: string[]
+  /** Ability IDs equipped in slots (ordered; index = slot). */
+  equippedAbilityIds?: string[]
+  /** Unspent ability points. */
+  abilityPoints?: number
 }
 
 export interface QuestClaimResult {
@@ -549,6 +645,14 @@ export function equipItem(fableId: string, realmId: string, characterId: string,
 
 export function allocateStat(fableId: string, realmId: string, characterId: string, stat: string, amount = 1) {
   return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/stats/allocate`, { body: { stat, amount } })
+}
+
+export function unlockAbility(fableId: string, realmId: string, characterId: string, abilityId: string) {
+  return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/abilities/unlock`, { body: { abilityId } })
+}
+
+export function equipAbilities(fableId: string, realmId: string, characterId: string, abilityIds: string[]) {
+  return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/abilities/equip`, { body: { abilityIds } })
 }
 
 export function pvpFight(fableId: string, realmId: string, characterId: string, targetCharacterId: string) {

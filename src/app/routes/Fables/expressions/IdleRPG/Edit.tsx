@@ -82,11 +82,15 @@ function normalizeStyleId(v: string): (typeof STYLE_IDS)[number] {
 const SLOTS = ['attack_source', 'defense_layer'] as const
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
 const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate']
+const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal'] as const
 
 // --- Form state types (same as Create) ---
 type XpEntry = { level: string; xp: string }
+type ResourceForm = { id: string; name: string; description: string; colorHex: string; isGenerative: boolean; max: string; regenPerTurn: string; gainOnHit: string }
 type AbilityForm = {
   id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string; delivery: string; styleId: string
+  cooldownTurns: string; resourceCostId: string; resourceCostAmount: string; unlockCost: string; minLevel: string
+  effectKind: string; effectAmount: string; effectPercentage: string; effectLifestealPct: string
   animWeaponSource: AnimationFrameImageSource; animWeaponUrl: string; animWeaponDelayMs: string
   animProjectileSource: AnimationFrameImageSource; animProjectileUrl: string; animProjectileTrajectory: 'straight' | 'arc'; animProjectileDelayMs: string
   animImpactSource: AnimationFrameImageSource; animImpactUrl: string; animImpactDelayMs: string
@@ -96,9 +100,9 @@ type ClassForm = {
   damageMainStat: string; primaryAttackAbilityId: string
   attackTags: string; attackRequired: boolean; attackAllowEmpty: boolean
   defenseTags: string; defenseRequired: boolean; defenseAllowEmpty: boolean
-  regularAbilityIds: string; ultimateAbilityId: string
+  regularAbilityIds: string; ultimateAbilityId: string; resourceId: string
 }
-type CreatureForm = { id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string; iconUrl: string; tags: string }
+type CreatureForm = { id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string; iconUrl: string; tags: string; abilityIds: string; resourceId: string; resourceMax: string }
 type ItemForm = { id: string; name: string; rarity: string; slot: string; tags: string; stats: string; iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string }
 type QuestForm = { id: string; name: string; creatureId: string; durationSec: string; iconUrl: string; rewardXp: string; rewardCurrency: string; lootTableId: string }
 type DungeonForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string }
@@ -106,8 +110,11 @@ type RaidForm = { id: string; name: string; description: string; imageUrl: strin
 type LootEntryForm = { itemId: string; weight: string; classId: string }
 
 const emptyXp = (): XpEntry => ({ level: '', xp: '' })
+const emptyResource = (): ResourceForm => ({ id: '', name: '', description: '', colorHex: '#3b82f6', isGenerative: false, max: '100', regenPerTurn: '5', gainOnHit: '0' })
 const emptyAbility = (): AbilityForm => ({
   id: '', name: '', abilityType: 'regular', description: '', iconUrl: '', delivery: 'melee', styleId: 'melee_slash',
+  cooldownTurns: '0', resourceCostId: '', resourceCostAmount: '0', unlockCost: '1', minLevel: '1',
+  effectKind: 'damage', effectAmount: '0', effectPercentage: '0', effectLifestealPct: '0',
   animWeaponSource: 'url', animWeaponUrl: '', animWeaponDelayMs: '0',
   animProjectileSource: 'url', animProjectileUrl: '', animProjectileTrajectory: 'arc', animProjectileDelayMs: '0',
   animImpactSource: 'url', animImpactUrl: '', animImpactDelayMs: '0',
@@ -117,9 +124,9 @@ const emptyClass = (): ClassForm => ({
   damageMainStat: 'STR', primaryAttackAbilityId: '',
   attackTags: '', attackRequired: true, attackAllowEmpty: false,
   defenseTags: '', defenseRequired: false, defenseAllowEmpty: true,
-  regularAbilityIds: '', ultimateAbilityId: '',
+  regularAbilityIds: '', ultimateAbilityId: '', resourceId: '',
 })
-const emptyCreature = (): CreatureForm => ({ id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0', iconUrl: '', tags: '' })
+const emptyCreature = (): CreatureForm => ({ id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0', iconUrl: '', tags: '', abilityIds: '', resourceId: '', resourceMax: '' })
 const emptyItem = (): ItemForm => ({ id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '', iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '' })
 const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', durationSec: '60', iconUrl: '', rewardXp: '10', rewardCurrency: '', lootTableId: '' })
 const emptyDungeon = (): DungeonForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '' })
@@ -135,6 +142,19 @@ const IMAGE_SOURCES: { value: AnimationFrameImageSource; label: string }[] = [
   { value: 'weaponImpact', label: 'Weapon impact' },
 ]
 
+function hydrateResources(pack: IdleRpgPackV1): ResourceForm[] {
+  return (pack.resources ?? []).map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description ?? '',
+    colorHex: r.colorHex ?? '#3b82f6',
+    isGenerative: r.isGenerative ?? false,
+    max: String(r.max ?? 100),
+    regenPerTurn: String(r.regenPerTurn ?? 5),
+    gainOnHit: String(r.gainOnHit ?? 0),
+  }))
+}
+
 function hydrateAbilities(pack: IdleRpgPackV1): AbilityForm[] {
   return (pack.abilities ?? []).map((a) => ({
     id: a.id,
@@ -144,16 +164,25 @@ function hydrateAbilities(pack: IdleRpgPackV1): AbilityForm[] {
     iconUrl: a.iconUrl ?? '',
     delivery: normalizeDelivery(a.primaryAttack?.delivery ?? 'melee'),
     styleId: normalizeStyleId(a.primaryAttack?.styleId ?? 'melee_slash'),
-    animWeaponSource: (a.animationFrames?.weapon?.imageSource ?? 'url') as AnimationFrameImageSource,
-    animWeaponUrl: a.animationFrames?.weapon?.url ?? '',
-    animWeaponDelayMs: String(a.animationFrames?.weapon?.delayMs ?? 0),
-    animProjectileSource: (a.animationFrames?.projectile?.imageSource ?? 'url') as AnimationFrameImageSource,
-    animProjectileUrl: a.animationFrames?.projectile?.url ?? '',
-    animProjectileTrajectory: a.animationFrames?.projectile?.trajectory ?? 'arc',
-    animProjectileDelayMs: String(a.animationFrames?.projectile?.delayMs ?? 0),
-    animImpactSource: (a.animationFrames?.impact?.imageSource ?? 'url') as AnimationFrameImageSource,
-    animImpactUrl: a.animationFrames?.impact?.url ?? '',
-    animImpactDelayMs: String(a.animationFrames?.impact?.delayMs ?? 0),
+    cooldownTurns: String(a.cooldownTurns ?? 0),
+    resourceCostId: (a as any).cost?.resourceCost?.resourceId ?? '',
+    resourceCostAmount: String((a as any).cost?.resourceCost?.amount ?? 0),
+    unlockCost: String((a as any).unlockCost ?? 1),
+    minLevel: String((a as any).requirements?.minLevel ?? 1),
+    effectKind: (a as any).effects?.[0]?.kind ?? 'damage',
+    effectAmount: String((a as any).effects?.[0]?.amount ?? 0),
+    effectPercentage: String((a as any).effects?.[0]?.percentage ?? 0),
+    effectLifestealPct: String((a as any).effects?.[0]?.lifestealPercent ?? 0),
+    animWeaponSource: (a.animationFrames?.weapon?.[0]?.imageSource ?? 'url') as AnimationFrameImageSource,
+    animWeaponUrl: a.animationFrames?.weapon?.[0]?.url ?? '',
+    animWeaponDelayMs: String(a.animationFrames?.weapon?.[0]?.delayMs ?? 0),
+    animProjectileSource: (a.animationFrames?.projectile?.[0]?.imageSource ?? 'url') as AnimationFrameImageSource,
+    animProjectileUrl: a.animationFrames?.projectile?.[0]?.url ?? '',
+    animProjectileTrajectory: a.animationFrames?.projectile?.[0]?.trajectory ?? 'arc',
+    animProjectileDelayMs: String(a.animationFrames?.projectile?.[0]?.delayMs ?? 0),
+    animImpactSource: (a.animationFrames?.impact?.[0]?.imageSource ?? 'url') as AnimationFrameImageSource,
+    animImpactUrl: a.animationFrames?.impact?.[0]?.url ?? '',
+    animImpactDelayMs: String(a.animationFrames?.impact?.[0]?.delayMs ?? 0),
   }))
 }
 
@@ -177,6 +206,7 @@ function hydrateClasses(pack: IdleRpgPackV1): ClassForm[] {
       defenseAllowEmpty: c.slots?.defense_layer?.allowEmpty ?? true,
       regularAbilityIds: c.abilities?.regular?.join(', ') ?? '',
       ultimateAbilityId: c.abilities?.ultimate ?? '',
+      resourceId: (c as any).resourceId ?? '',
     }
   })
 }
@@ -192,6 +222,9 @@ function hydrateCreatures(pack: IdleRpgPackV1): CreatureForm[] {
     arm: String(c.arm),
     iconUrl: c.iconUrl ?? '',
     tags: c.tags?.join(', ') ?? '',
+    abilityIds: (c as any).abilityIds?.join(', ') ?? '',
+    resourceId: (c as any).resourceId ?? '',
+    resourceMax: (c as any).resourceMax != null ? String((c as any).resourceMax) : '',
   }))
 }
 
@@ -273,7 +306,11 @@ export default function IdleRpgEdit() {
   const [maxLevel, setMaxLevel] = useState(10)
   const [combatPresetId, setCombatPresetId] = useState('combat_v1_simple')
   const [xpEntries, setXpEntries] = useState<XpEntry[]>([])
+  const [statPointsPerLevel, setStatPointsPerLevel] = useState(3)
+  const [abilityPointsPerLevel, setAbilityPointsPerLevel] = useState('1')
+  const [abilitySlotsByLevel, setAbilitySlotsByLevel] = useState('')
   const [currencies, setCurrencies] = useState<{ id: string; name: string; iconUrl?: string }[]>([])
+  const [resources, setResources] = useState<ResourceForm[]>([])
   const [abilities, setAbilities] = useState<AbilityForm[]>([])
   const [classes, setClasses] = useState<ClassForm[]>([emptyClass()])
   const [creatures, setCreatures] = useState<CreatureForm[]>([])
@@ -307,7 +344,12 @@ export default function IdleRpgEdit() {
           .sort(([a], [b]) => Number(a) - Number(b))
           .map(([level, xp]) => ({ level, xp: String(xp) })),
       )
+      setStatPointsPerLevel((pack.rules as any).statPointsPerLevel ?? 3)
+      setAbilityPointsPerLevel(String((pack.rules as any).abilityPointsPerLevel ?? 1))
+      const absMap = (pack.rules as any).abilitySlotsByLevel as Record<number, number> | undefined
+      setAbilitySlotsByLevel(absMap ? Object.entries(absMap).map(([k, v]) => `${k}:${v}`).join(',') : '')
       setCurrencies(pack.economy.currencies.map((c) => ({ id: c.id, name: c.name, iconUrl: c.iconUrl })))
+      setResources(hydrateResources(pack))
       setAbilities(hydrateAbilities(pack))
       setClasses(hydrateClasses(pack).length > 0 ? hydrateClasses(pack) : [emptyClass()])
       setCreatures(hydrateCreatures(pack))
@@ -331,6 +373,17 @@ export default function IdleRpgEdit() {
       if (l && !Number.isNaN(x)) xpTable[l] = x
     })
 
+    const resourceList = resources.filter(r => r.id.trim() && r.name.trim()).map(r => ({
+      id: r.id.trim(),
+      name: r.name.trim(),
+      ...(r.description.trim() ? { description: r.description.trim() } : {}),
+      colorHex: r.colorHex.trim() || '#3b82f6',
+      isGenerative: r.isGenerative,
+      max: Math.max(1, Number(r.max) || 100),
+      ...(Number(r.regenPerTurn) > 0 ? { regenPerTurn: Number(r.regenPerTurn) } : {}),
+      ...(Number(r.gainOnHit) > 0 ? { gainOnHit: Number(r.gainOnHit) } : {}),
+    }))
+
     const abilityList: Ability[] = abilities
       .filter((a) => a.id.trim() && a.name.trim())
       .map((a) => {
@@ -338,8 +391,20 @@ export default function IdleRpgEdit() {
           id: a.id.trim(),
           name: a.name.trim(),
           abilityType: a.abilityType,
+          cooldownTurns: Number(a.cooldownTurns) || 0,
           ...(a.description.trim() ? { description: a.description.trim() } : {}),
           ...(a.iconUrl.trim() ? { iconUrl: a.iconUrl.trim() } : {}),
+          ...(a.resourceCostId.trim() && Number(a.resourceCostAmount) > 0 ? {
+            cost: { cooldownTurns: Number(a.cooldownTurns) || 0, resourceCost: { resourceId: a.resourceCostId.trim(), amount: Number(a.resourceCostAmount) } }
+          } : {}),
+          ...(Number(a.unlockCost) > 0 ? { unlockCost: Number(a.unlockCost) } : {}),
+          ...(Number(a.minLevel) > 1 ? { requirements: { minLevel: Number(a.minLevel) } } : {}),
+          ...(a.effectKind ? { effects: [{
+            kind: a.effectKind as any,
+            ...(Number(a.effectAmount) > 0 ? { amount: Number(a.effectAmount) } : {}),
+            ...(Number(a.effectPercentage) > 0 ? { percentage: Number(a.effectPercentage) } : {}),
+            ...(a.effectKind === 'lifesteal' && Number(a.effectLifestealPct) > 0 ? { lifestealPercent: Number(a.effectLifestealPct) } : {}),
+          }] } : {}),
         }
         if (a.abilityType === 'primary') {
           def.primaryAttack = {
@@ -353,26 +418,26 @@ export default function IdleRpgEdit() {
         if (hasWeapon || hasProjectile || hasImpact) {
           def.animationFrames = {}
           if (hasWeapon) {
-            def.animationFrames.weapon = {
+            def.animationFrames.weapon = [{
               ...(a.animWeaponSource === 'url' && a.animWeaponUrl?.trim() ? { url: a.animWeaponUrl.trim() } : {}),
               ...(a.animWeaponSource !== 'url' ? { imageSource: a.animWeaponSource } : {}),
               ...(Math.max(0, Number(a.animWeaponDelayMs) || 0) > 0 ? { delayMs: Math.max(0, Number(a.animWeaponDelayMs) || 0) } : {}),
-            }
+            }]
           }
           if (hasProjectile) {
-            def.animationFrames.projectile = {
-              trajectory: a.animProjectileTrajectory,
+            def.animationFrames.projectile = [{
+              trajectory: a.animProjectileTrajectory as 'straight' | 'arc',
               ...(a.animProjectileSource === 'url' && a.animProjectileUrl?.trim() ? { url: a.animProjectileUrl.trim() } : {}),
               ...(a.animProjectileSource !== 'url' ? { imageSource: a.animProjectileSource } : {}),
               ...(Math.max(0, Number(a.animProjectileDelayMs) || 0) > 0 ? { delayMs: Math.max(0, Number(a.animProjectileDelayMs) || 0) } : {}),
-            }
+            }]
           }
           if (hasImpact) {
-            def.animationFrames.impact = {
+            def.animationFrames.impact = [{
               ...(a.animImpactSource === 'url' && a.animImpactUrl?.trim() ? { url: a.animImpactUrl.trim() } : {}),
               ...(a.animImpactSource !== 'url' ? { imageSource: a.animImpactSource } : {}),
               ...(Math.max(0, Number(a.animImpactDelayMs) || 0) > 0 ? { delayMs: Math.max(0, Number(a.animImpactDelayMs) || 0) } : {}),
-            }
+            }]
           }
         }
         return def
@@ -414,6 +479,7 @@ export default function IdleRpgEdit() {
                 },
               }
             : {}),
+          ...(c.resourceId.trim() ? { resourceId: c.resourceId.trim() } : {}),
         }
       })
 
@@ -429,6 +495,9 @@ export default function IdleRpgEdit() {
         arm: Number(c.arm) || 0,
         ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
         ...(c.tags.trim() ? { tags: parseTags(c.tags) } : {}),
+        ...(c.abilityIds.trim() ? { abilityIds: parseTags(c.abilityIds) } : {}),
+        ...(c.resourceId.trim() ? { resourceId: c.resourceId.trim() } : {}),
+        ...(c.resourceMax.trim() && Number(c.resourceMax) > 0 ? { resourceMax: Number(c.resourceMax) } : {}),
       }))
 
     const itemList: ItemTemplate[] = items
@@ -506,10 +575,25 @@ export default function IdleRpgEdit() {
       ...(c.iconUrl?.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
     }))
 
+    const parsedAbilitySlots: Record<number, number> = {}
+    ;(abilitySlotsByLevel || '').split(',').map(p => p.trim()).filter(Boolean).forEach(p => {
+      const i = p.indexOf(':')
+      if (i > 0) {
+        const lvl = Number(p.slice(0, i).trim())
+        const slots = Number(p.slice(i + 1).trim())
+        if (!Number.isNaN(lvl) && !Number.isNaN(slots)) parsedAbilitySlots[lvl] = slots
+      }
+    })
+
     return {
       version: 1,
-      rules: { maxLevel, xpTable, combatPresetId },
+      rules: {
+        maxLevel, xpTable, combatPresetId, statPointsPerLevel,
+        ...(Number(abilityPointsPerLevel) > 0 ? { abilityPointsPerLevel: Number(abilityPointsPerLevel) } : {}),
+        ...(Object.keys(parsedAbilitySlots).length > 0 ? { abilitySlotsByLevel: parsedAbilitySlots } : {}),
+      },
       economy: { currencies: validCurrencies },
+      ...(resourceList.length > 0 ? { resources: resourceList } : {}),
       ...(abilityList.length > 0 ? { abilities: abilityList } : {}),
       classes: classBlocks,
       creatures: creatureList,
@@ -606,7 +690,12 @@ export default function IdleRpgEdit() {
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Rules</Typography></AccordionSummary>
             <AccordionDetails>
               <TextField label="Max level" type="number" size="small" value={maxLevel} onChange={(e) => setMaxLevel(Number(e.target.value) || 1)} sx={{ mr: 2, width: 120 }} inputProps={{ min: 1 }} />
+              <TextField label="Stat points per level" type="number" size="small" value={statPointsPerLevel} onChange={(e) => setStatPointsPerLevel(Number(e.target.value) || 0)} sx={{ mr: 2, width: 140 }} inputProps={{ min: 0 }} />
               <TextField label="Combat preset ID" size="small" value={combatPresetId} onChange={(e) => setCombatPresetId(e.target.value)} sx={{ width: 220 }} />
+              <Box sx={{ display: 'flex', gap: 2, mt: 2, flexWrap: 'wrap' }}>
+                <TextField label="Ability points/level" type="number" size="small" value={abilityPointsPerLevel} onChange={(e) => setAbilityPointsPerLevel(e.target.value)} sx={{ width: 160 }} inputProps={{ min: 0 }} />
+                <TextField label="Ability slots by level" size="small" value={abilitySlotsByLevel} onChange={(e) => setAbilitySlotsByLevel(e.target.value)} placeholder="1:1,5:2,10:3" sx={{ width: 220 }} helperText="level:slots, comma-separated" />
+              </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>XP table (level → xp required)</Typography>
               {xpEntries.map((e, i) => (
                 <Box key={i} sx={{ display: 'flex', gap: 1, mb: 1 }}>
@@ -631,6 +720,33 @@ export default function IdleRpgEdit() {
                 </Box>
               ))}
               <Button type="button" size="small" variant="outlined" onClick={() => setCurrencies((p) => [...p, { id: '', name: '' }])}>+ Add currency</Button>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Resources</Typography></AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Resources power abilities (e.g. mana, rage, energy). Generative resources regen each turn; non-generative are gained on hit.
+              </Typography>
+              {resources.map((r, i) => (
+                <Paper key={i} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1 }}>
+                    <TextField size="small" label="ID" value={r.id} onChange={(e) => setResources((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} sx={{ width: 100 }} placeholder="mana" />
+                    <TextField size="small" label="Name" value={r.name} onChange={(e) => setResources((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 120 }} />
+                    <TextField size="small" label="Description" value={r.description} onChange={(e) => setResources((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} sx={{ flex: 1, minWidth: 140 }} />
+                    <TextField size="small" label="Color Hex" value={r.colorHex} onChange={(e) => setResources((p) => p.map((x, j) => j === i ? { ...x, colorHex: e.target.value } : x))} sx={{ width: 100 }} />
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <FormControlLabel control={<Checkbox size="small" checked={r.isGenerative} onChange={(e) => setResources((p) => p.map((x, j) => j === i ? { ...x, isGenerative: e.target.checked } : x))} />} label="Generative" />
+                    <TextField size="small" label="Max" type="number" value={r.max} onChange={(e) => setResources((p) => p.map((x, j) => j === i ? { ...x, max: e.target.value } : x))} sx={{ width: 80 }} />
+                    <TextField size="small" label="Regen/Turn" type="number" value={r.regenPerTurn} onChange={(e) => setResources((p) => p.map((x, j) => j === i ? { ...x, regenPerTurn: e.target.value } : x))} sx={{ width: 100 }} />
+                    <TextField size="small" label="Gain On Hit" type="number" value={r.gainOnHit} onChange={(e) => setResources((p) => p.map((x, j) => j === i ? { ...x, gainOnHit: e.target.value } : x))} sx={{ width: 100 }} />
+                    <IconButton size="small" color="error" onClick={() => setResources((p) => p.filter((_, j) => j !== i))}>−</IconButton>
+                  </Box>
+                </Paper>
+              ))}
+              <Button type="button" size="small" variant="outlined" onClick={() => setResources((p) => [...p, emptyResource()])}>+ Add resource</Button>
             </AccordionDetails>
           </Accordion>
 
@@ -702,6 +818,34 @@ export default function IdleRpgEdit() {
                   {a.animImpactSource === 'url' && <TextField size="small" placeholder="Impact URL" value={a.animImpactUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animImpactUrl: e.target.value } : x))} sx={{ width: 140 }} />}
                   <TextField size="small" type="number" label="I delay (ms)" value={a.animImpactDelayMs} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animImpactDelayMs: e.target.value } : x))} inputProps={{ min: 0 }} sx={{ width: 90 }} />
                   </Box>
+                  {a.abilityType !== 'primary' && (
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%', mt: 1 }}>
+                      <TextField size="small" label="Cooldown (turns)" type="number" value={a.cooldownTurns} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, cooldownTurns: e.target.value } : x))} sx={{ width: 120 }} />
+                      <FormControl size="small" sx={{ minWidth: 130 }}>
+                        <InputLabel>Resource cost</InputLabel>
+                        <Select value={a.resourceCostId} label="Resource cost" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, resourceCostId: e.target.value } : x))} displayEmpty>
+                          <MenuItem value="">— None —</MenuItem>
+                          {resources.filter((r) => r.id.trim()).map((r) => (
+                            <MenuItem key={r.id} value={r.id}>{r.name || r.id}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Cost amount" type="number" value={a.resourceCostAmount} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, resourceCostAmount: e.target.value } : x))} sx={{ width: 100 }} />
+                      <TextField size="small" label="Unlock cost (AP)" type="number" value={a.unlockCost} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, unlockCost: e.target.value } : x))} sx={{ width: 120 }} />
+                      <TextField size="small" label="Min level" type="number" value={a.minLevel} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, minLevel: e.target.value } : x))} sx={{ width: 90 }} />
+                      <FormControl size="small" sx={{ minWidth: 120 }}>
+                        <InputLabel>Effect kind</InputLabel>
+                        <Select value={a.effectKind} label="Effect kind" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effectKind: e.target.value } : x))}>
+                          {EFFECT_KINDS.map((k) => <MenuItem key={k} value={k}>{k}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Effect amount" type="number" value={a.effectAmount} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effectAmount: e.target.value } : x))} sx={{ width: 110 }} />
+                      <TextField size="small" label="Effect %" type="number" value={a.effectPercentage} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effectPercentage: e.target.value } : x))} sx={{ width: 90 }} />
+                      {a.effectKind === 'lifesteal' && (
+                        <TextField size="small" label="Lifesteal %" type="number" value={a.effectLifestealPct} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effectLifestealPct: e.target.value } : x))} sx={{ width: 100 }} />
+                      )}
+                    </Box>
+                  )}
                 </Box>
               ))}
               <Button type="button" size="small" variant="outlined" onClick={() => setAbilities((p) => [...p, emptyAbility()])}>+ Add ability</Button>
@@ -754,10 +898,19 @@ export default function IdleRpgEdit() {
                     <FormControlLabel control={<Checkbox size="small" checked={c.defenseAllowEmpty} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, defenseAllowEmpty: e.target.checked } : x))} />} label="Allow empty" />
                   </Box>
                   <Typography variant="caption" color="text.secondary">Ability access (IDs from Abilities section)</Typography>
-                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 1 }}>
                     <TextField size="small" label="Regular ability IDs (comma)" value={c.regularAbilityIds} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, regularAbilityIds: e.target.value } : x))} placeholder="fireball, heal" sx={{ minWidth: 220 }} />
                     <TextField size="small" label="Ultimate ability ID" value={c.ultimateAbilityId} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, ultimateAbilityId: e.target.value } : x))} placeholder="ultimate_slash" sx={{ width: 160 }} />
                   </Box>
+                  <FormControl size="small" sx={{ minWidth: 160 }}>
+                    <InputLabel>Resource</InputLabel>
+                    <Select value={c.resourceId} label="Resource" onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, resourceId: e.target.value } : x))} displayEmpty>
+                      <MenuItem value="">— None —</MenuItem>
+                      {resources.filter((r) => r.id.trim()).map((r) => (
+                        <MenuItem key={r.id} value={r.id}>{r.name || r.id}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
                   <IconButton size="small" color="error" sx={{ mt: 1 }} onClick={() => setClasses((p) => p.filter((_, j) => j !== i))} disabled={classes.length <= 1}>Remove class</IconButton>
                 </Paper>
               ))}
@@ -782,6 +935,17 @@ export default function IdleRpgEdit() {
                   <TextField size="small" label="Armor" type="number" value={c.arm} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, arm: e.target.value } : x))} sx={{ width: 70 }} />
                   <TextField size="small" label="Icon URL" value={c.iconUrl} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 140 }} />
                   <TextField size="small" label="Tags (comma)" value={c.tags} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, tags: e.target.value } : x))} sx={{ flex: 1 }} />
+                  <TextField size="small" label="Abilities (comma IDs)" value={c.abilityIds} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, abilityIds: e.target.value } : x))} placeholder="fireball, heal" sx={{ width: 160 }} />
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                    <InputLabel>Resource</InputLabel>
+                    <Select value={c.resourceId} label="Resource" onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, resourceId: e.target.value } : x))} displayEmpty>
+                      <MenuItem value="">— None —</MenuItem>
+                      {resources.filter((r) => r.id.trim()).map((r) => (
+                        <MenuItem key={r.id} value={r.id}>{r.name || r.id}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <TextField size="small" label="Resource Max" type="number" value={c.resourceMax} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, resourceMax: e.target.value } : x))} sx={{ width: 100 }} />
                   <IconButton size="small" color="error" onClick={() => setCreatures((p) => p.filter((_, j) => j !== i))}>−</IconButton>
                 </Box>
               ))}

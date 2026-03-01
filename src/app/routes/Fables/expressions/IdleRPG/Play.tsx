@@ -29,6 +29,7 @@ import BoltIcon from '@mui/icons-material/Bolt'
 import ShieldIcon from '@mui/icons-material/Shield'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
 import IconButton from '@mui/material/IconButton'
 import {
   getIdleRpgRealms,
@@ -49,6 +50,7 @@ import GuildTab from './tabs/GuildTab'
 import PvPTab from './tabs/PvPTab'
 import DungeonsTab from './tabs/DungeonsTab'
 import RaidsTab from './tabs/RaidsTab'
+import AbilitiesTab from './tabs/AbilitiesTab'
 
 /* ------------------------------------------------------------------ */
 /*  Sidebar Character Card                                            */
@@ -356,11 +358,12 @@ function EquipRow({ label, item, emptyText }: { label: string; item?: { name: st
 
 /* ------------------------------------------------------------------ */
 
-type Tab = 'tavern' | 'shop' | 'guild' | 'dungeons' | 'raids' | 'pvp'
+type Tab = 'tavern' | 'shop' | 'abilities' | 'guild' | 'dungeons' | 'raids' | 'pvp'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'tavern', label: 'Tavern', icon: <LocalBarIcon /> },
   { id: 'shop', label: 'Shop', icon: <StorefrontIcon /> },
+  { id: 'abilities', label: 'Abilities', icon: <AutoFixHighIcon /> },
   { id: 'guild', label: 'Guild', icon: <GroupsIcon /> },
   { id: 'dungeons', label: 'Dungeons', icon: <CastleIcon /> },
   { id: 'raids', label: 'Raids', icon: <MilitaryTechIcon /> },
@@ -635,6 +638,15 @@ export default function FableIdleRPG() {
             )}
             {activeTab === 'shop' && (
               <ShopTab
+                fableId={fableId}
+                realmId={realm.id}
+                character={displayCharacter}
+                pack={pack}
+                onCharacterUpdate={handleCharacterUpdate}
+              />
+            )}
+            {activeTab === 'abilities' && displayCharacter && realm && pack && (
+              <AbilitiesTab
                 fableId={fableId}
                 realmId={realm.id}
                 character={displayCharacter}

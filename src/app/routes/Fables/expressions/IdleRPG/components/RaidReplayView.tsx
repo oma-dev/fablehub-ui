@@ -6,7 +6,7 @@ import LinearProgress from '@mui/material/LinearProgress'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import PersonIcon from '@mui/icons-material/Person'
-import type { CombatResult, CombatTurnEvent, IdleRpgGroup, IdleRpgPackV1, RaidReplayPayload } from '../../../../../../services/api'
+import type { CombatEventType, CombatResult, CombatTurnEvent, IdleRpgGroup, IdleRpgPackV1, RaidReplayPayload } from '../../../../../../services/api'
 import type { IdleRpgGroupMember } from '../../../../../../services/api'
 import { getAttackAnimationConfig, type AttackAnimationConfig } from './vfx/animationConfig'
 import DamageNumber from './vfx/DamageNumber'
@@ -169,8 +169,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const [projTo, setProjTo] = useState<ProjectilePos>({ x: 0, y: 0 })
   const [projectileImageUrl, setProjectileImageUrl] = useState<string | null>(null)
   const [projectileDurationMs, setProjectileDurationMs] = useState<number | undefined>(undefined)
-  const [partyDmg, setPartyDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
-  const [bossDmg, setBossDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
+  const [partyDmg, setPartyDmg] = useState<{ value: number; type: CombatEventType; key: number; abilityName?: string } | null>(null)
+  const [bossDmg, setBossDmg] = useState<{ value: number; type: CombatEventType; key: number; abilityName?: string } | null>(null)
   const dmgKeyRef = useRef(0)
   /** IDs of party members who just died; kept in the list until fade-out completes so we can animate. */
   const [justDiedIds, setJustDiedIds] = useState<string[]>([])
@@ -234,7 +234,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       setTargetImpact(true)
       setTargetVariant('hit')
       dmgKeyRef.current++
-      setTargetDmg({ value: event.value, type: event.type, key: dmgKeyRef.current })
+      setTargetDmg({ value: event.value, type: event.type, key: dmgKeyRef.current, abilityName: event.abilityName })
       const targetHpAfter = Math.max(0, event.targetHpAfter)
       setCombatantHp((prev) => ({ ...prev, [event.targetId]: targetHpAfter }))
       if (targetHpAfter === 0 && partyOrder.includes(event.targetId)) {
@@ -416,7 +416,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                           />
                           <AnimatePresence>
                             {partyDmg && (
-                              <DamageNumber value={partyDmg.value} type={partyDmg.type} id={partyDmg.key} />
+                              <DamageNumber value={partyDmg.value} type={partyDmg.type} id={partyDmg.key} abilityName={partyDmg.abilityName} />
                             )}
                           </AnimatePresence>
                         </>
@@ -547,7 +547,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                   />
                   <AnimatePresence>
                     {bossDmg && (
-                      <DamageNumber value={bossDmg.value} type={bossDmg.type} id={bossDmg.key} />
+                      <DamageNumber value={bossDmg.value} type={bossDmg.type} id={bossDmg.key} abilityName={bossDmg.abilityName} />
                     )}
                   </AnimatePresence>
                 </Box>

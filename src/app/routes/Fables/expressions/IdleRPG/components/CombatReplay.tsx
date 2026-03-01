@@ -4,9 +4,10 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import LinearProgress from '@mui/material/LinearProgress'
 import Paper from '@mui/material/Paper'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import PersonIcon from '@mui/icons-material/Person'
-import type { AnimationFrames, CombatResult, CombatTurnEvent } from '../../../../../../services/api'
+import type { ActiveStatusEffect, AnimationFrames, CombatEventType, CombatResult, CombatTurnEvent } from '../../../../../../services/api'
 import { getAttackAnimationConfig, type AttackAnimationConfig } from './vfx/animationConfig'
 import DamageNumber from './vfx/DamageNumber'
 import ImpactEffect from './vfx/ImpactEffect'
@@ -147,6 +148,50 @@ function HpBar({ current, max }: { current: number; max: number }) {
   )
 }
 
+const STATUS_ICON_SIZE = 24
+const STATUS_EFFECT_COLORS: Record<string, string> = {
+  dot: '#ce93d8', hot: '#66bb6a', stun: '#ffa726', buff: '#64b5f6', debuff: '#ef5350',
+  slow: '#90a4ae', paralyze: '#ffcc80', freeze: '#80deea', sleep: '#b39ddb',
+  confusion: '#f48fb1', blind: '#bdbdbd', vulnerability: '#ff8a65', anti_heal: '#e57373',
+  thorns: '#a5d6a7', barrier: '#4fc3f7', evasion: '#b0bec5', haste: '#fff176', auto_revive: '#ffd54f',
+}
+
+function StatusEffectIcons({ effects }: { effects: ActiveStatusEffect[] }) {
+  if (effects.length === 0) return null
+  return (
+    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap', mt: 0.5 }}>
+      {effects.map((eff) => (
+        <Tooltip key={eff.id} title={`${eff.name}${eff.description ? `: ${eff.description}` : ''} (${eff.remainingTurns} turns)`}>
+          {eff.iconUrl ? (
+            <Box
+              component="img"
+              src={eff.iconUrl}
+              alt={eff.name}
+              sx={{ width: STATUS_ICON_SIZE, height: STATUS_ICON_SIZE, borderRadius: '4px', border: `1px solid ${STATUS_EFFECT_COLORS[eff.kind] ?? '#666'}` }}
+            />
+          ) : (
+            <Box sx={{
+              width: STATUS_ICON_SIZE,
+              height: STATUS_ICON_SIZE,
+              borderRadius: '4px',
+              bgcolor: STATUS_EFFECT_COLORS[eff.kind] ?? '#666',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 10,
+              fontWeight: 700,
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.2)',
+            }}>
+              {eff.name.charAt(0).toUpperCase()}
+            </Box>
+          )}
+        </Tooltip>
+      ))}
+    </Box>
+  )
+}
+
 function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'right') {
   const sign = direction === 'left' ? 1 : -1
   return {
@@ -225,8 +270,11 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const [activeProjectiles, setActiveProjectiles] = useState<ActiveProjectileEntry[]>([])
   const [activeImpactFrames, setActiveImpactFrames] = useState<ActiveImpactFrame[]>([])
 
-  const [playerDmg, setPlayerDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
-  const [creatureDmg, setCreatureDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
+  type DmgState = { value: number; type: CombatEventType; key: number; abilityName?: string } | null
+  const [playerDmg, setPlayerDmg] = useState<DmgState>(null)
+  const [creatureDmg, setCreatureDmg] = useState<DmgState>(null)
+  const [playerStatusEffects, setPlayerStatusEffects] = useState<ActiveStatusEffect[]>([])
+  const [creatureStatusEffects, setCreatureStatusEffects] = useState<ActiveStatusEffect[]>([])
   const dmgKeyRef = useRef(0)
   const vfxKeyRef = useRef(0)
 
@@ -373,7 +421,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     setTargetImpact(true)
     setTargetVariant('hit')
     dmgKeyRef.current++
-    setTargetDmg({ value: event.value, type: event.type, key: dmgKeyRef.current })
+    setTargetDmg({ value: event.value, type: event.type, key: dmgKeyRef.current, abilityName: event.abilityName })
     setTargetHp(Math.max(0, event.targetHpAfter))
     await sleep(maxImpactMs)
 
@@ -408,6 +456,13 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           const anim = attackerSide === 'player' ? playerAnim : creatureAnim
 
           await animateAttack(attackerSide, ev, anim)
+        }
+        // Update status effect icons after each turn
+        if (turn.activeStatusEffects) {
+          setPlayerStatusEffects(turn.activeStatusEffects[playerId] ?? [])
+          const creatureId = combat.turns[0]?.events?.find(e => e.sourceId !== playerId)?.sourceId
+            ?? combat.turns[0]?.events?.find(e => e.targetId !== playerId)?.targetId ?? ''
+          setCreatureStatusEffects(turn.activeStatusEffects[creatureId] ?? [])
         }
         if (!abortRef.current) await sleep(300)
       }
@@ -514,7 +569,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               }
               <AnimatePresence>
                 {playerDmg && (
-                  <DamageNumber value={playerDmg.value} type={playerDmg.type} id={playerDmg.key} />
+                  <DamageNumber value={playerDmg.value} type={playerDmg.type} id={playerDmg.key} abilityName={playerDmg.abilityName} />
                 )}
               </AnimatePresence>
             </Box>
@@ -523,6 +578,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {player.level}</Typography>
             </Box>
             <HpBar current={playerHp} max={player.maxHp} />
+            <StatusEffectIcons effects={playerStatusEffects} />
             <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
               {STAT_LABELS.map(({ key, label }) => (
                 <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
@@ -587,7 +643,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               }
               <AnimatePresence>
                 {creatureDmg && (
-                  <DamageNumber value={creatureDmg.value} type={creatureDmg.type} id={creatureDmg.key} />
+                  <DamageNumber value={creatureDmg.value} type={creatureDmg.type} id={creatureDmg.key} abilityName={creatureDmg.abilityName} />
                 )}
               </AnimatePresence>
             </Box>
@@ -596,6 +652,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {creature.level}</Typography>
             </Box>
             <HpBar current={creatureHp} max={creature.maxHp} />
+            <StatusEffectIcons effects={creatureStatusEffects} />
             <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
               {STAT_LABELS.map(({ key, label }) => (
                 <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
