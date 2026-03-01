@@ -38,6 +38,7 @@ import type {
 } from '../../../../../services/api'
 import { RARITY_NAME_TO_NUMBER, RARITY_NAMES } from '../../../../../services/api'
 import { exampleFormState } from './examplePack'
+import AbilityAnimationEditor, { type AbilityAnimFrames, emptyAnimFrames, hydrateAnimFrames, buildAnimationFrames } from './components/AbilityAnimationEditor'
 
 // --- Helpers ---
 function parseTags(s: string): string[] {
@@ -87,7 +88,7 @@ const DELIVERIES = ['melee', 'projectile_straight', 'projectile_arced', 'instant
 const STYLE_IDS = ['melee_slash', 'melee_punch', 'projectile_arrow', 'projectile_bolt', 'instant_slash'] as const
 const SLOTS = ['attack_source', 'defense_layer'] as const
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
-const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate']
+const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate', 'reactive']
 const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal'] as const
 
 // --- Form state types ---
@@ -97,6 +98,8 @@ type AbilityForm = {
   id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string; delivery: string; styleId: string
   cooldownTurns: string; resourceCostId: string; resourceCostAmount: string; unlockCost: string; minLevel: string
   effectKind: string; effectAmount: string; effectPercentage: string; effectLifestealPct: string
+  animFrames: AbilityAnimFrames
+  reactiveBaseChance: string; reactiveScalingStat: string; reactiveScalingCoeff: string
 }
 type ClassForm = {
   id: string
@@ -128,6 +131,8 @@ const emptyAbility = (): AbilityForm => ({
   id: '', name: '', abilityType: 'regular', description: '', iconUrl: '', delivery: 'melee', styleId: 'melee_slash',
   cooldownTurns: '0', resourceCostId: '', resourceCostAmount: '0', unlockCost: '1', minLevel: '1',
   effectKind: 'damage', effectAmount: '0', effectPercentage: '0', effectLifestealPct: '0',
+  animFrames: emptyAnimFrames(),
+  reactiveBaseChance: '0.2', reactiveScalingStat: '', reactiveScalingCoeff: '0',
 })
 const emptyClass = (): ClassForm => ({
   id: '', name: '', description: '', iconUrl: '',
@@ -213,16 +218,10 @@ export default function IdleRpgCreate() {
       effectAmount: String((a as any).effects?.[0]?.amount ?? 0),
       effectPercentage: String((a as any).effects?.[0]?.percentage ?? 0),
       effectLifestealPct: String((a as any).effects?.[0]?.lifestealPercent ?? 0),
-      animWeaponSource: (a.animationFrames?.weapon?.[0]?.imageSource ?? 'url') as any,
-      animWeaponUrl: a.animationFrames?.weapon?.[0]?.url ?? '',
-      animWeaponDelayMs: String(a.animationFrames?.weapon?.[0]?.delayMs ?? 0),
-      animProjectileSource: (a.animationFrames?.projectile?.[0]?.imageSource ?? 'url') as any,
-      animProjectileUrl: a.animationFrames?.projectile?.[0]?.url ?? '',
-      animProjectileTrajectory: (a.animationFrames?.projectile?.[0]?.trajectory ?? 'arc') as 'straight' | 'arc',
-      animProjectileDelayMs: String(a.animationFrames?.projectile?.[0]?.delayMs ?? 0),
-      animImpactSource: (a.animationFrames?.impact?.[0]?.imageSource ?? 'url') as any,
-      animImpactUrl: a.animationFrames?.impact?.[0]?.url ?? '',
-      animImpactDelayMs: String(a.animationFrames?.impact?.[0]?.delayMs ?? 0),
+      animFrames: hydrateAnimFrames(a.animationFrames),
+      reactiveBaseChance: String((a as any).reactiveConfig?.baseChance ?? 0.2),
+      reactiveScalingStat: (a as any).reactiveConfig?.scalingStat ?? '',
+      reactiveScalingCoeff: String((a as any).reactiveConfig?.scalingCoeff ?? 0),
     })))
     setClasses(pack.classes.map((c) => {
       const primaryAbility = (pack.abilities ?? []).find(
@@ -333,6 +332,10 @@ export default function IdleRpgCreate() {
       effectAmount: a.effectAmount ?? '0',
       effectPercentage: a.effectPercentage ?? '0',
       effectLifestealPct: a.effectLifestealPct ?? '0',
+      animFrames: (a as any).animFrames ?? emptyAnimFrames(),
+      reactiveBaseChance: (a as any).reactiveBaseChance ?? '0.2',
+      reactiveScalingStat: (a as any).reactiveScalingStat ?? '',
+      reactiveScalingCoeff: (a as any).reactiveScalingCoeff ?? '0',
     })))
     setClasses(ex.classes.map((c) => ({ ...c, resourceId: c.resourceId ?? '' })))
     setCreatures(ex.creatures.map((c) => ({ ...c, abilityIds: c.abilityIds ?? '', resourceId: c.resourceId ?? '', resourceMax: c.resourceMax ?? '' })))
@@ -414,6 +417,15 @@ export default function IdleRpgCreate() {
           def.primaryAttack = {
             delivery: a.delivery || 'melee',
             styleId: a.styleId || 'melee_slash',
+          }
+        }
+        const animationFrames = buildAnimationFrames(a.animFrames)
+        if (animationFrames) def.animationFrames = animationFrames
+        if (a.abilityType === 'reactive') {
+          def.reactiveConfig = {
+            baseChance: Number(a.reactiveBaseChance) || 0.2,
+            ...(a.reactiveScalingStat ? { scalingStat: a.reactiveScalingStat as any } : {}),
+            ...(Number(a.reactiveScalingCoeff) > 0 ? { scalingCoeff: Number(a.reactiveScalingCoeff) } : {}),
           }
         }
         return def
@@ -805,6 +817,24 @@ export default function IdleRpgCreate() {
                       )}
                     </Box>
                   )}
+                  {a.abilityType === 'reactive' && (
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%', mt: 1 }}>
+                      <TextField size="small" label="Base block chance (0-1)" type="number" value={a.reactiveBaseChance} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveBaseChance: e.target.value } : x))} sx={{ width: 160 }} inputProps={{ step: 0.05, min: 0, max: 1 }} />
+                      <FormControl size="small" sx={{ minWidth: 100 }}>
+                        <InputLabel>Scaling stat</InputLabel>
+                        <Select value={a.reactiveScalingStat} label="Scaling stat" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveScalingStat: e.target.value } : x))} displayEmpty>
+                          <MenuItem value="">— None —</MenuItem>
+                          {STAT_IDS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Scaling coeff" type="number" value={a.reactiveScalingCoeff} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveScalingCoeff: e.target.value } : x))} sx={{ width: 120 }} inputProps={{ step: 0.001 }} />
+                    </Box>
+                  )}
+                  <AbilityAnimationEditor
+                    animFrames={a.animFrames}
+                    onChange={(af) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animFrames: af } : x))}
+                    isReactive={a.abilityType === 'reactive'}
+                  />
                 </Box>
               ))}
               <Button type="button" size="small" variant="outlined" onClick={() => setAbilities((p) => [...p, emptyAbility()])}>+ Add ability</Button>

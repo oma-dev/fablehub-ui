@@ -8,7 +8,8 @@ import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import PersonIcon from '@mui/icons-material/Person'
 import type { ActiveStatusEffect, AnimationFrames, CombatEventType, CombatResult, CombatTurnEvent } from '../../../../../../services/api'
-import { getAttackAnimationConfig, type AttackAnimationConfig } from './vfx/animationConfig'
+import { getAttackAnimationConfig, type AttackAnimationConfig, type AnimationBlockFrame } from './vfx/animationConfig'
+import BlockFrame from './vfx/BlockFrame'
 import DamageNumber from './vfx/DamageNumber'
 import ImpactEffect from './vfx/ImpactEffect'
 import ImpactFrame from './vfx/ImpactFrame'
@@ -287,6 +288,19 @@ interface ActiveImpactFrame {
   offsetY: number
 }
 
+interface ActiveBlockFrameEntry {
+  key: number
+  side: 'player' | 'creature'
+  url: string
+  showMs: number
+  vanishMs: number
+  sizePx?: number
+  startSizePx?: number
+  endSizePx?: number
+  offsetX: number
+  offsetY: number
+}
+
 export default function CombatReplay({ combat, player, creature, victory, onFinish, leftCharacterId }: Props) {
   const [playerHp, setPlayerHp] = useState(player.maxHp)
   const [creatureHp, setCreatureHp] = useState(creature.maxHp)
@@ -302,6 +316,8 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const arenaRef = useRef<HTMLDivElement>(null)
   const playerPortraitRef = useRef<HTMLDivElement>(null)
   const creaturePortraitRef = useRef<HTMLDivElement>(null)
+  const playerCardRef = useRef<HTMLDivElement>(null)
+  const creatureCardRef = useRef<HTMLDivElement>(null)
 
   const playerId = leftCharacterId ?? combat.turns[0]?.events[0]?.sourceId ?? 'player'
 
@@ -314,6 +330,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   const [activeWeaponFrames, setActiveWeaponFrames] = useState<ActiveWeaponFrame[]>([])
   const [activeProjectiles, setActiveProjectiles] = useState<ActiveProjectileEntry[]>([])
   const [activeImpactFrames, setActiveImpactFrames] = useState<ActiveImpactFrame[]>([])
+  const [activeBlockFrames, setActiveBlockFrames] = useState<ActiveBlockFrameEntry[]>([])
 
   type DmgState = { value: number; type: CombatEventType; key: number; abilityName?: string } | null
   const [playerDmg, setPlayerDmg] = useState<DmgState>(null)
@@ -338,6 +355,21 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
       x: eRect.left + eRect.width / 2 - aRect.left,
       y: eRect.top + eRect.height / 2 - aRect.top,
     }
+  }, [])
+
+  const getCardBorderPos = useCallback((cardRef: React.RefObject<HTMLDivElement | null>, portraitRef: React.RefObject<HTMLDivElement | null>, side: 'player' | 'creature'): ProjectilePos => {
+    const arena = arenaRef.current
+    const card = cardRef.current
+    const portrait = portraitRef.current
+    if (!arena || !card) return { x: 0, y: 0 }
+    const aRect = arena.getBoundingClientRect()
+    const cRect = card.getBoundingClientRect()
+    const pRect = portrait?.getBoundingClientRect()
+    const y = pRect ? pRect.top + pRect.height / 2 - aRect.top : cRect.top + cRect.height / 2 - aRect.top
+    const x = side === 'creature'
+      ? cRect.left - aRect.left
+      : cRect.right - aRect.left
+    return { x, y }
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
@@ -399,12 +431,21 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
       await sleep(maxWeaponMs)
     }
 
+    // Detect block events in this group
+    const blockEvent = events.find(ev => ev.type === 'block' && ev.blocked)
+    const isBlocked = !!blockEvent
+
     // --- Projectile frames ---
     const projFrames = frames?.projectile ?? []
     if (anim.projectile && projFrames.length > 0) {
       const srcRef = attackerSide === 'player' ? playerPortraitRef : creaturePortraitRef
       const tgtRef = attackerSide === 'player' ? creaturePortraitRef : playerPortraitRef
-      const tgtPos = getPortraitPos(tgtRef)
+      const defenderSide: 'player' | 'creature' = attackerSide === 'player' ? 'creature' : 'player'
+      const defenderCardRef = defenderSide === 'player' ? playerCardRef : creatureCardRef
+      const defenderPortraitRef = defenderSide === 'player' ? playerPortraitRef : creaturePortraitRef
+      const tgtPos = isBlocked
+        ? getCardBorderPos(defenderCardRef, defenderPortraitRef, defenderSide)
+        : getPortraitPos(tgtRef)
       const weaponUrlFallback = attackerSide === 'player' ? player.weaponUrl : creature.weaponUrl
       const dir = attackerSide === 'player' ? 'left-to-right' as const : 'right-to-left' as const
       const defaultFlight = (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
@@ -438,6 +479,61 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     }
 
     if (abortRef.current) return
+
+    // --- Block frames (shown at defender card border when blocked) ---
+    if (isBlocked && blockEvent) {
+      const defenderSide: 'player' | 'creature' = attackerSide === 'player' ? 'creature' : 'player'
+      const resolveBlockTiming = (f: AnimationBlockFrame) => {
+        if (f.showMs != null && f.vanishMs != null) return { showMs: f.showMs, vanishMs: f.vanishMs }
+        const lt = f.lifetimeMs ?? (f.showMs != null ? f.showMs + (f.vanishMs ?? 500) : 800)
+        return { showMs: Math.floor(lt * 0.4), vanishMs: Math.ceil(lt * 0.6) }
+      }
+      const blockAnimFrames = (blockEvent.blockAnimationFrames?.block ?? []).filter(f => f.url?.trim())
+      if (blockAnimFrames.length > 0) {
+        blockAnimFrames.forEach(async (f) => {
+          if (f.delayMs) await sleep(f.delayMs)
+          const { showMs, vanishMs } = resolveBlockTiming(f)
+          const entry: ActiveBlockFrameEntry = {
+            key: ++vfxKeyRef.current,
+            side: defenderSide,
+            url: f.url!.trim(),
+            showMs,
+            vanishMs,
+            sizePx: f.sizePx,
+            startSizePx: f.startSizePx,
+            endSizePx: f.endSizePx,
+            offsetX: f.offsetX ?? 0,
+            offsetY: f.offsetY ?? 0,
+          }
+          setActiveBlockFrames(prev => [...prev, entry])
+        })
+      }
+
+      // Show "Blocked" text on the defender side
+      const isDefenderPlayer = defenderSide === 'player'
+      dmgKeyRef.current++
+      if (isDefenderPlayer) {
+        setPlayerDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Blocked!' })
+      } else {
+        setCreatureDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Blocked!' })
+      }
+
+      const maxBlockMs = blockAnimFrames.length > 0
+        ? Math.max(...blockAnimFrames.map(f => {
+            const { showMs, vanishMs } = resolveBlockTiming(f)
+            return (f.delayMs ?? 0) + showMs + vanishMs
+          }))
+        : 600
+      await sleep(maxBlockMs)
+
+      setActiveBlockFrames([])
+      setAttackerVariant('return')
+      await sleep(280)
+      setAttackerVariant('idle')
+      setPlayerDmg(null)
+      setCreatureDmg(null)
+      return
+    }
 
     // --- Impact frames ---
     const impactFrames = (frames?.impact ?? []).filter(f => f.url?.trim())
@@ -475,7 +571,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
 
     // Combat events (damage/heal/execute) — split into target-side (shown at impact) and self-side
     // (lifesteal heal shown 200ms later so it reads: "hit enemy → drain life → heal self")
-    const combatEvents = events.filter(ev => ev.type !== 'resource_change')
+    const combatEvents = events.filter(ev => ev.type !== 'resource_change' && ev.type !== 'block')
     const targetEvents = combatEvents.filter(ev => ev.targetId !== ev.sourceId || ev.type !== 'heal')
     const selfHealEvents = combatEvents.filter(ev => ev.targetId === ev.sourceId && ev.type === 'heal')
 
@@ -522,7 +618,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     setAttackerVariant('idle')
     setPlayerDmg(null)
     setCreatureDmg(null)
-  }, [playerId, player.weaponUrl, creature.weaponUrl, getPortraitPos])
+  }, [playerId, player.weaponUrl, creature.weaponUrl, getPortraitPos, getCardBorderPos])
 
   useEffect(() => {
     if (combat.turns.length === 0) {
@@ -538,11 +634,14 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
         const turn = combat.turns[i]
         setCurrentTurn(turn.turnIndex)
 
-        // Group consecutive events with the same sourceId+abilityId into one animation
+        // Group consecutive events with the same sourceId+abilityId into one animation.
+        // Block events (emitted by defender) are appended to the preceding attacker group.
         const groups: CombatTurnEvent[][] = []
         for (const ev of turn.events) {
           const prev = groups[groups.length - 1]
-          if (prev && prev[0].sourceId === ev.sourceId && ev.abilityId && prev[0].abilityId === ev.abilityId) {
+          if (ev.type === 'block' && prev && prev.length > 0) {
+            prev.push(ev)
+          } else if (prev && prev[0].sourceId === ev.sourceId && ev.abilityId && prev[0].abilityId === ev.abilityId) {
             prev.push(ev)
           } else {
             groups.push([ev])
@@ -586,6 +685,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
     setActiveWeaponFrames([])
     setActiveProjectiles([])
     setActiveImpactFrames([])
+    setActiveBlockFrames([])
     setPlayerDmg(null)
     setCreatureDmg(null)
 
@@ -651,6 +751,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
         >
           <Paper
+            ref={playerCardRef}
             variant="outlined"
             sx={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -658,6 +759,7 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
               bgcolor: '#14121f',
               borderColor: 'rgba(99,102,241,0.45)',
               boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(99,102,241,0.12)',
+              position: 'relative', overflow: 'visible',
             }}
           >
             <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
@@ -701,6 +803,9 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
                 </Box>
               ))}
             </Box>
+            {activeBlockFrames.filter(f => f.side === 'player').map(f => (
+              <BlockFrame key={f.key} show url={f.url} side="player" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+            ))}
           </Paper>
         </motion.div>
 
@@ -728,13 +833,15 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
         >
           <Paper
+            ref={creatureCardRef}
             variant="outlined"
             sx={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
-              gap: CARD_GAP, p: CARD_PADDING, pt: 0 ,borderRadius: CARD_RADIUS,
+              gap: CARD_GAP, p: CARD_PADDING, pt: 0, borderRadius: CARD_RADIUS,
               bgcolor: '#1a1414',
               borderColor: 'rgba(239,68,68,0.4)',
               boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(239,68,68,0.1)',
+              position: 'relative', overflow: 'visible',
             }}
           >
             <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
@@ -778,6 +885,9 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
                 </Box>
               ))}
             </Box>
+            {activeBlockFrames.filter(f => f.side === 'creature').map(f => (
+              <BlockFrame key={f.key} show url={f.url} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+            ))}
           </Paper>
         </motion.div>
       </Box>

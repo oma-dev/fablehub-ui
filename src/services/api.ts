@@ -124,11 +124,34 @@ export interface AnimationImpactFrame {
   offsetY?: number
 }
 
+/** Optional block frame: pops at defender card border when a reactive block triggers. */
+export interface AnimationBlockFrame {
+  url?: string
+  imageSource?: AnimationFrameImageSource
+  delayMs?: number
+  showMs?: number
+  vanishMs?: number
+  lifetimeMs?: number
+  sizePx?: number
+  startSizePx?: number
+  endSizePx?: number
+  offsetX?: number
+  offsetY?: number
+}
+
 /** Attack animation as arrays of optional PNG frames per phase. Multiple entries play concurrently. */
 export interface AnimationFrames {
   weapon?: AnimationWeaponFrame[]
   projectile?: AnimationProjectileFrame[]
   impact?: AnimationImpactFrame[]
+  block?: AnimationBlockFrame[]
+}
+
+/** Reactive ability configuration (e.g. block chance). */
+export interface ReactiveConfig {
+  baseChance: number
+  scalingStat?: StatId
+  scalingCoeff?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +219,7 @@ export interface Ability {
   id: string
   name: string
   description?: string
-  abilityType: 'primary' | 'regular' | 'passive' | 'ultimate'
+  abilityType: 'primary' | 'regular' | 'passive' | 'ultimate' | 'reactive'
   effects?: Effect[]
   /** @deprecated Use effects[] instead. */
   effect?: unknown
@@ -209,10 +232,12 @@ export interface Ability {
   /** When abilityType is 'primary': defines the class primary attack. */
   primaryAttack?: { delivery: string; styleId: string }
   iconUrl?: string
-  /** Optional animation frames (weapon / projectile / impact PNGs). */
+  /** Optional animation frames (weapon / projectile / impact / block PNGs). */
   animationFrames?: AnimationFrames
   /** Ability points required to unlock this ability. */
   unlockCost?: number
+  /** When abilityType is 'reactive': controls trigger chance and stat scaling. */
+  reactiveConfig?: ReactiveConfig
 }
 
 /** Realm pack shape (backend IdleRpgPackV1). */
@@ -406,7 +431,7 @@ export interface CreateIdleRpgBody {
 export type CombatEventType =
   | 'damage' | 'heal' | 'dot_tick' | 'hot_tick'
   | 'status_applied' | 'status_expired' | 'stun_skip'
-  | 'execute' | 'resource_change'
+  | 'execute' | 'resource_change' | 'block'
 
 export interface ActiveStatusEffect {
   id: string
@@ -429,6 +454,9 @@ export interface CombatTurnEvent {
   statusEffectId?: string
   resourceAfter?: { current: number; max: number }
   statusEffectName?: string
+  blocked?: boolean
+  blockAbilityId?: string
+  blockAnimationFrames?: AnimationFrames
 }
 
 export interface CombatTurn {

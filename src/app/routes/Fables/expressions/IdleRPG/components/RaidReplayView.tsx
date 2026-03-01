@@ -8,10 +8,13 @@ import Typography from '@mui/material/Typography'
 import PersonIcon from '@mui/icons-material/Person'
 import type { CombatEventType, CombatResult, CombatTurnEvent, IdleRpgGroup, IdleRpgPackV1, RaidReplayPayload } from '../../../../../../services/api'
 import type { IdleRpgGroupMember } from '../../../../../../services/api'
-import { getAttackAnimationConfig, type AttackAnimationConfig } from './vfx/animationConfig'
+import { getAttackAnimationConfig, type AttackAnimationConfig, type AnimationBlockFrame } from './vfx/animationConfig'
+import BlockFrame from './vfx/BlockFrame'
 import DamageNumber from './vfx/DamageNumber'
 import ImpactEffect from './vfx/ImpactEffect'
+import ImpactFrame from './vfx/ImpactFrame'
 import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from './vfx/Projectile'
+import WeaponFrame from './vfx/WeaponFrame'
 
 import dungeonBg from '../../../../../../assets/backgrounds/dungeon.png'
 
@@ -202,6 +205,15 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const [partyDmg, setPartyDmg] = useState<{ value: number; type: CombatEventType; key: number; abilityName?: string } | null>(null)
   const [bossDmg, setBossDmg] = useState<{ value: number; type: CombatEventType; key: number; abilityName?: string } | null>(null)
   const dmgKeyRef = useRef(0)
+  const vfxKeyRef = useRef(0)
+
+  type ActiveWF = { key: number; side: 'party' | 'boss'; url: string; fadeInMs: number; lifetimeMs?: number; sizePx?: number; startSizePx?: number; endSizePx?: number; offsetX: number; offsetY: number }
+  type ActiveIF = { key: number; side: 'party' | 'boss'; url: string; showMs: number; vanishMs: number; sizePx?: number; startSizePx?: number; endSizePx?: number; offsetX: number; offsetY: number }
+  type ActiveBF = { key: number; side: 'party' | 'boss'; url: string; showMs: number; vanishMs: number; sizePx?: number; startSizePx?: number; endSizePx?: number; offsetX: number; offsetY: number }
+  const [activeWeaponFrames, setActiveWeaponFrames] = useState<ActiveWF[]>([])
+  const [activeImpactFrames, setActiveImpactFrames] = useState<ActiveIF[]>([])
+  const [activeBlockFrames, setActiveBlockFrames] = useState<ActiveBF[]>([])
+  const bossCardRef = useRef<HTMLDivElement>(null)
   /** IDs of party members who just died; kept in the list until fade-out completes so we can animate. */
   const [justDiedIds, setJustDiedIds] = useState<string[]>([])
 
@@ -236,42 +248,190 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
+  const resolveAbilityAnim = useCallback((abilityId?: string): AttackAnimationConfig => {
+    if (!abilityId) return DEFAULT_ANIM
+    const ability = (pack.abilities ?? []).find(a => a.id === abilityId)
+    if (!ability?.animationFrames) return DEFAULT_ANIM
+    return getAttackAnimationConfig(undefined, ability.animationFrames)
+  }, [pack.abilities])
+
+  const getCardBorderPos = useCallback((cardRef: React.RefObject<HTMLDivElement | null>, portraitRef: React.RefObject<HTMLDivElement | null>, side: 'party' | 'boss'): ProjectilePos => {
+    const arena = arenaRef.current
+    const card = cardRef.current
+    const portrait = portraitRef.current
+    if (!arena || !card) return { x: 0, y: 0 }
+    const aRect = arena.getBoundingClientRect()
+    const cRect = card.getBoundingClientRect()
+    const pRect = portrait?.getBoundingClientRect()
+    const y = pRect ? pRect.top + pRect.height / 2 - aRect.top : cRect.top + cRect.height / 2 - aRect.top
+    const x = side === 'boss'
+      ? cRect.left - aRect.left
+      : cRect.right - aRect.left
+    return { x, y }
+  }, [])
+
   const animateAttack = useCallback(
-    async (attackerSide: 'party' | 'boss', event: CombatTurnEvent) => {
-      if (abortRef.current) return
+    async (attackerSide: 'party' | 'boss', events: CombatTurnEvent[], anim: AttackAnimationConfig) => {
+      if (abortRef.current || events.length === 0) return
       const setAttackerVariant = attackerSide === 'party' ? setPartyVariant : setBossVariant
       const setTargetImpact = attackerSide === 'party' ? setShowBossImpact : setShowPartyImpact
       const setTargetDmg = attackerSide === 'party' ? setBossDmg : setPartyDmg
       const setTargetVariant = attackerSide === 'party' ? setBossVariant : setPartyVariant
+      const frames = anim.frames
+
+      // Resource events first
+      const hasResourceCost = events.some(ev => ev.type === 'resource_change' && ev.resourceAfter)
+      if (hasResourceCost) {
+        await sleep(350)
+        if (abortRef.current) return
+      }
 
       setAttackerVariant('cast')
       await sleep(160)
 
-      const dir = attackerSide === 'party' ? 'left-to-right' : 'right-to-left'
+      // Detect block
+      const blockEvent = events.find(ev => ev.type === 'block' && ev.blocked)
+      const isBlocked = !!blockEvent
+
+      // Weapon frames
+      const weaponFrames = (frames?.weapon ?? []).filter(f => f.url?.trim())
+      if (weaponFrames.length > 0) {
+        const maxWeaponMs = Math.max(...weaponFrames.map(f => (f.delayMs ?? 0) + (f.fadeInMs ?? 200)))
+        weaponFrames.forEach(async (f) => {
+          if (f.delayMs) await sleep(f.delayMs)
+          const entry: ActiveWF = {
+            key: ++vfxKeyRef.current, side: attackerSide, url: f.url!.trim(),
+            fadeInMs: f.fadeInMs ?? 200, lifetimeMs: f.lifetimeMs, sizePx: f.sizePx,
+            startSizePx: f.startSizePx, endSizePx: f.endSizePx, offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+          }
+          setActiveWeaponFrames(prev => [...prev, entry])
+          if (f.lifetimeMs != null) {
+            await sleep(f.lifetimeMs + 100)
+            setActiveWeaponFrames(prev => prev.filter(e => e.key !== entry.key))
+          }
+        })
+        await sleep(maxWeaponMs)
+      }
+
+      // Projectile
+      const dir: 'left-to-right' | 'right-to-left' = attackerSide === 'party' ? 'left-to-right' : 'right-to-left'
       const srcRef = attackerSide === 'party' ? partyPortraitRef : bossPortraitRef
       const tgtRef = attackerSide === 'party' ? bossPortraitRef : partyPortraitRef
-      setProjFrom(getPortraitPos(srcRef))
-      setProjTo(getPortraitPos(tgtRef))
-      setProjectileImageUrl(null)
-      setProjectileDurationMs(undefined)
-      setShowProjectile(dir)
-      const flightMs = (DEFAULT_ANIM.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
-      await sleep(flightMs)
-      setShowProjectile(null)
+      const defenderSide: 'party' | 'boss' = attackerSide === 'party' ? 'boss' : 'party'
+      const defenderCardRef = defenderSide === 'boss' ? bossCardRef : partyPortraitRef
+      const defenderPortraitRef = defenderSide === 'boss' ? bossPortraitRef : partyPortraitRef
+      const tgtPos = isBlocked
+        ? getCardBorderPos(defenderCardRef, defenderPortraitRef, defenderSide)
+        : getPortraitPos(tgtRef)
+
+      const projFrames = frames?.projectile ?? []
+      if (anim.projectile) {
+        if (projFrames.length > 0) {
+          const firstFrame = projFrames[0]
+          setProjFrom(getPortraitPos(srcRef))
+          setProjTo(tgtPos)
+          setProjectileImageUrl(firstFrame.url?.trim() ?? null)
+          const flightMs = firstFrame.lifetimeMs ?? firstFrame.speedMs ?? (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
+          setProjectileDurationMs(flightMs)
+          setShowProjectile(dir)
+          await sleep(flightMs)
+          setShowProjectile(null)
+        } else {
+          setProjFrom(getPortraitPos(srcRef))
+          setProjTo(tgtPos)
+          setProjectileImageUrl(null)
+          setProjectileDurationMs(undefined)
+          setShowProjectile(dir)
+          const flightMs = (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
+          await sleep(flightMs)
+          setShowProjectile(null)
+        }
+      }
 
       if (abortRef.current) return
 
+      // Block handling
+      if (isBlocked && blockEvent) {
+        const resolveBlockTiming = (f: AnimationBlockFrame) => {
+          if (f.showMs != null && f.vanishMs != null) return { showMs: f.showMs, vanishMs: f.vanishMs }
+          const lt = f.lifetimeMs ?? (f.showMs != null ? f.showMs + (f.vanishMs ?? 500) : 800)
+          return { showMs: Math.floor(lt * 0.4), vanishMs: Math.ceil(lt * 0.6) }
+        }
+        const blockAnimFrames = (blockEvent.blockAnimationFrames?.block ?? []).filter(f => f.url?.trim())
+        if (blockAnimFrames.length > 0) {
+          blockAnimFrames.forEach(async (f) => {
+            if (f.delayMs) await sleep(f.delayMs)
+            const { showMs, vanishMs } = resolveBlockTiming(f)
+            setActiveBlockFrames(prev => [...prev, {
+              key: ++vfxKeyRef.current, side: defenderSide, url: f.url!.trim(),
+              showMs, vanishMs, sizePx: f.sizePx, startSizePx: f.startSizePx, endSizePx: f.endSizePx,
+              offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+            }])
+          })
+        }
+        dmgKeyRef.current++
+        setTargetDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Blocked!' })
+        const maxBlockMs = blockAnimFrames.length > 0
+          ? Math.max(...blockAnimFrames.map(f => { const t = resolveBlockTiming(f); return (f.delayMs ?? 0) + t.showMs + t.vanishMs }))
+          : 600
+        await sleep(maxBlockMs)
+        setActiveBlockFrames([])
+        setActiveWeaponFrames([])
+        setAttackerVariant('return')
+        await sleep(280)
+        setAttackerVariant('idle')
+        setTargetDmg(null)
+        return
+      }
+
+      // Impact frames
+      const impactFrames = (frames?.impact ?? []).filter(f => f.url?.trim())
+      if (impactFrames.length > 0) {
+        const resolveImpactTiming = (f: typeof impactFrames[0]) => {
+          if (f.showMs != null && f.vanishMs != null) return { showMs: f.showMs, vanishMs: f.vanishMs }
+          const lt = f.lifetimeMs ?? (f.showMs != null ? f.showMs + (f.vanishMs ?? 500) : 600)
+          return { showMs: Math.floor(lt * 0.15), vanishMs: Math.ceil(lt * 0.85) }
+        }
+        impactFrames.forEach(async (f) => {
+          if (f.delayMs) await sleep(f.delayMs)
+          const { showMs, vanishMs } = resolveImpactTiming(f)
+          setActiveImpactFrames(prev => [...prev, {
+            key: ++vfxKeyRef.current, side: defenderSide, url: f.url!.trim(),
+            showMs, vanishMs, sizePx: f.sizePx, startSizePx: f.startSizePx, endSizePx: f.endSizePx,
+            offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+          }])
+        })
+      }
+
       setTargetImpact(true)
       setTargetVariant('hit')
-      dmgKeyRef.current++
-      setTargetDmg({ value: event.value, type: event.type, key: dmgKeyRef.current, abilityName: event.abilityName })
-      const targetHpAfter = Math.max(0, event.targetHpAfter)
-      setCombatantHp((prev) => ({ ...prev, [event.targetId]: targetHpAfter }))
-      if (targetHpAfter === 0 && partyOrder.includes(event.targetId)) {
-        setJustDiedIds((prev) => (prev.includes(event.targetId) ? prev : [...prev, event.targetId]))
-      }
-      await sleep(350)
 
+      const combatEvents = events.filter(ev => ev.type !== 'resource_change' && ev.type !== 'block')
+      for (const ev of combatEvents) {
+        dmgKeyRef.current++
+        const isOnBoss = ev.targetId === bossId
+        if (isOnBoss) {
+          setBossDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+        } else {
+          setPartyDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+        }
+        const targetHpAfter = Math.max(0, ev.targetHpAfter)
+        setCombatantHp((prev) => ({ ...prev, [ev.targetId]: targetHpAfter }))
+        if (targetHpAfter === 0 && partyOrder.includes(ev.targetId)) {
+          setJustDiedIds((prev) => (prev.includes(ev.targetId) ? prev : [...prev, ev.targetId]))
+        }
+      }
+
+      const maxImpactMs = impactFrames.length > 0
+        ? Math.max(...impactFrames.map(f => {
+            const t = (() => { if (f.showMs != null && f.vanishMs != null) return { showMs: f.showMs, vanishMs: f.vanishMs }; const lt = f.lifetimeMs ?? 600; return { showMs: Math.floor(lt * 0.15), vanishMs: Math.ceil(lt * 0.85) } })()
+            return (f.delayMs ?? 0) + t.showMs + t.vanishMs
+          }))
+        : 350
+      await sleep(maxImpactMs)
+
+      setActiveWeaponFrames([])
+      setActiveImpactFrames([])
       setTargetImpact(false)
       setAttackerVariant('return')
       setTargetVariant('idle')
@@ -280,7 +440,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       setAttackerVariant('idle')
       setTargetDmg(null)
     },
-    [getPortraitPos],
+    [getPortraitPos, getCardBorderPos, bossId, partyOrder, resolveAbilityAnim],
   )
 
   useEffect(() => {
@@ -295,10 +455,23 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         if (abortRef.current) return
         const turn = combat.turns[i]
         setCurrentTurn(turn.turnIndex ?? i)
+        const groups: CombatTurnEvent[][] = []
         for (const ev of turn.events as CombatTurnEvent[]) {
+          const prev = groups[groups.length - 1]
+          if (ev.type === 'block' && prev && prev.length > 0) {
+            prev.push(ev)
+          } else if (prev && prev[0].sourceId === ev.sourceId && ev.abilityId && prev[0].abilityId === ev.abilityId) {
+            prev.push(ev)
+          } else {
+            groups.push([ev])
+          }
+        }
+        for (const grp of groups) {
           if (abortRef.current) return
-          const attackerSide = partyOrder.includes(ev.sourceId) ? 'party' : 'boss'
-          await animateAttack(attackerSide, ev)
+          if (grp.every(ev => ev.type === 'resource_change')) continue
+          const attackerSide = partyOrder.includes(grp[0].sourceId) ? 'party' : 'boss'
+          const anim = resolveAbilityAnim(grp[0].abilityId)
+          await animateAttack(attackerSide, grp, anim)
         }
         if (!abortRef.current) await sleep(300)
       }
@@ -308,7 +481,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     return () => {
       abortRef.current = true
     }
-  }, [combat.turns, totalTurns, partyOrder, animateAttack])
+  }, [combat.turns, totalTurns, partyOrder, animateAttack, resolveAbilityAnim])
 
   const handleSkip = () => {
     abortRef.current = true
@@ -319,6 +492,9 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     setShowProjectile(null)
     setPartyDmg(null)
     setBossDmg(null)
+    setActiveWeaponFrames([])
+    setActiveImpactFrames([])
+    setActiveBlockFrames([])
     setJustDiedIds([])
     const hp: Record<string, number> = {}
     for (const id of partyOrder) hp[id] = partyMaxHp[id] ?? 100
@@ -438,12 +614,22 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                       <RaidPortrait url={getMemberPortrait(member)} size={portraitSize} />
                       {isFront && (
                         <>
-                          <ImpactEffect
-                            show={showPartyImpact}
-                            style="generic"
-                            color={DEFAULT_ANIM.impactColor}
-                            id={`party-impact-${dmgKeyRef.current}`}
-                          />
+                          {activeWeaponFrames.filter(f => f.side === 'party').map(f => (
+                            <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                          ))}
+                          {showPartyImpact && activeImpactFrames.filter(f => f.side === 'party').length > 0
+                            ? activeImpactFrames.filter(f => f.side === 'party').map(f => (
+                              <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                            ))
+                            : (
+                              <ImpactEffect
+                                show={showPartyImpact}
+                                style="generic"
+                                color={DEFAULT_ANIM.impactColor}
+                                id={`party-impact-${dmgKeyRef.current}`}
+                              />
+                            )
+                          }
                           <AnimatePresence>
                             {partyDmg && (
                               <DamageNumber value={partyDmg.value} type={partyDmg.type} id={partyDmg.key} abilityName={partyDmg.abilityName} />
@@ -558,6 +744,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
               style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
             >
               <Paper
+                ref={bossCardRef}
                 variant="outlined"
                 sx={{
                   display: 'flex',
@@ -572,16 +759,27 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                   bgcolor: '#1a1414',
                   borderColor: 'rgba(239,68,68,0.4)',
                   boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(239,68,68,0.1)',
+                  position: 'relative', overflow: 'visible',
                 }}
               >
                 <Box ref={bossPortraitRef} sx={{ position: 'relative' }}>
                   <RaidPortrait url={boss.iconUrl ?? undefined} size={PORTRAIT_SIZE} />
-                  <ImpactEffect
-                    show={showBossImpact}
-                    style="generic"
-                    color={DEFAULT_ANIM.impactColor}
-                    id={`boss-impact-${dmgKeyRef.current}`}
-                  />
+                  {activeWeaponFrames.filter(f => f.side === 'boss').map(f => (
+                    <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                  ))}
+                  {showBossImpact && activeImpactFrames.filter(f => f.side === 'boss').length > 0
+                    ? activeImpactFrames.filter(f => f.side === 'boss').map(f => (
+                      <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                    ))
+                    : (
+                      <ImpactEffect
+                        show={showBossImpact}
+                        style="generic"
+                        color={DEFAULT_ANIM.impactColor}
+                        id={`boss-impact-${dmgKeyRef.current}`}
+                      />
+                    )
+                  }
                   <AnimatePresence>
                     {bossDmg && (
                       <DamageNumber value={bossDmg.value} type={bossDmg.type} id={bossDmg.key} abilityName={bossDmg.abilityName} />
@@ -615,6 +813,9 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                     </Box>
                   ))}
                 </Box>
+                {activeBlockFrames.filter(f => f.side === 'boss').map(f => (
+                  <BlockFrame key={f.key} show url={f.url} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                ))}
               </Paper>
             </motion.div>
           )}

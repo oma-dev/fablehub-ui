@@ -20,9 +20,9 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { getIdleRpgRealm, getFable, updateIdleRpgRealm } from '../../../../../services/api'
+import AbilityAnimationEditor, { type AbilityAnimFrames, emptyAnimFrames, hydrateAnimFrames, buildAnimationFrames } from './components/AbilityAnimationEditor'
 import type {
   Ability,
-  AnimationFrameImageSource,
   ClassBlock,
   CreatureTemplate,
   Dungeon,
@@ -81,7 +81,7 @@ function normalizeStyleId(v: string): (typeof STYLE_IDS)[number] {
 }
 const SLOTS = ['attack_source', 'defense_layer'] as const
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
-const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate']
+const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate', 'reactive']
 const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal'] as const
 
 // --- Form state types (same as Create) ---
@@ -91,9 +91,8 @@ type AbilityForm = {
   id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string; delivery: string; styleId: string
   cooldownTurns: string; resourceCostId: string; resourceCostAmount: string; unlockCost: string; minLevel: string
   effectKind: string; effectAmount: string; effectPercentage: string; effectLifestealPct: string
-  animWeaponSource: AnimationFrameImageSource; animWeaponUrl: string; animWeaponDelayMs: string
-  animProjectileSource: AnimationFrameImageSource; animProjectileUrl: string; animProjectileTrajectory: 'straight' | 'arc'; animProjectileDelayMs: string
-  animImpactSource: AnimationFrameImageSource; animImpactUrl: string; animImpactDelayMs: string
+  animFrames: AbilityAnimFrames
+  reactiveBaseChance: string; reactiveScalingStat: string; reactiveScalingCoeff: string
 }
 type ClassForm = {
   id: string; name: string; description: string; iconUrl: string
@@ -115,9 +114,8 @@ const emptyAbility = (): AbilityForm => ({
   id: '', name: '', abilityType: 'regular', description: '', iconUrl: '', delivery: 'melee', styleId: 'melee_slash',
   cooldownTurns: '0', resourceCostId: '', resourceCostAmount: '0', unlockCost: '1', minLevel: '1',
   effectKind: 'damage', effectAmount: '0', effectPercentage: '0', effectLifestealPct: '0',
-  animWeaponSource: 'url', animWeaponUrl: '', animWeaponDelayMs: '0',
-  animProjectileSource: 'url', animProjectileUrl: '', animProjectileTrajectory: 'arc', animProjectileDelayMs: '0',
-  animImpactSource: 'url', animImpactUrl: '', animImpactDelayMs: '0',
+  animFrames: emptyAnimFrames(),
+  reactiveBaseChance: '0.2', reactiveScalingStat: '', reactiveScalingCoeff: '0',
 })
 const emptyClass = (): ClassForm => ({
   id: '', name: '', description: '', iconUrl: '',
@@ -134,13 +132,6 @@ const emptyRaid = (): RaidForm => ({ id: '', name: '', description: '', imageUrl
 const emptyLootEntry = (): LootEntryForm => ({ itemId: '', weight: '1', classId: '' })
 
 // --- Hydrate form state from pack ---
-const IMAGE_SOURCES: { value: AnimationFrameImageSource; label: string }[] = [
-  { value: 'url', label: 'Custom URL' },
-  { value: 'weaponIcon', label: 'Weapon icon' },
-  { value: 'weaponAnimation', label: 'Weapon animation' },
-  { value: 'weaponProjectile', label: 'Weapon projectile' },
-  { value: 'weaponImpact', label: 'Weapon impact' },
-]
 
 function hydrateResources(pack: IdleRpgPackV1): ResourceForm[] {
   return (pack.resources ?? []).map((r: any) => ({
@@ -173,16 +164,10 @@ function hydrateAbilities(pack: IdleRpgPackV1): AbilityForm[] {
     effectAmount: String((a as any).effects?.[0]?.amount ?? 0),
     effectPercentage: String((a as any).effects?.[0]?.percentage ?? 0),
     effectLifestealPct: String((a as any).effects?.[0]?.lifestealPercent ?? 0),
-    animWeaponSource: (a.animationFrames?.weapon?.[0]?.imageSource ?? 'url') as AnimationFrameImageSource,
-    animWeaponUrl: a.animationFrames?.weapon?.[0]?.url ?? '',
-    animWeaponDelayMs: String(a.animationFrames?.weapon?.[0]?.delayMs ?? 0),
-    animProjectileSource: (a.animationFrames?.projectile?.[0]?.imageSource ?? 'url') as AnimationFrameImageSource,
-    animProjectileUrl: a.animationFrames?.projectile?.[0]?.url ?? '',
-    animProjectileTrajectory: a.animationFrames?.projectile?.[0]?.trajectory ?? 'arc',
-    animProjectileDelayMs: String(a.animationFrames?.projectile?.[0]?.delayMs ?? 0),
-    animImpactSource: (a.animationFrames?.impact?.[0]?.imageSource ?? 'url') as AnimationFrameImageSource,
-    animImpactUrl: a.animationFrames?.impact?.[0]?.url ?? '',
-    animImpactDelayMs: String(a.animationFrames?.impact?.[0]?.delayMs ?? 0),
+    animFrames: hydrateAnimFrames(a.animationFrames),
+    reactiveBaseChance: String((a as any).reactiveConfig?.baseChance ?? 0.2),
+    reactiveScalingStat: (a as any).reactiveConfig?.scalingStat ?? '',
+    reactiveScalingCoeff: String((a as any).reactiveConfig?.scalingCoeff ?? 0),
   }))
 }
 
@@ -413,32 +398,13 @@ export default function IdleRpgEdit() {
             styleId: normalizeStyleId(a.styleId || 'melee_slash'),
           }
         }
-        const hasWeapon = a.animWeaponSource !== 'url' || (a.animWeaponUrl?.trim() ?? '') !== ''
-        const hasProjectile = a.animProjectileSource !== 'url' || (a.animProjectileUrl?.trim() ?? '') !== ''
-        const hasImpact = a.animImpactSource !== 'url' || (a.animImpactUrl?.trim() ?? '') !== ''
-        if (hasWeapon || hasProjectile || hasImpact) {
-          def.animationFrames = {}
-          if (hasWeapon) {
-            def.animationFrames.weapon = [{
-              ...(a.animWeaponSource === 'url' && a.animWeaponUrl?.trim() ? { url: a.animWeaponUrl.trim() } : {}),
-              ...(a.animWeaponSource !== 'url' ? { imageSource: a.animWeaponSource } : {}),
-              ...(Math.max(0, Number(a.animWeaponDelayMs) || 0) > 0 ? { delayMs: Math.max(0, Number(a.animWeaponDelayMs) || 0) } : {}),
-            }]
-          }
-          if (hasProjectile) {
-            def.animationFrames.projectile = [{
-              trajectory: a.animProjectileTrajectory as 'straight' | 'arc',
-              ...(a.animProjectileSource === 'url' && a.animProjectileUrl?.trim() ? { url: a.animProjectileUrl.trim() } : {}),
-              ...(a.animProjectileSource !== 'url' ? { imageSource: a.animProjectileSource } : {}),
-              ...(Math.max(0, Number(a.animProjectileDelayMs) || 0) > 0 ? { delayMs: Math.max(0, Number(a.animProjectileDelayMs) || 0) } : {}),
-            }]
-          }
-          if (hasImpact) {
-            def.animationFrames.impact = [{
-              ...(a.animImpactSource === 'url' && a.animImpactUrl?.trim() ? { url: a.animImpactUrl.trim() } : {}),
-              ...(a.animImpactSource !== 'url' ? { imageSource: a.animImpactSource } : {}),
-              ...(Math.max(0, Number(a.animImpactDelayMs) || 0) > 0 ? { delayMs: Math.max(0, Number(a.animImpactDelayMs) || 0) } : {}),
-            }]
+        const animationFrames = buildAnimationFrames(a.animFrames)
+        if (animationFrames) def.animationFrames = animationFrames
+        if (a.abilityType === 'reactive') {
+          def.reactiveConfig = {
+            baseChance: Number(a.reactiveBaseChance) || 0.2,
+            ...(a.reactiveScalingStat ? { scalingStat: a.reactiveScalingStat as any } : {}),
+            ...(Number(a.reactiveScalingCoeff) > 0 ? { scalingCoeff: Number(a.reactiveScalingCoeff) } : {}),
           }
         }
         return def
@@ -838,37 +804,24 @@ export default function IdleRpgEdit() {
                     <TextField size="small" label="Icon URL" value={a.iconUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 140 }} />
                     <IconButton size="small" color="error" onClick={() => setAbilities((p) => p.filter((_, j) => j !== i))}>−</IconButton>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1.5, pl: 1 }}>
-                  <Typography variant="caption" color="text.secondary">Animation frames:</Typography>
-                  <FormControl size="small" sx={{ minWidth: 100 }}>
-                    <InputLabel>Weapon</InputLabel>
-                    <Select value={a.animWeaponSource} label="Weapon" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animWeaponSource: e.target.value as AnimationFrameImageSource } : x))}>
-                      {IMAGE_SOURCES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
-                    </Select>
-                  </FormControl>
-                  {a.animWeaponSource === 'url' && <TextField size="small" placeholder="Weapon URL" value={a.animWeaponUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animWeaponUrl: e.target.value } : x))} sx={{ width: 140 }} />}
-                  <TextField size="small" type="number" label="W delay (ms)" value={a.animWeaponDelayMs} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animWeaponDelayMs: e.target.value } : x))} inputProps={{ min: 0 }} sx={{ width: 90 }} />
-                  <FormControl size="small" sx={{ minWidth: 100 }}>
-                    <InputLabel>Projectile</InputLabel>
-                    <Select value={a.animProjectileSource} label="Projectile" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animProjectileSource: e.target.value as AnimationFrameImageSource } : x))}>
-                      {IMAGE_SOURCES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
-                    </Select>
-                  </FormControl>
-                  {a.animProjectileSource === 'url' && <TextField size="small" placeholder="Projectile URL" value={a.animProjectileUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animProjectileUrl: e.target.value } : x))} sx={{ width: 140 }} />}
-                  <Select size="small" value={a.animProjectileTrajectory} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animProjectileTrajectory: e.target.value as 'straight' | 'arc' } : x))} sx={{ width: 90 }}>
-                    <MenuItem value="straight">straight</MenuItem>
-                    <MenuItem value="arc">arc</MenuItem>
-                  </Select>
-                  <TextField size="small" type="number" label="P delay (ms)" value={a.animProjectileDelayMs} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animProjectileDelayMs: e.target.value } : x))} inputProps={{ min: 0 }} sx={{ width: 90 }} />
-                  <FormControl size="small" sx={{ minWidth: 100 }}>
-                    <InputLabel>Impact</InputLabel>
-                    <Select value={a.animImpactSource} label="Impact" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animImpactSource: e.target.value as AnimationFrameImageSource } : x))}>
-                      {IMAGE_SOURCES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
-                    </Select>
-                  </FormControl>
-                  {a.animImpactSource === 'url' && <TextField size="small" placeholder="Impact URL" value={a.animImpactUrl} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animImpactUrl: e.target.value } : x))} sx={{ width: 140 }} />}
-                  <TextField size="small" type="number" label="I delay (ms)" value={a.animImpactDelayMs} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animImpactDelayMs: e.target.value } : x))} inputProps={{ min: 0 }} sx={{ width: 90 }} />
-                  </Box>
+                  {a.abilityType === 'reactive' && (
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%', mt: 1 }}>
+                      <TextField size="small" label="Base block chance (0-1)" type="number" value={a.reactiveBaseChance} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveBaseChance: e.target.value } : x))} sx={{ width: 160 }} inputProps={{ step: 0.05, min: 0, max: 1 }} />
+                      <FormControl size="small" sx={{ minWidth: 100 }}>
+                        <InputLabel>Scaling stat</InputLabel>
+                        <Select value={a.reactiveScalingStat} label="Scaling stat" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveScalingStat: e.target.value } : x))} displayEmpty>
+                          <MenuItem value="">— None —</MenuItem>
+                          {STAT_IDS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Scaling coeff" type="number" value={a.reactiveScalingCoeff} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveScalingCoeff: e.target.value } : x))} sx={{ width: 120 }} inputProps={{ step: 0.001 }} />
+                    </Box>
+                  )}
+                  <AbilityAnimationEditor
+                    animFrames={a.animFrames}
+                    onChange={(af) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animFrames: af } : x))}
+                    isReactive={a.abilityType === 'reactive'}
+                  />
                   {a.abilityType !== 'primary' && (
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%', mt: 1 }}>
                       <TextField size="small" label="Cooldown (turns)" type="number" value={a.cooldownTurns} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, cooldownTurns: e.target.value } : x))} sx={{ width: 120 }} />

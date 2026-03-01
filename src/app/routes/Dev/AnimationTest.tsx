@@ -26,6 +26,7 @@ import {
   type ImpactStyle,
   type AnimationFrameImageSource,
 } from '../../routes/Fables/expressions/IdleRPG/components/vfx/animationConfig'
+import BlockFrame from '../../routes/Fables/expressions/IdleRPG/components/vfx/BlockFrame'
 import DamageNumber from '../../routes/Fables/expressions/IdleRPG/components/vfx/DamageNumber'
 import ImpactEffect from '../../routes/Fables/expressions/IdleRPG/components/vfx/ImpactEffect'
 import ImpactFrame from '../../routes/Fables/expressions/IdleRPG/components/vfx/ImpactFrame'
@@ -121,6 +122,33 @@ const defaultImpactFrame = (): ImpactFrameForm => ({
   offsetY: 0,
 })
 
+interface BlockFrameForm {
+  enabled: boolean
+  imageSource: AnimationFrameImageSource
+  url: string
+  delayMs: number
+  showMs: number
+  vanishMs: number
+  lifetimeMs: number
+  startSizePx: number
+  endSizePx: number
+  offsetX: number
+  offsetY: number
+}
+const defaultBlockFrame = (): BlockFrameForm => ({
+  enabled: false,
+  imageSource: 'url',
+  url: '',
+  delayMs: 0,
+  showMs: 320,
+  vanishMs: 480,
+  lifetimeMs: 800,
+  startSizePx: 100,
+  endSizePx: 140,
+  offsetX: 0,
+  offsetY: 0,
+})
+
 // --- Active VFX types (runtime) ---
 interface ActiveWeaponFrameEntry {
   key: number
@@ -156,6 +184,17 @@ interface ActiveImpactFrameEntry {
   offsetX: number
   offsetY: number
 }
+interface ActiveBlockFrameEntry {
+  key: number
+  side: 'player' | 'creature'
+  url: string
+  showMs: number
+  vanishMs: number
+  startSizePx?: number
+  endSizePx?: number
+  offsetX: number
+  offsetY: number
+}
 
 function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'right') {
   const sign = direction === 'left' ? 1 : -1
@@ -176,10 +215,13 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   impactStyle: ImpactStyle
   impactColor: string
   impactKey: number
-  dmg: { value: number; type: 'damage' | 'heal'; key: number } | null
+  dmg: { value: number; type: 'damage' | 'heal' | 'block'; key: number } | null
   accentGradient: string
   activeWeaponFrames?: ActiveWeaponFrameEntry[]
   activeImpactFrames?: ActiveImpactFrameEntry[]
+  activeBlockFrames?: ActiveBlockFrameEntry[]
+  cardRef?: React.Ref<HTMLDivElement>
+  side: 'player' | 'creature'
 }>(function CombatantCard({
   label,
   icon,
@@ -193,14 +235,19 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   accentGradient,
   activeWeaponFrames,
   activeImpactFrames,
+  activeBlockFrames,
+  cardRef,
+  side,
 }, ref) {
   return (
     <motion.div variants={variants} animate={variant} style={{ width: 220, position: 'relative' }}>
       <Paper
+        ref={cardRef}
         variant="outlined"
         sx={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           gap: 1.5, p: 2.5, borderRadius: 2, background: accentGradient,
+          position: 'relative', overflow: 'visible',
         }}
       >
         <Box ref={ref} sx={{ position: 'relative', width: 100, height: 100 }}>
@@ -227,6 +274,9 @@ const CombatantCard = forwardRef<HTMLDivElement, {
           </AnimatePresence>
         </Box>
         <Typography variant="subtitle1" fontWeight={700}>{label}</Typography>
+        {(activeBlockFrames ?? []).map(f => (
+          <BlockFrame key={f.key} show url={f.url} side={side} showMs={f.showMs} vanishMs={f.vanishMs} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+        ))}
       </Paper>
     </motion.div>
   )
@@ -395,6 +445,57 @@ function ImpactFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
   )
 }
 
+function BlockFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
+  frame: BlockFrameForm
+  idx: number
+  onChange: (f: BlockFrameForm) => void
+  onRemove: () => void
+  resolveUrl: (source: AnimationFrameImageSource, url: string) => string
+}) {
+  const set = <K extends keyof BlockFrameForm>(key: K, val: BlockFrameForm[K]) => onChange({ ...frame, [key]: val })
+  return (
+    <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <FormControlLabel
+          control={<Checkbox checked={frame.enabled} onChange={(e) => set('enabled', e.target.checked)} size="small" />}
+          label={<Typography variant="body2" fontWeight={600}>Block frame #{idx + 1}</Typography>}
+          sx={{ m: 0 }}
+        />
+        <IconButton size="small" color="error" onClick={onRemove}><DeleteIcon fontSize="small" /></IconButton>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center', opacity: frame.enabled ? 1 : 0.4 }}>
+        <FormControl size="small" sx={{ minWidth: 140 }} disabled={!frame.enabled}>
+          <InputLabel>Image</InputLabel>
+          <Select value={frame.imageSource} label="Image" onChange={(e) => set('imageSource', e.target.value as AnimationFrameImageSource)}>
+            {IMAGE_SOURCE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+          </Select>
+        </FormControl>
+        {frame.imageSource === 'url' && (
+          <TextField size="small" label="PNG URL" value={frame.url} onChange={(e) => set('url', e.target.value)} placeholder="https://..." sx={{ minWidth: 240, flex: 1 }} disabled={!frame.enabled} />
+        )}
+        {resolveUrl(frame.imageSource, frame.url) && (
+          <img src={resolveUrl(frame.imageSource, frame.url)} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }} />
+        )}
+        <NumField label="Delay (ms)" value={frame.delayMs} onChange={(v) => set('delayMs', Math.max(0, v))} min={0} max={2000} step={50} disabled={!frame.enabled} />
+        <NumField
+          label="Lifetime (ms)" value={frame.lifetimeMs}
+          onChange={(v) => {
+            const lt = Math.max(200, v)
+            onChange({ ...frame, lifetimeMs: lt, showMs: Math.floor(lt * 0.15), vanishMs: Math.ceil(lt * 0.85) })
+          }}
+          min={200} max={5000} step={50} width={120} helperText="show+vanish" disabled={!frame.enabled}
+        />
+        <NumField label="Show (ms)" value={frame.showMs} onChange={(v) => set('showMs', Math.max(0, v))} min={0} max={1000} step={50} disabled={!frame.enabled} />
+        <NumField label="Vanish (ms)" value={frame.vanishMs} onChange={(v) => set('vanishMs', Math.max(100, v))} min={100} max={2000} step={50} width={110} helperText="fade-out" disabled={!frame.enabled} />
+        <NumField label="Start size" value={frame.startSizePx} onChange={(v) => set('startSizePx', Math.max(16, v))} min={16} max={400} step={8} disabled={!frame.enabled} />
+        <NumField label="End size" value={frame.endSizePx} onChange={(v) => set('endSizePx', Math.max(16, v))} min={16} max={400} step={8} disabled={!frame.enabled} />
+        <NumField label="Offset X" value={frame.offsetX} onChange={(v) => set('offsetX', v)} min={-300} max={300} step={8} disabled={!frame.enabled} />
+        <NumField label="Offset Y" value={frame.offsetY} onChange={(v) => set('offsetY', v)} min={-300} max={300} step={8} disabled={!frame.enabled} />
+      </Box>
+    </Box>
+  )
+}
+
 export default function AnimationTest() {
   const [attackerStyle, setAttackerStyle] = useState(styleIds[0])
   const [defenderStyle, setDefenderStyle] = useState(styleIds[0])
@@ -410,6 +511,8 @@ export default function AnimationTest() {
   const [weaponFrames, setWeaponFrames] = useState<WeaponFrameForm[]>([defaultWeaponFrame()])
   const [projectileFrames, setProjectileFrames] = useState<ProjectileFrameForm[]>([defaultProjectileFrame()])
   const [impactFrames, setImpactFrames] = useState<ImpactFrameForm[]>([defaultImpactFrame()])
+  const [blockFrames, setBlockFrames] = useState<BlockFrameForm[]>([])
+  const [simulateBlock, setSimulateBlock] = useState(false)
 
   // Active VFX state (runtime)
   const [playerActiveWeapon, setPlayerActiveWeapon] = useState<ActiveWeaponFrameEntry[]>([])
@@ -417,18 +520,21 @@ export default function AnimationTest() {
   const [activeProjectiles, setActiveProjectiles] = useState<ActiveProjectileEntry[]>([])
   const [playerActiveImpact, setPlayerActiveImpact] = useState<ActiveImpactFrameEntry[]>([])
   const [creatureActiveImpact, setCreatureActiveImpact] = useState<ActiveImpactFrameEntry[]>([])
+  const [activeBlockFrames, setActiveBlockFrames] = useState<ActiveBlockFrameEntry[]>([])
 
   const [playerVariant, setPlayerVariant] = useState('idle')
   const [creatureVariant, setCreatureVariant] = useState('idle')
   const [showPlayerImpact, setShowPlayerImpact] = useState(false)
   const [showCreatureImpact, setShowCreatureImpact] = useState(false)
-  const [playerDmg, setPlayerDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
-  const [creatureDmg, setCreatureDmg] = useState<{ value: number; type: 'damage' | 'heal'; key: number } | null>(null)
+  const [playerDmg, setPlayerDmg] = useState<{ value: number; type: 'damage' | 'heal' | 'block'; key: number } | null>(null)
+  const [creatureDmg, setCreatureDmg] = useState<{ value: number; type: 'damage' | 'heal' | 'block'; key: number } | null>(null)
   const dmgKeyRef = useRef(0)
   const vfxKeyRef = useRef(0)
   const arenaRef = useRef<HTMLDivElement>(null)
   const playerPortraitRef = useRef<HTMLDivElement>(null)
   const creaturePortraitRef = useRef<HTMLDivElement>(null)
+  const playerCardRef = useRef<HTMLDivElement>(null)
+  const creatureCardRef = useRef<HTMLDivElement>(null)
 
   // Impact gallery state
   const [galleryKey, setGalleryKey] = useState(0)
@@ -451,6 +557,19 @@ export default function AnimationTest() {
     }
   }, [])
 
+  const getCardBorderPos = useCallback((cardRef: React.RefObject<HTMLDivElement | null>, defenderSide: 'player' | 'creature'): ProjectilePos => {
+    const arena = arenaRef.current
+    const el = cardRef.current
+    if (!arena || !el) return { x: 0, y: 0 }
+    const aRect = arena.getBoundingClientRect()
+    const eRect = el.getBoundingClientRect()
+    const y = eRect.top + eRect.height / 2 - aRect.top
+    const x = defenderSide === 'creature'
+      ? eRect.left - aRect.left
+      : eRect.right - aRect.left
+    return { x, y }
+  }, [])
+
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
   const resolveFrameUrl = useCallback((source: AnimationFrameImageSource, customUrl: string): string => {
@@ -470,6 +589,7 @@ export default function AnimationTest() {
     anim: AttackAnimationConfig,
     styleId: string,
   ) => {
+    const defenderSide = side === 'player' ? 'creature' : 'player'
     const setAttVar = side === 'player' ? setPlayerVariant : setCreatureVariant
     const setTgtImpact = side === 'player' ? setShowCreatureImpact : setShowPlayerImpact
     const setTgtDmg = side === 'player' ? setCreatureDmg : setPlayerDmg
@@ -477,14 +597,15 @@ export default function AnimationTest() {
     const setAttackerWeapon = side === 'player' ? setPlayerActiveWeapon : setCreatureActiveWeapon
     const setTargetImpactFrames = side === 'player' ? setCreatureActiveImpact : setPlayerActiveImpact
     const sideLabel = side === 'player' ? 'Player' : 'Creature'
-    log(`${sideLabel} attacks with "${styleId}"`)
+    const defenderCardRefUsed = side === 'player' ? creatureCardRef : playerCardRef
+
+    const isBlocked = simulateBlock && blockFrames.some(f => f.enabled)
+    log(`${sideLabel} attacks with "${styleId}"${isBlocked ? ' (BLOCKED!)' : ''}`)
 
     setAttVar('cast')
     await sleep(160)
 
     // --- Weapon frames ---
-    // Sequence timing: wait only for fade-in phase. lifetimeMs (if set) controls independent fade-out.
-    // A frame without lifetimeMs stays until sequence-end cleanup.
     const activeWeaponForms = weaponFrames.filter(f => f.enabled)
     if (activeWeaponForms.length > 0) {
       const maxWeaponMs = Math.max(...activeWeaponForms.map(f => f.delayMs + f.fadeInMs))
@@ -505,11 +626,9 @@ export default function AnimationTest() {
         }
         setAttackerWeapon(prev => [...prev, entry])
         if (f.lifetimeMs > 0) {
-          // Auto-remove after explicit lifetime
           await sleep(f.lifetimeMs + 100)
           setAttackerWeapon(prev => prev.filter(e => e.key !== entry.key))
         }
-        // else: cleaned up at sequence end
       })
       log(`  Weapon frames: ${activeWeaponForms.length}`)
       await sleep(maxWeaponMs)
@@ -521,7 +640,7 @@ export default function AnimationTest() {
       const dir = side === 'player' ? 'left-to-right' as const : 'right-to-left' as const
       const srcRef = side === 'player' ? playerPortraitRef : creaturePortraitRef
       const tgtRef = side === 'player' ? creaturePortraitRef : playerPortraitRef
-      const tgtPos = getPortraitPos(tgtRef)
+      const tgtPos = isBlocked ? getCardBorderPos(defenderCardRefUsed, defenderSide) : getPortraitPos(tgtRef)
       const maxProjMs = Math.max(...activeProjForms.map(f => f.delayMs + f.lifetimeMs))
       log(`  Projectile frames: ${activeProjForms.length}`)
       activeProjForms.forEach(async (f) => {
@@ -549,16 +668,16 @@ export default function AnimationTest() {
       })
       await sleep(maxProjMs)
     } else {
-      // Fallback orb projectile if style has a projectile
       const traj = trajectoryOverride === 'auto' ? anim.projectile : trajectoryOverride
       if (traj) {
         const dir = side === 'player' ? 'left-to-right' as const : 'right-to-left' as const
         const srcRef = side === 'player' ? playerPortraitRef : creaturePortraitRef
         const tgtRef = side === 'player' ? creaturePortraitRef : playerPortraitRef
         const key = ++vfxKeyRef.current
+        const tgtPos = isBlocked ? getCardBorderPos(defenderCardRefUsed, defenderSide) : getPortraitPos(tgtRef)
         const entry: ActiveProjectileEntry = {
           key, direction: dir, imageUrl: null,
-          from: getPortraitPos(srcRef), to: getPortraitPos(tgtRef),
+          from: getPortraitPos(srcRef), to: tgtPos,
           trajectory: traj as 'straight' | 'arc', color: anim.impactColor, show: true,
         }
         setActiveProjectiles(prev => [...prev, entry])
@@ -570,46 +689,78 @@ export default function AnimationTest() {
       }
     }
 
-    // --- Impact frames ---
-    const activeImpactForms = impactFrames.filter(f => f.enabled)
-    if (activeImpactForms.length > 0) {
-      const maxImpactMs = Math.max(...activeImpactForms.map(f => f.delayMs + f.showMs + f.vanishMs))
-      log(`  Impact frames: ${activeImpactForms.length}`)
-      activeImpactForms.forEach(async (f) => {
-        const url = resolveFrameUrl(f.imageSource, f.url)
-        if (!url) return
-        if (f.delayMs) await sleep(f.delayMs)
-        const entry: ActiveImpactFrameEntry = {
-          key: ++vfxKeyRef.current,
-          url,
-          showMs: f.showMs,
-          vanishMs: f.vanishMs,
-          startSizePx: f.startSizePx,
-          endSizePx: f.endSizePx,
-          offsetX: f.offsetX,
-          offsetY: f.offsetY,
-        }
-        setTargetImpactFrames(prev => [...prev, entry])
-      })
-      const dmgValue = Math.floor(Math.random() * 30) + 5
-      setTgtImpact(true)
-      setTgtVar('hit')
-      dmgKeyRef.current++
-      setTgtDmg({ value: dmgValue, type: 'damage', key: dmgKeyRef.current })
-      log(`  Impact → ${dmgValue} damage`)
-      await sleep(maxImpactMs)
+    // --- Block frames (if blocked) ---
+    if (isBlocked) {
+      const activeBlockForms = blockFrames.filter(f => f.enabled)
+      if (activeBlockForms.length > 0) {
+        const maxBlockMs = Math.max(...activeBlockForms.map(f => f.delayMs + f.showMs + f.vanishMs))
+        log(`  Block frames: ${activeBlockForms.length}`)
+        activeBlockForms.forEach(async (f) => {
+          const url = resolveFrameUrl(f.imageSource, f.url)
+          if (!url) return
+          if (f.delayMs) await sleep(f.delayMs)
+          const entry: ActiveBlockFrameEntry = {
+            key: ++vfxKeyRef.current,
+            side: defenderSide,
+            url,
+            showMs: f.showMs,
+            vanishMs: f.vanishMs,
+            startSizePx: f.startSizePx,
+            endSizePx: f.endSizePx,
+            offsetX: f.offsetX,
+            offsetY: f.offsetY,
+          }
+          setActiveBlockFrames(prev => [...prev, entry])
+        })
+        dmgKeyRef.current++
+        setTgtDmg({ value: 0, type: 'block', key: dmgKeyRef.current })
+        log(`  Blocked! (0 damage)`)
+        await sleep(maxBlockMs)
+      }
+      setActiveBlockFrames([])
     } else {
-      const dmgValue = Math.floor(Math.random() * 30) + 5
-      setTgtImpact(true)
-      setTgtVar('hit')
-      dmgKeyRef.current++
-      setTgtDmg({ value: dmgValue, type: 'damage', key: dmgKeyRef.current })
-      log(`  Impact → ${dmgValue} damage`)
-      await sleep(350)
+      // --- Impact frames (normal hit) ---
+      const activeImpactForms = impactFrames.filter(f => f.enabled)
+      if (activeImpactForms.length > 0) {
+        const maxImpactMs = Math.max(...activeImpactForms.map(f => f.delayMs + f.showMs + f.vanishMs))
+        log(`  Impact frames: ${activeImpactForms.length}`)
+        activeImpactForms.forEach(async (f) => {
+          const url = resolveFrameUrl(f.imageSource, f.url)
+          if (!url) return
+          if (f.delayMs) await sleep(f.delayMs)
+          const entry: ActiveImpactFrameEntry = {
+            key: ++vfxKeyRef.current,
+            url,
+            showMs: f.showMs,
+            vanishMs: f.vanishMs,
+            startSizePx: f.startSizePx,
+            endSizePx: f.endSizePx,
+            offsetX: f.offsetX,
+            offsetY: f.offsetY,
+          }
+          setTargetImpactFrames(prev => [...prev, entry])
+        })
+        const dmgValue = Math.floor(Math.random() * 30) + 5
+        setTgtImpact(true)
+        setTgtVar('hit')
+        dmgKeyRef.current++
+        setTgtDmg({ value: dmgValue, type: 'damage', key: dmgKeyRef.current })
+        log(`  Impact → ${dmgValue} damage`)
+        await sleep(maxImpactMs)
+      } else {
+        const dmgValue = Math.floor(Math.random() * 30) + 5
+        setTgtImpact(true)
+        setTgtVar('hit')
+        dmgKeyRef.current++
+        setTgtDmg({ value: dmgValue, type: 'damage', key: dmgKeyRef.current })
+        log(`  Impact → ${dmgValue} damage`)
+        await sleep(350)
+      }
     }
 
-    setAttackerWeapon([])  // clean up weapon particles that had no explicit lifetimeMs
+    setAttackerWeapon([])
     setTargetImpactFrames([])
+    setActiveBlockFrames([])
     setTgtImpact(false)
     setAttVar('return')
     setTgtVar('idle')
@@ -617,7 +768,7 @@ export default function AnimationTest() {
     setAttVar('idle')
     setTgtDmg(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [log, weaponFrames, projectileFrames, impactFrames, trajectoryOverride, resolveFrameUrl, getPortraitPos])
+  }, [log, weaponFrames, projectileFrames, impactFrames, blockFrames, simulateBlock, trajectoryOverride, resolveFrameUrl, getPortraitPos, getCardBorderPos])
 
   const handlePlay = useCallback(async () => {
     if (playing) return
@@ -772,6 +923,30 @@ export default function AnimationTest() {
           ))}
           {impactFrames.length === 0 && <Typography variant="body2" color="text.disabled" sx={{ ml: 1 }}>No impact frames. Click Add to create one.</Typography>}
         </Box>
+
+        {/* Block frames */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="subtitle2" fontWeight={700} color="text.secondary">④ Block (pops at defender border)</Typography>
+            <Button size="small" startIcon={<AddIcon />} onClick={() => setBlockFrames(prev => [...prev, defaultBlockFrame()])}>Add</Button>
+          </Box>
+          {blockFrames.map((f, i) => (
+            <BlockFrameEditor
+              key={i}
+              frame={f}
+              idx={i}
+              onChange={(updated) => setBlockFrames(prev => prev.map((x, j) => j === i ? updated : x))}
+              onRemove={() => setBlockFrames(prev => prev.filter((_, j) => j !== i))}
+              resolveUrl={resolveFrameUrl}
+            />
+          ))}
+          {blockFrames.length === 0 && <Typography variant="body2" color="text.disabled" sx={{ ml: 1 }}>No block frames. Click Add to create one.</Typography>}
+          <FormControlLabel
+            control={<Checkbox checked={simulateBlock} onChange={(e) => setSimulateBlock(e.target.checked)} size="small" />}
+            label={<Typography variant="body2">Simulate block on next attack</Typography>}
+            sx={{ ml: 0.5 }}
+          />
+        </Box>
       </Paper>
 
       {/* Arena */}
@@ -800,6 +975,8 @@ export default function AnimationTest() {
 
           <CombatantCard
             ref={playerPortraitRef}
+            cardRef={playerCardRef}
+            side="player"
             label="Player"
             icon={<PersonIcon sx={{ fontSize: 48, color: 'rgba(33,150,243,0.5)' }} />}
             variant={playerVariant}
@@ -812,6 +989,7 @@ export default function AnimationTest() {
             accentGradient="linear-gradient(135deg, rgba(33,150,243,0.08) 0%, rgba(33,150,243,0.02) 100%)"
             activeWeaponFrames={playerActiveWeapon}
             activeImpactFrames={playerActiveImpact}
+            activeBlockFrames={activeBlockFrames.filter(f => f.side === 'player')}
           />
 
           <Box sx={{ width: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -820,6 +998,8 @@ export default function AnimationTest() {
 
           <CombatantCard
             ref={creaturePortraitRef}
+            cardRef={creatureCardRef}
+            side="creature"
             label="Creature"
             icon={<SmartToyIcon sx={{ fontSize: 48, color: 'rgba(244,67,54,0.5)' }} />}
             variant={creatureVariant}
@@ -832,6 +1012,7 @@ export default function AnimationTest() {
             accentGradient="linear-gradient(135deg, rgba(244,67,54,0.08) 0%, rgba(244,67,54,0.02) 100%)"
             activeWeaponFrames={creatureActiveWeapon}
             activeImpactFrames={creatureActiveImpact}
+            activeBlockFrames={activeBlockFrames.filter(f => f.side === 'creature')}
           />
         </Box>
 

@@ -81,11 +81,27 @@ export interface AnimationImpactFrame {
   offsetY?: number
 }
 
+/** Optional block frame: pops at defender card border when a reactive block triggers. */
+export interface AnimationBlockFrame {
+  url?: string
+  imageSource?: AnimationFrameImageSource
+  delayMs?: number
+  showMs?: number
+  vanishMs?: number
+  lifetimeMs?: number
+  sizePx?: number
+  startSizePx?: number
+  endSizePx?: number
+  offsetX?: number
+  offsetY?: number
+}
+
 /** Attack animation as arrays of optional PNG frames per phase. Multiple entries play concurrently. */
 export interface AnimationFrames {
   weapon?: AnimationWeaponFrame[]
   projectile?: AnimationProjectileFrame[]
   impact?: AnimationImpactFrame[]
+  block?: AnimationBlockFrame[]
 }
 
 export type ProjectileType = 'straight' | 'arc' | null
@@ -150,8 +166,9 @@ export function getAttackAnimationConfig(
   const hasWeapon = (animationFrames?.weapon?.length ?? 0) > 0
   const hasProjectile = (animationFrames?.projectile?.length ?? 0) > 0
   const hasImpact = (animationFrames?.impact?.length ?? 0) > 0
+  const hasBlock = (animationFrames?.block?.length ?? 0) > 0
 
-  if (animationFrames && (hasWeapon || hasProjectile || hasImpact)) {
+  if (animationFrames && (hasWeapon || hasProjectile || hasImpact || hasBlock)) {
     // Use trajectory from first projectile frame, else fallback
     const projectile: ProjectileType = hasProjectile
       ? animationFrames.projectile![0].trajectory
@@ -228,6 +245,16 @@ export function resolveAnimationFrames(
     if (resolved.length) result.impact = resolved
   }
 
-  if (!result.weapon && !result.projectile && !result.impact) return null
+  if (frames.block?.length) {
+    const resolved = frames.block.flatMap((f) => {
+      const url = resolveFrameUrl(f, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
+      if (url) return [{ ...f, url }]
+      if (f.url?.trim()) return [{ ...f }]
+      return []
+    })
+    if (resolved.length) result.block = resolved
+  }
+
+  if (!result.weapon && !result.projectile && !result.impact && !result.block) return null
   return result
 }
