@@ -13,13 +13,15 @@ interface Props {
   endSizePx?: number
   offsetX?: number
   offsetY?: number
+  /** Mirror frame horizontally (used for right-side combatants). */
+  mirrored?: boolean
   id: string | number
 }
 
 /**
  * Block animation frame: centered on the defender's portrait.
  */
-export default function BlockFrame({ show, url, showMs = 100, vanishMs = 500, sizePx, startSizePx, endSizePx, offsetX = 0, offsetY = 0, id }: Props) {
+export default function BlockFrame({ show, url, showMs = 100, vanishMs = 500, sizePx, startSizePx, endSizePx, offsetX = 0, offsetY = 0, mirrored = false, id }: Props) {
   const totalSec = showMs / 1000 + vanishMs / 1000
   let fadeStart = showMs / 1000 / totalSec
   if (fadeStart < 0.08) fadeStart = 0.08
@@ -66,7 +68,13 @@ export default function BlockFrame({ show, url, showMs = 100, vanishMs = 500, si
           <img
             src={url}
             alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))' }}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
+              transform: mirrored ? 'scaleX(-1)' : undefined,
+            }}
           />
         </motion.div>
       )}

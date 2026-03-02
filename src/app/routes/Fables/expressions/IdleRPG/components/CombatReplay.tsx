@@ -102,7 +102,17 @@ function Portrait({ url, weaponUrl }: { url?: string | null; weaponUrl?: string 
         }}
       >
         {url ? (
-          <Box component="img" src={url} alt="portrait" sx={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))' }} />
+          <Box
+            component="img"
+            src={url}
+            alt="portrait"
+            sx={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))',
+            }}
+          />
         ) : (
           <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
         )}
@@ -272,6 +282,7 @@ interface ActiveProjectileEntry {
   key: number
   direction: 'left-to-right' | 'right-to-left'
   imageUrl: string | null
+  mirrored?: boolean
   from: ProjectilePos
   to: ProjectilePos
   trajectory: 'straight' | 'arc'
@@ -386,6 +397,7 @@ export default function CombatReplay({
     const setTargetImpact = attackerSide === 'player' ? setShowCreatureImpact : setShowPlayerImpact
     const setTargetVariant = attackerSide === 'player' ? setCreatureVariant : setPlayerVariant
     const frames = anim.frames
+    const isRightSideAttacker = attackerSide === 'creature'
 
     // Step 1: Spend resource BEFORE the animation fires — standard gaming feel
     const hasResourceCost = events.some(ev => ev.type === 'resource_change' && ev.resourceAfter)
@@ -421,7 +433,7 @@ export default function CombatReplay({
           sizePx: f.sizePx,
           startSizePx: f.startSizePx,
           endSizePx: f.endSizePx,
-          offsetX: f.offsetX ?? 0,
+          offsetX: isRightSideAttacker ? -(f.offsetX ?? 0) : (f.offsetX ?? 0),
           offsetY: f.offsetY ?? 0,
         }
         setActiveWeaponFrames(prev => [...prev, entry])
@@ -457,7 +469,11 @@ export default function CombatReplay({
           key,
           direction: dir,
           imageUrl: f.url?.trim() ?? weaponUrlFallback ?? null,
-          from: { x: srcPos.x + (f.offsetX ?? 0), y: srcPos.y + (f.offsetY ?? 0) },
+          mirrored: isRightSideAttacker,
+          from: {
+            x: srcPos.x + (isRightSideAttacker ? -(f.offsetX ?? 0) : (f.offsetX ?? 0)),
+            y: srcPos.y + (f.offsetY ?? 0),
+          },
           to: tgtPos,
           trajectory: f.trajectory,
           durationMs: flightMs,
@@ -480,6 +496,7 @@ export default function CombatReplay({
     // --- Block frames (shown at defender portrait center when blocked) ---
     if (isBlocked && blockEvent) {
       const defenderSide: 'player' | 'creature' = attackerSide === 'player' ? 'creature' : 'player'
+      const isRightSideDefender = defenderSide === 'creature'
       const resolveBlockTiming = (f: AnimationBlockFrame) => {
         if (f.showMs != null && f.vanishMs != null) return { showMs: f.showMs, vanishMs: f.vanishMs }
         const lt = f.lifetimeMs ?? (f.showMs != null ? f.showMs + (f.vanishMs ?? 500) : 800)
@@ -499,7 +516,7 @@ export default function CombatReplay({
             sizePx: f.sizePx,
             startSizePx: f.startSizePx,
             endSizePx: f.endSizePx,
-            offsetX: f.offsetX ?? 0,
+            offsetX: isRightSideDefender ? -(f.offsetX ?? 0) : (f.offsetX ?? 0),
             offsetY: f.offsetY ?? 0,
           }
           setActiveBlockFrames(prev => [...prev, entry])
@@ -547,6 +564,7 @@ export default function CombatReplay({
       : 350
 
     if (impactFrames.length > 0) {
+      const isRightSideDefender = attackerSide === 'player'
       impactFrames.forEach(async (f) => {
         if (f.delayMs) await sleep(f.delayMs)
         const { showMs, vanishMs } = resolveImpactTiming(f)
@@ -559,7 +577,7 @@ export default function CombatReplay({
           sizePx: f.sizePx,
           startSizePx: f.startSizePx,
           endSizePx: f.endSizePx,
-          offsetX: f.offsetX ?? 0,
+          offsetX: isRightSideDefender ? -(f.offsetX ?? 0) : (f.offsetX ?? 0),
           offsetY: f.offsetY ?? 0,
         }
         setActiveImpactFrames(prev => [...prev, entry])
@@ -747,6 +765,7 @@ export default function CombatReplay({
               direction={p.direction}
               id={p.key}
               weaponUrl={p.imageUrl}
+              mirrored={p.mirrored}
               trajectory={p.trajectory}
               durationMs={p.durationMs}
               sizePx={p.sizePx}
@@ -779,11 +798,11 @@ export default function CombatReplay({
             <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
               <Portrait url={player.portraitUrl} weaponUrl={player.weaponUrl} />
               {activeWeaponFrames.filter(f => f.side === 'player').map(f => (
-                <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored={false} id={f.key} />
               ))}
               {showPlayerImpact && activeImpactFrames.filter(f => f.side === 'player').length > 0
                 ? activeImpactFrames.filter(f => f.side === 'player').map(f => (
-                  <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                  <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored={false} id={f.key} />
                 ))
                 : (
                   <ImpactEffect
@@ -818,7 +837,7 @@ export default function CombatReplay({
               ))}
             </Box>
             {activeBlockFrames.filter(f => f.side === 'player').map(f => (
-              <BlockFrame key={f.key} show url={f.url} side="player" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+              <BlockFrame key={f.key} show url={f.url} side="player" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored={false} id={f.key} />
             ))}
           </Paper>
         </motion.div>
@@ -861,11 +880,11 @@ export default function CombatReplay({
             <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
               <Portrait url={creature.portraitUrl} weaponUrl={creature.weaponUrl} />
               {activeWeaponFrames.filter(f => f.side === 'creature').map(f => (
-                <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored id={f.key} />
               ))}
               {showCreatureImpact && activeImpactFrames.filter(f => f.side === 'creature').length > 0
                 ? activeImpactFrames.filter(f => f.side === 'creature').map(f => (
-                  <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                  <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored id={f.key} />
                 ))
                 : (
                   <ImpactEffect
@@ -900,7 +919,7 @@ export default function CombatReplay({
               ))}
             </Box>
             {activeBlockFrames.filter(f => f.side === 'creature').map(f => (
-              <BlockFrame key={f.key} show url={f.url} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+              <BlockFrame key={f.key} show url={f.url} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored id={f.key} />
             ))}
           </Paper>
         </motion.div>

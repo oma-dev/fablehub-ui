@@ -90,7 +90,17 @@ function RaidPortrait({ url, size }: { url?: string | null; size: number }) {
         }}
       >
         {url ? (
-          <Box component="img" src={url} alt="portrait" sx={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))' }} />
+          <Box
+            component="img"
+            src={url}
+            alt="portrait"
+            sx={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))',
+            }}
+          />
         ) : (
           <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
         )}
@@ -205,6 +215,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const [projFrom, setProjFrom] = useState<ProjectilePos>({ x: 0, y: 0 })
   const [projTo, setProjTo] = useState<ProjectilePos>({ x: 0, y: 0 })
   const [projectileImageUrl, setProjectileImageUrl] = useState<string | null>(null)
+  const [projectileMirrored, setProjectileMirrored] = useState(false)
   const [projectileDurationMs, setProjectileDurationMs] = useState<number | undefined>(undefined)
   const [partyDmg, setPartyDmg] = useState<{ value: number; type: CombatEventType; key: number; abilityName?: string } | null>(null)
   const [bossDmg, setBossDmg] = useState<{ value: number; type: CombatEventType; key: number; abilityName?: string } | null>(null)
@@ -269,6 +280,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       const setTargetDmg = attackerSide === 'party' ? setBossDmg : setPartyDmg
       const setTargetVariant = attackerSide === 'party' ? setBossVariant : setPartyVariant
       const frames = anim.frames
+      const isRightSideAttacker = attackerSide === 'boss'
 
       // Resource events first
       const hasResourceCost = events.some(ev => ev.type === 'resource_change' && ev.resourceAfter)
@@ -293,7 +305,10 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           const entry: ActiveWF = {
             key: ++vfxKeyRef.current, side: attackerSide, url: f.url!.trim(),
             fadeInMs: f.fadeInMs ?? 200, lifetimeMs: f.lifetimeMs, sizePx: f.sizePx,
-            startSizePx: f.startSizePx, endSizePx: f.endSizePx, offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+            startSizePx: f.startSizePx,
+            endSizePx: f.endSizePx,
+            offsetX: isRightSideAttacker ? -(f.offsetX ?? 0) : (f.offsetX ?? 0),
+            offsetY: f.offsetY ?? 0,
           }
           setActiveWeaponFrames(prev => [...prev, entry])
           if (f.lifetimeMs != null) {
@@ -313,6 +328,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
 
       const projFrames = frames?.projectile ?? []
       if (anim.projectile) {
+        setProjectileMirrored(isRightSideAttacker)
         if (projFrames.length > 0) {
           const firstFrame = projFrames[0]
           setProjFrom(getPortraitPos(srcRef))
@@ -339,6 +355,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
 
       // Block handling
       if (isBlocked && blockEvent) {
+        const isRightSideDefender = defenderSide === 'boss'
         const resolveBlockTiming = (f: AnimationBlockFrame) => {
           if (f.showMs != null && f.vanishMs != null) return { showMs: f.showMs, vanishMs: f.vanishMs }
           const lt = f.lifetimeMs ?? (f.showMs != null ? f.showMs + (f.vanishMs ?? 500) : 800)
@@ -352,7 +369,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
             setActiveBlockFrames(prev => [...prev, {
               key: ++vfxKeyRef.current, side: defenderSide, url: f.url!.trim(),
               showMs, vanishMs, sizePx: f.sizePx, startSizePx: f.startSizePx, endSizePx: f.endSizePx,
-              offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+              offsetX: isRightSideDefender ? -(f.offsetX ?? 0) : (f.offsetX ?? 0),
+              offsetY: f.offsetY ?? 0,
             }])
           })
         }
@@ -374,6 +392,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       // Impact frames
       const impactFrames = (frames?.impact ?? []).filter(f => f.url?.trim())
       if (impactFrames.length > 0) {
+        const isRightSideDefender = defenderSide === 'boss'
         const resolveImpactTiming = (f: typeof impactFrames[0]) => {
           if (f.showMs != null && f.vanishMs != null) return { showMs: f.showMs, vanishMs: f.vanishMs }
           const lt = f.lifetimeMs ?? (f.showMs != null ? f.showMs + (f.vanishMs ?? 500) : 600)
@@ -385,7 +404,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           setActiveImpactFrames(prev => [...prev, {
             key: ++vfxKeyRef.current, side: defenderSide, url: f.url!.trim(),
             showMs, vanishMs, sizePx: f.sizePx, startSizePx: f.startSizePx, endSizePx: f.endSizePx,
-            offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+            offsetX: isRightSideDefender ? -(f.offsetX ?? 0) : (f.offsetX ?? 0),
+            offsetY: f.offsetY ?? 0,
           }])
         })
       }
@@ -477,6 +497,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     setShowPartyImpact(false)
     setShowBossImpact(false)
     setShowProjectile(null)
+    setProjectileMirrored(false)
     setPartyDmg(null)
     setBossDmg(null)
     setActiveWeaponFrames([])
@@ -548,6 +569,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                 direction={showProjectile}
                 id={`proj-${dmgKeyRef.current}`}
                 weaponUrl={projectileImageUrl}
+                mirrored={projectileMirrored}
                 trajectory={DEFAULT_ANIM.projectile}
                 durationMs={projectileDurationMs}
                 from={projFrom}
@@ -604,11 +626,11 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                       {isFront && (
                         <>
                           {activeWeaponFrames.filter(f => f.side === 'party').map(f => (
-                            <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                            <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored={false} id={f.key} />
                           ))}
                           {showPartyImpact && activeImpactFrames.filter(f => f.side === 'party').length > 0
                             ? activeImpactFrames.filter(f => f.side === 'party').map(f => (
-                              <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                              <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored={false} id={f.key} />
                             ))
                             : (
                               <ImpactEffect
@@ -754,11 +776,11 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                 <Box ref={bossPortraitRef} sx={{ position: 'relative' }}>
                   <RaidPortrait url={boss.iconUrl ?? undefined} size={PORTRAIT_SIZE} />
                   {activeWeaponFrames.filter(f => f.side === 'boss').map(f => (
-                    <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                    <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored id={f.key} />
                   ))}
                   {showBossImpact && activeImpactFrames.filter(f => f.side === 'boss').length > 0
                     ? activeImpactFrames.filter(f => f.side === 'boss').map(f => (
-                      <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                      <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored id={f.key} />
                     ))
                     : (
                       <ImpactEffect
@@ -803,7 +825,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                   ))}
                 </Box>
                 {activeBlockFrames.filter(f => f.side === 'boss').map(f => (
-                  <BlockFrame key={f.key} show url={f.url} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+                  <BlockFrame key={f.key} show url={f.url} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored id={f.key} />
                 ))}
               </Paper>
             </motion.div>

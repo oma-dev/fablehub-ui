@@ -12,6 +12,8 @@ interface Props {
   direction: 'left-to-right' | 'right-to-left'
   id: string | number
   weaponUrl?: string | null
+  /** Mirror projectile image horizontally. */
+  mirrored?: boolean
   trajectory?: ProjectileType
   /** Override flight duration in ms (when e.g. from AnimationFrames.projectile.speedMs). */
   durationMs?: number
@@ -50,6 +52,7 @@ function WeaponProjectile({
   sizePx,
   startSizePx,
   endSizePx,
+  mirrored = false,
 }: {
   direction: 'left-to-right' | 'right-to-left'
   weaponUrl: string
@@ -61,6 +64,7 @@ function WeaponProjectile({
   sizePx?: number
   startSizePx?: number
   endSizePx?: number
+  mirrored?: boolean
 }) {
   const baseRotate = tipRotation(direction)
   const duration = trajectory === 'arc' ? durationSec * 1.25 : durationSec
@@ -71,7 +75,11 @@ function WeaponProjectile({
   const size = animateSize ? endSize : singleSize
   const flightDuration = trajectory === 'arc' ? duration : durationSec
 
-  const imgStyle = { objectFit: 'contain' as const, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }
+  const imgStyle = {
+    objectFit: 'contain' as const,
+    filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))',
+    transform: mirrored ? 'scaleX(-1)' : undefined,
+  }
   const imgEl = (
     animateSize
       ? (
@@ -185,7 +193,7 @@ function OrbProjectile({
 const FALLBACK_FROM: ProjectilePos = { x: 100, y: 100 }
 const FALLBACK_TO: ProjectilePos = { x: 300, y: 100 }
 
-export default function Projectile({ show, color, direction, id, weaponUrl, trajectory, durationMs, sizePx, startSizePx, endSizePx, from, to }: Props) {
+export default function Projectile({ show, color, direction, id, weaponUrl, mirrored = false, trajectory, durationMs, sizePx, startSizePx, endSizePx, from, to }: Props) {
   const start = from ?? (direction === 'left-to-right' ? FALLBACK_FROM : FALLBACK_TO)
   const end = to ?? (direction === 'left-to-right' ? FALLBACK_TO : FALLBACK_FROM)
   const durationSec = durationMs != null ? durationMs / 1000 : PROJECTILE_SPEED
@@ -206,6 +214,7 @@ export default function Projectile({ show, color, direction, id, weaponUrl, traj
               sizePx={sizePx}
               startSizePx={startSizePx}
               endSizePx={endSizePx}
+              mirrored={mirrored}
             />
             )
           : <OrbProjectile color={color} id={id} from={start} to={end} />

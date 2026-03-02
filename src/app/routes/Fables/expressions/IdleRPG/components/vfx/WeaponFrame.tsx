@@ -24,6 +24,8 @@ interface Props {
   offsetX?: number
   /** Vertical offset in px from portrait center (positive = down). */
   offsetY?: number
+  /** Mirror frame horizontally (used for right-side combatants). */
+  mirrored?: boolean
   id: string | number
 }
 
@@ -33,6 +35,7 @@ export default function WeaponFrame({
   lifetimeMs,
   sizePx, startSizePx, endSizePx,
   offsetX = 0, offsetY = 0,
+  mirrored = false,
   id,
 }: Props) {
   const startSize = startSizePx ?? sizePx ?? DEFAULT_SIZE
@@ -94,7 +97,13 @@ export default function WeaponFrame({
           <img
             src={url}
             alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.4))' }}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.4))',
+              transform: mirrored ? 'scaleX(-1)' : undefined,
+            }}
           />
         </motion.div>
       )}
