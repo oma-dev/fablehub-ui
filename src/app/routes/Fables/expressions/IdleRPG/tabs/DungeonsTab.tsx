@@ -129,6 +129,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
     }
   }
   const boss = currentDungeon?.boss
+  const bossReplayBackground = boss?.backgroundImageUrl?.trim() ? boss.backgroundImageUrl.trim() : undefined
 
   return (
     <Box
@@ -452,6 +453,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
             combat={combatResult.combat}
             leftCharacterId={character.id}
             abilityAnimations={abilityAnimations}
+            arenaBackgroundImageUrl={bossReplayBackground}
             player={{
               name: character.name,
               level: character.level,

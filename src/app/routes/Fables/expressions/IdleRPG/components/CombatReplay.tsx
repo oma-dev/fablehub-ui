@@ -46,6 +46,8 @@ interface Props {
   creature: CombatantInfo
   victory: boolean
   onFinish: () => void
+  /** Optional replay background image URL (used for boss fights). */
+  arenaBackgroundImageUrl?: string | null
   /** When provided (e.g. PvP), use this as the left-side combatant ID. Otherwise derived from first event. */
   leftCharacterId?: string
   /** Per-ability animation overrides keyed by abilityId. When an ability fires, its frames are used instead of the combatant default. */
@@ -307,7 +309,16 @@ interface ActiveBlockFrameEntry {
   offsetY: number
 }
 
-export default function CombatReplay({ combat, player, creature, victory, onFinish, leftCharacterId, abilityAnimations }: Props) {
+export default function CombatReplay({
+  combat,
+  player,
+  creature,
+  victory,
+  onFinish,
+  arenaBackgroundImageUrl,
+  leftCharacterId,
+  abilityAnimations,
+}: Props) {
   const [playerHp, setPlayerHp] = useState(player.maxHp)
   const [creatureHp, setCreatureHp] = useState(creature.maxHp)
   const [playerResourceCurrent, setPlayerResourceCurrent] = useState<number | null>(
@@ -703,7 +714,19 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: '100%' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2.5,
+        height: '100%',
+        backgroundImage: arenaBackgroundImageUrl
+          ? `linear-gradient(rgba(12,10,20,0.35), rgba(12,10,20,0.35)), url(${arenaBackgroundImageUrl})`
+          : undefined,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
 
       {currentTurn >= 0 && (
         <Typography variant="body2" color="text.secondary" textAlign="center" fontWeight={600} sx={{ fontSize: TURN_FONT_SIZE }}>

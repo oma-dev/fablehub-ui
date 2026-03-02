@@ -229,7 +229,9 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     [partyOrder, currentHp, justDiedIds],
   )
 
-  const boss = bossId ? pack.creatures?.find((c) => c.id === bossId) : null
+  const bossLookupId = replay.bossCreatureId || bossId
+  const boss = bossLookupId ? pack.creatures?.find((c) => c.id === bossLookupId) : null
+  const bossReplayBackground = replay.bossBackgroundImageUrl ?? boss?.backgroundImageUrl
 
   const getMember = (id: string): IdleRpgGroupMember | undefined =>
     group?.members?.find((m) => m.id === id)
@@ -505,7 +507,9 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         flexDirection: 'column',
         height: '100%',
         flex: 1,
-        backgroundImage: `url(${dungeonBg})`,
+        backgroundImage: bossReplayBackground
+          ? `linear-gradient(rgba(12,10,20,0.35), rgba(12,10,20,0.35)), url(${bossReplayBackground})`
+          : `url(${dungeonBg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}

@@ -52,6 +52,7 @@ export type ExampleCreatureForm = {
   ap: string
   arm: string
   iconUrl: string
+  backgroundImageUrl?: string
   tags: string
   abilityIds?: string
   resourceId?: string

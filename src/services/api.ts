@@ -289,6 +289,8 @@ export interface CreatureTemplate {
   ap: number
   arm: number
   iconUrl?: string
+  /** Optional combat replay background image URL (typically used by bosses). */
+  backgroundImageUrl?: string
   tags?: string[]
   abilityIds?: string[]
   resourceId?: string
@@ -396,6 +398,7 @@ export interface RaidReplayPayload {
   raidId: string
   raidName: string
   bossCreatureId: string
+  bossBackgroundImageUrl?: string
   partyOrder: string[]
   victory: boolean
   partyMaxHp?: Record<string, number>

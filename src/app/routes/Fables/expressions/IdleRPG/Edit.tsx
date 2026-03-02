@@ -85,7 +85,7 @@ type ClassForm = {
   defenseTags: string; defenseRequired: boolean; defenseAllowEmpty: boolean
   regularAbilityIds: string; ultimateAbilityId: string; resourceId: string
 }
-type CreatureForm = { id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string; iconUrl: string; tags: string; abilityIds: string; resourceId: string; resourceMax: string }
+type CreatureForm = { id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string; iconUrl: string; backgroundImageUrl: string; tags: string; abilityIds: string; resourceId: string; resourceMax: string }
 type ItemForm = { id: string; name: string; rarity: string; slot: string; tags: string; stats: string; iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string }
 type QuestForm = { id: string; name: string; creatureId: string; durationSec: string; iconUrl: string; rewardXp: string; rewardCurrency: string; lootTableId: string }
 type DungeonForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string }
@@ -108,7 +108,7 @@ const emptyClass = (): ClassForm => ({
   defenseTags: '', defenseRequired: false, defenseAllowEmpty: true,
   regularAbilityIds: '', ultimateAbilityId: '', resourceId: '',
 })
-const emptyCreature = (): CreatureForm => ({ id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0', iconUrl: '', tags: '', abilityIds: '', resourceId: '', resourceMax: '' })
+const emptyCreature = (): CreatureForm => ({ id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0', iconUrl: '', backgroundImageUrl: '', tags: '', abilityIds: '', resourceId: '', resourceMax: '' })
 const emptyItem = (): ItemForm => ({ id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '', iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '' })
 const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', durationSec: '60', iconUrl: '', rewardXp: '10', rewardCurrency: '', lootTableId: '' })
 const emptyDungeon = (): DungeonForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '' })
@@ -186,6 +186,7 @@ function hydrateCreatures(pack: IdleRpgPackV1): CreatureForm[] {
     ap: String(c.ap),
     arm: String(c.arm),
     iconUrl: c.iconUrl ?? '',
+    backgroundImageUrl: c.backgroundImageUrl ?? '',
     tags: c.tags?.join(', ') ?? '',
     abilityIds: (c as any).abilityIds?.join(', ') ?? '',
     resourceId: (c as any).resourceId ?? '',
@@ -430,6 +431,7 @@ export default function IdleRpgEdit() {
         ap: Number(c.ap) || 0,
         arm: Number(c.arm) || 0,
         ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
+        ...(c.backgroundImageUrl.trim() ? { backgroundImageUrl: c.backgroundImageUrl.trim() } : {}),
         ...(c.tags.trim() ? { tags: parseTags(c.tags) } : {}),
         ...(c.abilityIds.trim() ? { abilityIds: parseTags(c.abilityIds) } : {}),
         ...(c.resourceId.trim() ? { resourceId: c.resourceId.trim() } : {}),
@@ -892,6 +894,7 @@ export default function IdleRpgEdit() {
                   <TextField size="small" label="AP" type="number" value={c.ap} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, ap: e.target.value } : x))} sx={{ width: 70 }} />
                   <TextField size="small" label="Armor" type="number" value={c.arm} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, arm: e.target.value } : x))} sx={{ width: 70 }} />
                   <TextField size="small" label="Icon URL" value={c.iconUrl} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 140 }} />
+                  <TextField size="small" label="Boss Bg URL" value={c.backgroundImageUrl} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, backgroundImageUrl: e.target.value } : x))} placeholder="Used in boss replay" sx={{ width: 200 }} />
                   <TextField size="small" label="Tags (comma)" value={c.tags} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, tags: e.target.value } : x))} sx={{ flex: 1 }} />
                   <TextField size="small" label="Abilities (comma IDs)" value={c.abilityIds} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, abilityIds: e.target.value } : x))} placeholder="fireball, heal" sx={{ width: 160 }} />
                   <FormControl size="small" sx={{ minWidth: 120 }}>
