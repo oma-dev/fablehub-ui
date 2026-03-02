@@ -35,6 +35,10 @@ export interface AnimationWeaponFrame {
   endOffsetY?: number
   /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
   acceleration?: number
+  /** Rotation at frame start in degrees. */
+  rotationStart?: number
+  /** Rotation at frame end in degrees. */
+  rotationEnd?: number
 }
 
 /** Optional projectile frame (flies caster → target). */
@@ -60,6 +64,10 @@ export interface AnimationProjectileFrame {
   offsetY?: number
   /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
   acceleration?: number
+  /** Rotation at frame start in degrees. */
+  rotationStart?: number
+  /** Rotation at frame end in degrees. */
+  rotationEnd?: number
 }
 
 /** Optional impact frame (pops at target, fades out). */
@@ -93,6 +101,10 @@ export interface AnimationImpactFrame {
   endOffsetY?: number
   /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
   acceleration?: number
+  /** Rotation at frame start in degrees. */
+  rotationStart?: number
+  /** Rotation at frame end in degrees. */
+  rotationEnd?: number
 }
 
 /** Optional block frame: pops at defender portrait center when a reactive block triggers. */
@@ -108,6 +120,10 @@ export interface AnimationBlockFrame {
   endSizePx?: number
   offsetX?: number
   offsetY?: number
+  /** Rotation at frame start in degrees. */
+  rotationStart?: number
+  /** Rotation at frame end in degrees. */
+  rotationEnd?: number
 }
 
 /** Attack animation as arrays of optional PNG frames per phase. Multiple entries play concurrently. */

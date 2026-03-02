@@ -13,6 +13,10 @@ interface Props {
   endSizePx?: number
   offsetX?: number
   offsetY?: number
+  /** Rotation at frame start in degrees. */
+  rotationStart?: number
+  /** Rotation at frame end in degrees. */
+  rotationEnd?: number
   /** Mirror frame horizontally (used for right-side combatants). */
   mirrored?: boolean
   id: string | number
@@ -21,7 +25,21 @@ interface Props {
 /**
  * Block animation frame: centered on the defender's portrait.
  */
-export default function BlockFrame({ show, url, showMs = 100, vanishMs = 500, sizePx, startSizePx, endSizePx, offsetX = 0, offsetY = 0, mirrored = false, id }: Props) {
+export default function BlockFrame({
+  show,
+  url,
+  showMs = 100,
+  vanishMs = 500,
+  sizePx,
+  startSizePx,
+  endSizePx,
+  offsetX = 0,
+  offsetY = 0,
+  rotationStart = 0,
+  rotationEnd,
+  mirrored = false,
+  id,
+}: Props) {
   const totalSec = showMs / 1000 + vanishMs / 1000
   let fadeStart = showMs / 1000 / totalSec
   if (fadeStart < 0.08) fadeStart = 0.08
@@ -30,16 +48,18 @@ export default function BlockFrame({ show, url, showMs = 100, vanishMs = 500, si
   const baseSize = Math.max(startSize, endSize, 1)
   const initialScale = startSize / baseSize
   const finalScale = endSize / baseSize
+  const finalRotation = rotationEnd ?? rotationStart
 
   return (
     <AnimatePresence>
       {show && (
         <motion.div
           key={id}
-          initial={{ opacity: 0, scale: initialScale }}
+          initial={{ opacity: 0, scale: initialScale, rotate: rotationStart }}
           animate={{
             opacity: [0, 1, 1, 0],
             scale: [initialScale, finalScale],
+            rotate: finalRotation,
             transition: {
               opacity: {
                 times: [0, 0.08, fadeStart, 1],
@@ -47,6 +67,7 @@ export default function BlockFrame({ show, url, showMs = 100, vanishMs = 500, si
                 ease: 'easeOut',
               },
               scale: { duration: totalSec, ease: 'easeOut' },
+              rotate: { duration: totalSec, ease: 'easeOut' },
             },
           }}
           exit={{ opacity: 0 }}

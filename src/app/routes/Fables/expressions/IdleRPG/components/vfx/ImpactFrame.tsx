@@ -26,6 +26,10 @@ interface Props {
   endOffsetY?: number
   /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
   acceleration?: number
+  /** Rotation at frame start in degrees. */
+  rotationStart?: number
+  /** Rotation at frame end in degrees. */
+  rotationEnd?: number
   /** Mirror frame horizontally (used for right-side combatants). */
   mirrored?: boolean
   id: string | number
@@ -44,6 +48,8 @@ export default function ImpactFrame({
   endOffsetX,
   endOffsetY,
   acceleration = 0,
+  rotationStart = 0,
+  rotationEnd,
   mirrored = false,
   id,
 }: Props) {
@@ -61,18 +67,20 @@ export default function ImpactFrame({
   const deltaX = targetOffsetX - offsetX
   const deltaY = targetOffsetY - offsetY
   const motionEase = getAccelerationEase(acceleration)
+  const finalRotation = rotationEnd ?? rotationStart
 
   return (
     <AnimatePresence>
       {show && (
         <motion.div
           key={id}
-          initial={{ opacity: 0, scale: initialScale, x: 0, y: 0 }}
+          initial={{ opacity: 0, scale: initialScale, x: 0, y: 0, rotate: rotationStart }}
           animate={{
             opacity: [0, 1, 1, 0],
             scale: [initialScale, finalScale],
             x: deltaX,
             y: deltaY,
+            rotate: finalRotation,
             transition: {
               opacity: {
                 times: [0, 0.08, fadeStart, 1],
@@ -82,6 +90,7 @@ export default function ImpactFrame({
               scale: { duration: totalSec, ease: 'easeOut' },
               x: { duration: totalSec, ease: motionEase },
               y: { duration: totalSec, ease: motionEase },
+              rotate: { duration: totalSec, ease: motionEase },
             },
           }}
           exit={{ opacity: 0 }}

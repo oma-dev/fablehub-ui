@@ -31,6 +31,10 @@ interface Props {
   endOffsetY?: number
   /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
   acceleration?: number
+  /** Rotation at frame start in degrees. */
+  rotationStart?: number
+  /** Rotation at frame end in degrees. */
+  rotationEnd?: number
   /** Mirror frame horizontally (used for right-side combatants). */
   mirrored?: boolean
   id: string | number
@@ -44,6 +48,8 @@ export default function WeaponFrame({
   offsetX = 0, offsetY = 0,
   endOffsetX, endOffsetY,
   acceleration = 0,
+  rotationStart = 0,
+  rotationEnd,
   mirrored = false,
   id,
 }: Props) {
@@ -57,6 +63,7 @@ export default function WeaponFrame({
   const deltaX = targetOffsetX - offsetX
   const deltaY = targetOffsetY - offsetY
   const motionEase = getAccelerationEase(acceleration)
+  const finalRotation = rotationEnd ?? rotationStart
 
   // When lifetimeMs is given, animate the complete lifecycle as one keyframe sequence.
   // Fade-out uses the same duration as fade-in (symmetric), capped to leave at least
@@ -76,20 +83,23 @@ export default function WeaponFrame({
       scale: [initialScale, finalScale, finalScale],
       x: deltaX,
       y: deltaY,
+      rotate: finalRotation,
     }
     transitionProps = {
       opacity: { times: [0, t1, t2, 1], duration: totalSec, ease: 'easeInOut' },
       scale: { duration: fadeInMs / 1000, ease: 'easeOut' },
       x: { duration: totalSec, ease: motionEase },
       y: { duration: totalSec, ease: motionEase },
+      rotate: { duration: totalSec, ease: motionEase },
     }
   } else {
-    animateProps = { opacity: 1, scale: finalScale, x: deltaX, y: deltaY }
+    animateProps = { opacity: 1, scale: finalScale, x: deltaX, y: deltaY, rotate: finalRotation }
     transitionProps = {
       opacity: { duration: fadeInMs / 1000, ease: 'easeOut' },
       scale: { duration: fadeInMs / 1000, ease: 'easeOut' },
       x: { duration: fadeInMs / 1000, ease: motionEase },
       y: { duration: fadeInMs / 1000, ease: motionEase },
+      rotate: { duration: fadeInMs / 1000, ease: motionEase },
     }
   }
 
@@ -98,7 +108,7 @@ export default function WeaponFrame({
       {show && (
         <motion.div
           key={id}
-          initial={{ opacity: 0, scale: initialScale, x: 0, y: 0 }}
+          initial={{ opacity: 0, scale: initialScale, x: 0, y: 0, rotate: rotationStart }}
           animate={animateProps}
           exit={{ opacity: 0, transition: { duration: 0.1 } }}
           transition={transitionProps}

@@ -72,6 +72,8 @@ interface WeaponFrameForm {
   endOffsetX: number
   endOffsetY: number
   acceleration: number
+  rotationStart: number
+  rotationEnd: number
 }
 interface ProjectileFrameForm {
   enabled: boolean
@@ -86,6 +88,8 @@ interface ProjectileFrameForm {
   offsetX: number
   offsetY: number
   acceleration: number
+  rotationStart: number
+  rotationEnd: number
 }
 interface ImpactFrameForm {
   enabled: boolean
@@ -103,6 +107,8 @@ interface ImpactFrameForm {
   endOffsetX: number
   endOffsetY: number
   acceleration: number
+  rotationStart: number
+  rotationEnd: number
 }
 
 const defaultWeaponFrame = (): WeaponFrameForm => ({
@@ -119,6 +125,8 @@ const defaultWeaponFrame = (): WeaponFrameForm => ({
   endOffsetX: 0,
   endOffsetY: 0,
   acceleration: 0,
+  rotationStart: 0,
+  rotationEnd: 0,
 })
 const defaultProjectileFrame = (): ProjectileFrameForm => ({
   enabled: false,
@@ -132,6 +140,8 @@ const defaultProjectileFrame = (): ProjectileFrameForm => ({
   offsetX: 0,
   offsetY: 0,
   acceleration: 0,
+  rotationStart: 0,
+  rotationEnd: 0,
 })
 const defaultImpactFrame = (): ImpactFrameForm => ({
   enabled: false,
@@ -148,6 +158,8 @@ const defaultImpactFrame = (): ImpactFrameForm => ({
   endOffsetX: 0,
   endOffsetY: 0,
   acceleration: 0,
+  rotationStart: 0,
+  rotationEnd: 0,
 })
 
 interface BlockFrameForm {
@@ -163,6 +175,8 @@ interface BlockFrameForm {
   endSizePx: number
   offsetX: number
   offsetY: number
+  rotationStart: number
+  rotationEnd: number
 }
 const defaultBlockFrame = (): BlockFrameForm => ({
   enabled: false,
@@ -177,6 +191,8 @@ const defaultBlockFrame = (): BlockFrameForm => ({
   endSizePx: 140,
   offsetX: 0,
   offsetY: 0,
+  rotationStart: 0,
+  rotationEnd: 0,
 })
 
 // --- Active VFX types (runtime) ---
@@ -193,6 +209,9 @@ interface ActiveWeaponFrameEntry {
   endOffsetX: number
   endOffsetY: number
   acceleration: number
+  rotationStart: number
+  rotationEnd: number
+  mirrored?: boolean
 }
 interface ActiveProjectileEntry {
   key: number
@@ -205,6 +224,9 @@ interface ActiveProjectileEntry {
   startSizePx?: number
   endSizePx?: number
   acceleration: number
+  rotationStart: number
+  rotationEnd: number
+  mirrored?: boolean
   color: string
   show: boolean
 }
@@ -220,6 +242,9 @@ interface ActiveImpactFrameEntry {
   endOffsetX: number
   endOffsetY: number
   acceleration: number
+  rotationStart: number
+  rotationEnd: number
+  mirrored?: boolean
 }
 interface ActiveBlockFrameEntry {
   key: number
@@ -231,6 +256,9 @@ interface ActiveBlockFrameEntry {
   endSizePx?: number
   offsetX: number
   offsetY: number
+  rotationStart: number
+  rotationEnd: number
+  mirrored?: boolean
 }
 
 function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'right') {
@@ -330,6 +358,9 @@ const CombatantCard = forwardRef<HTMLDivElement, {
               endOffsetX={f.endOffsetX}
               endOffsetY={f.endOffsetY}
               acceleration={f.acceleration}
+              rotationStart={f.rotationStart}
+              rotationEnd={f.rotationEnd}
+              mirrored={f.mirrored}
               id={f.key}
             />
           ))}
@@ -348,6 +379,9 @@ const CombatantCard = forwardRef<HTMLDivElement, {
                 endOffsetX={f.endOffsetX}
                 endOffsetY={f.endOffsetY}
                 acceleration={f.acceleration}
+                rotationStart={f.rotationStart}
+                rotationEnd={f.rotationEnd}
+                mirrored={f.mirrored}
                 id={f.key}
               />
             ))
@@ -359,7 +393,7 @@ const CombatantCard = forwardRef<HTMLDivElement, {
         </Box>
         <Typography variant="subtitle1" fontWeight={700} sx={{ fontSize: NAME_FONT_SIZE }}>{label}</Typography>
         {(activeBlockFrames ?? []).map(f => (
-          <BlockFrame key={f.key} show url={f.url} side={side} showMs={f.showMs} vanishMs={f.vanishMs} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+          <BlockFrame key={f.key} show url={f.url} side={side} showMs={f.showMs} vanishMs={f.vanishMs} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={f.mirrored} id={f.key} />
         ))}
       </Paper>
     </motion.div>
@@ -435,6 +469,8 @@ function WeaponFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         <NumField label="End X" value={frame.endOffsetX} onChange={(v) => set('endOffsetX', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="final offset" />
         <NumField label="End Y" value={frame.endOffsetY} onChange={(v) => set('endOffsetY', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="final offset" />
         <NumField label="Accel" value={frame.acceleration} onChange={(v) => set('acceleration', v)} min={-5} max={5} step={0.1} width={100} disabled={!frame.enabled} />
+        <NumField label="Rot Start" value={frame.rotationStart} onChange={(v) => set('rotationStart', v)} min={-720} max={720} step={5} width={110} disabled={!frame.enabled} />
+        <NumField label="Rot End" value={frame.rotationEnd} onChange={(v) => set('rotationEnd', v)} min={-720} max={720} step={5} width={110} disabled={!frame.enabled} />
       </Box>
     </Box>
   )
@@ -486,6 +522,8 @@ function ProjectileFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         <NumField label="Offset X" value={frame.offsetX} onChange={(v) => set('offsetX', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="start pos" />
         <NumField label="Offset Y" value={frame.offsetY} onChange={(v) => set('offsetY', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="start pos" />
         <NumField label="Accel" value={frame.acceleration} onChange={(v) => set('acceleration', v)} min={-5} max={5} step={0.1} width={100} disabled={!frame.enabled} />
+        <NumField label="Rot Start" value={frame.rotationStart} onChange={(v) => set('rotationStart', v)} min={-720} max={720} step={5} width={110} disabled={!frame.enabled} />
+        <NumField label="Rot End" value={frame.rotationEnd} onChange={(v) => set('rotationEnd', v)} min={-720} max={720} step={5} width={110} disabled={!frame.enabled} />
       </Box>
     </Box>
   )
@@ -551,6 +589,8 @@ function ImpactFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         <NumField label="End X" value={frame.endOffsetX} onChange={(v) => set('endOffsetX', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="final offset" />
         <NumField label="End Y" value={frame.endOffsetY} onChange={(v) => set('endOffsetY', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="final offset" />
         <NumField label="Accel" value={frame.acceleration} onChange={(v) => set('acceleration', v)} min={-5} max={5} step={0.1} width={100} disabled={!frame.enabled} />
+        <NumField label="Rot Start" value={frame.rotationStart} onChange={(v) => set('rotationStart', v)} min={-720} max={720} step={5} width={110} disabled={!frame.enabled} />
+        <NumField label="Rot End" value={frame.rotationEnd} onChange={(v) => set('rotationEnd', v)} min={-720} max={720} step={5} width={110} disabled={!frame.enabled} />
       </Box>
     </Box>
   )
@@ -602,6 +642,8 @@ function BlockFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         <NumField label="End size" value={frame.endSizePx} onChange={(v) => set('endSizePx', Math.max(16, v))} min={16} max={400} step={8} disabled={!frame.enabled} />
         <NumField label="Offset X" value={frame.offsetX} onChange={(v) => set('offsetX', v)} min={-300} max={300} step={8} disabled={!frame.enabled} />
         <NumField label="Offset Y" value={frame.offsetY} onChange={(v) => set('offsetY', v)} min={-300} max={300} step={8} disabled={!frame.enabled} />
+        <NumField label="Rot Start" value={frame.rotationStart} onChange={(v) => set('rotationStart', v)} min={-720} max={720} step={5} width={110} disabled={!frame.enabled} />
+        <NumField label="Rot End" value={frame.rotationEnd} onChange={(v) => set('rotationEnd', v)} min={-720} max={720} step={5} width={110} disabled={!frame.enabled} />
       </Box>
     </Box>
   )
@@ -691,6 +733,8 @@ export default function AnimationTest() {
         ...(f.endOffsetX !== f.offsetX ? { endOffsetX: f.endOffsetX } : {}),
         ...(f.endOffsetY !== f.offsetY ? { endOffsetY: f.endOffsetY } : {}),
         ...(f.acceleration !== 0 ? { acceleration: f.acceleration } : {}),
+        ...(f.rotationStart !== 0 ? { rotationStart: f.rotationStart } : {}),
+        ...(f.rotationEnd !== f.rotationStart ? { rotationEnd: f.rotationEnd } : {}),
       }))
       const p = projectileFrames.filter(f => f.enabled).map(f => ({
         ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
@@ -702,6 +746,8 @@ export default function AnimationTest() {
         ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
         ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
         ...(f.acceleration !== 0 ? { acceleration: f.acceleration } : {}),
+        ...(f.rotationStart !== 0 ? { rotationStart: f.rotationStart } : {}),
+        ...(f.rotationEnd !== f.rotationStart ? { rotationEnd: f.rotationEnd } : {}),
       }))
       const im = impactFrames.filter(f => f.enabled).map(f => ({
         ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
@@ -716,6 +762,8 @@ export default function AnimationTest() {
         ...(f.endOffsetX !== f.offsetX ? { endOffsetX: f.endOffsetX } : {}),
         ...(f.endOffsetY !== f.offsetY ? { endOffsetY: f.endOffsetY } : {}),
         ...(f.acceleration !== 0 ? { acceleration: f.acceleration } : {}),
+        ...(f.rotationStart !== 0 ? { rotationStart: f.rotationStart } : {}),
+        ...(f.rotationEnd !== f.rotationStart ? { rotationEnd: f.rotationEnd } : {}),
       }))
       const b = blockFrames.filter(f => f.enabled).map(f => ({
         ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
@@ -728,6 +776,8 @@ export default function AnimationTest() {
         startSizePx: f.startSizePx, endSizePx: f.endSizePx,
         ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
         ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
+        ...(f.rotationStart !== 0 ? { rotationStart: f.rotationStart } : {}),
+        ...(f.rotationEnd !== f.rotationStart ? { rotationEnd: f.rotationEnd } : {}),
       }))
       if (!w.length && !p.length && !im.length && !b.length) return undefined
       return {
@@ -811,6 +861,8 @@ export default function AnimationTest() {
           offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
           endOffsetX: f.endOffsetX ?? f.offsetX ?? 0, endOffsetY: f.endOffsetY ?? f.offsetY ?? 0,
           acceleration: f.acceleration ?? 0,
+          rotationStart: f.rotationStart ?? 0,
+          rotationEnd: f.rotationEnd ?? f.rotationStart ?? 0,
         })))
         setProjectileFrames((af.projectile ?? []).map((f: any) => ({
           enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
@@ -819,6 +871,8 @@ export default function AnimationTest() {
           startSizePx: f.startSizePx ?? f.sizePx ?? 120, endSizePx: f.endSizePx ?? f.sizePx ?? 300,
           offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
           acceleration: f.acceleration ?? 0,
+          rotationStart: f.rotationStart ?? 0,
+          rotationEnd: f.rotationEnd ?? f.rotationStart ?? 0,
         })))
         setImpactFrames((af.impact ?? []).map((f: any) => ({
           enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
@@ -828,6 +882,8 @@ export default function AnimationTest() {
           offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
           endOffsetX: f.endOffsetX ?? f.offsetX ?? 0, endOffsetY: f.endOffsetY ?? f.offsetY ?? 0,
           acceleration: f.acceleration ?? 0,
+          rotationStart: f.rotationStart ?? 0,
+          rotationEnd: f.rotationEnd ?? f.rotationStart ?? 0,
         })))
         setBlockFrames((af.block ?? []).map((f: any) => ({
           enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
@@ -835,6 +891,8 @@ export default function AnimationTest() {
           showMs: f.showMs ?? 320, vanishMs: f.vanishMs ?? 480, lifetimeMs: f.lifetimeMs ?? 800,
           startSizePx: f.startSizePx ?? f.sizePx ?? 100, endSizePx: f.endSizePx ?? f.sizePx ?? 140,
           offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+          rotationStart: f.rotationStart ?? 0,
+          rotationEnd: f.rotationEnd ?? f.rotationStart ?? 0,
         })))
       }
       setJsonImportText('')
@@ -887,6 +945,8 @@ export default function AnimationTest() {
     const setAttackerWeapon = side === 'player' ? setPlayerActiveWeapon : setCreatureActiveWeapon
     const setTargetImpactFrames = side === 'player' ? setCreatureActiveImpact : setPlayerActiveImpact
     const sideLabel = side === 'player' ? 'Player' : 'Creature'
+    const isRightSideAttacker = side === 'creature'
+    const isRightSideDefender = side === 'player'
 
 
     const isBlocked = simulateBlock && blockFrames.some(f => f.enabled)
@@ -911,11 +971,14 @@ export default function AnimationTest() {
           sizePx: undefined,
           startSizePx: f.startSizePx,
           endSizePx: f.endSizePx,
-          offsetX: f.offsetX,
+          offsetX: isRightSideAttacker ? -f.offsetX : f.offsetX,
           offsetY: f.offsetY,
-          endOffsetX: f.endOffsetX,
+          endOffsetX: isRightSideAttacker ? -f.endOffsetX : f.endOffsetX,
           endOffsetY: f.endOffsetY,
           acceleration: f.acceleration,
+          rotationStart: isRightSideAttacker ? -f.rotationStart : f.rotationStart,
+          rotationEnd: isRightSideAttacker ? -f.rotationEnd : f.rotationEnd,
+          mirrored: isRightSideAttacker,
         }
         setAttackerWeapon(prev => [...prev, entry])
         if (f.lifetimeMs > 0) {
@@ -945,13 +1008,16 @@ export default function AnimationTest() {
           key,
           direction: dir,
           imageUrl: url || null,
-          from: { x: srcPos.x + f.offsetX, y: srcPos.y + f.offsetY },
+          from: { x: srcPos.x + (isRightSideAttacker ? -f.offsetX : f.offsetX), y: srcPos.y + f.offsetY },
           to: tgtPos,
           trajectory: f.trajectory,
           durationMs: f.lifetimeMs,
           startSizePx: f.startSizePx,
           endSizePx: f.endSizePx,
           acceleration: f.acceleration,
+          rotationStart: isRightSideAttacker ? -f.rotationStart : f.rotationStart,
+          rotationEnd: isRightSideAttacker ? -f.rotationEnd : f.rotationEnd,
+          mirrored: isRightSideAttacker,
           color: anim.impactColor,
           show: true,
         }
@@ -972,7 +1038,7 @@ export default function AnimationTest() {
         const entry: ActiveProjectileEntry = {
           key, direction: dir, imageUrl: null,
           from: getPortraitPos(srcRef), to: tgtPos,
-          trajectory: traj as 'straight' | 'arc', acceleration: 0, color: anim.impactColor, show: true,
+          trajectory: traj as 'straight' | 'arc', acceleration: 0, rotationStart: 0, rotationEnd: 0, mirrored: isRightSideAttacker, color: anim.impactColor, show: true,
         }
         setActiveProjectiles(prev => [...prev, entry])
         const flightMs = (traj === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
@@ -1001,8 +1067,11 @@ export default function AnimationTest() {
             vanishMs: f.vanishMs,
             startSizePx: f.startSizePx,
             endSizePx: f.endSizePx,
-            offsetX: f.offsetX,
+            offsetX: isRightSideDefender ? -f.offsetX : f.offsetX,
             offsetY: f.offsetY,
+            rotationStart: isRightSideDefender ? -f.rotationStart : f.rotationStart,
+            rotationEnd: isRightSideDefender ? -f.rotationEnd : f.rotationEnd,
+            mirrored: isRightSideDefender,
           }
           setActiveBlockFrames(prev => [...prev, entry])
         })
@@ -1029,11 +1098,14 @@ export default function AnimationTest() {
             vanishMs: f.vanishMs,
             startSizePx: f.startSizePx,
             endSizePx: f.endSizePx,
-            offsetX: f.offsetX,
+            offsetX: isRightSideDefender ? -f.offsetX : f.offsetX,
             offsetY: f.offsetY,
-            endOffsetX: f.endOffsetX,
+            endOffsetX: isRightSideDefender ? -f.endOffsetX : f.endOffsetX,
             endOffsetY: f.endOffsetY,
             acceleration: f.acceleration,
+            rotationStart: isRightSideDefender ? -f.rotationStart : f.rotationStart,
+            rotationEnd: isRightSideDefender ? -f.rotationEnd : f.rotationEnd,
+            mirrored: isRightSideDefender,
           }
           setTargetImpactFrames(prev => [...prev, entry])
         })
@@ -1368,6 +1440,9 @@ export default function AnimationTest() {
                 startSizePx={p.startSizePx}
                 endSizePx={p.endSizePx}
                 acceleration={p.acceleration}
+                rotationStart={p.rotationStart}
+                rotationEnd={p.rotationEnd}
+                mirrored={p.mirrored}
                 from={p.from}
                 to={p.to}
               />

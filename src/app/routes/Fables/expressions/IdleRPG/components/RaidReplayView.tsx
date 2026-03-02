@@ -217,6 +217,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const [projectileImageUrl, setProjectileImageUrl] = useState<string | null>(null)
   const [projectileMirrored, setProjectileMirrored] = useState(false)
   const [projectileAcceleration, setProjectileAcceleration] = useState(0)
+  const [projectileRotationStart, setProjectileRotationStart] = useState(0)
+  const [projectileRotationEnd, setProjectileRotationEnd] = useState(0)
   const [projectileDurationMs, setProjectileDurationMs] = useState<number | undefined>(undefined)
   const [partyDmg, setPartyDmg] = useState<{ value: number; type: CombatEventType; key: number; abilityName?: string } | null>(null)
   const [bossDmg, setBossDmg] = useState<{ value: number; type: CombatEventType; key: number; abilityName?: string } | null>(null)
@@ -237,6 +239,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     endOffsetX?: number
     endOffsetY?: number
     acceleration?: number
+    rotationStart?: number
+    rotationEnd?: number
   }
   type ActiveIF = {
     key: number
@@ -252,8 +256,10 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     endOffsetX?: number
     endOffsetY?: number
     acceleration?: number
+    rotationStart?: number
+    rotationEnd?: number
   }
-  type ActiveBF = { key: number; side: 'party' | 'boss'; url: string; showMs: number; vanishMs: number; sizePx?: number; startSizePx?: number; endSizePx?: number; offsetX: number; offsetY: number }
+  type ActiveBF = { key: number; side: 'party' | 'boss'; url: string; showMs: number; vanishMs: number; sizePx?: number; startSizePx?: number; endSizePx?: number; offsetX: number; offsetY: number; rotationStart?: number; rotationEnd?: number }
   const [activeWeaponFrames, setActiveWeaponFrames] = useState<ActiveWF[]>([])
   const [activeImpactFrames, setActiveImpactFrames] = useState<ActiveIF[]>([])
   const [activeBlockFrames, setActiveBlockFrames] = useState<ActiveBF[]>([])
@@ -341,6 +347,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
             endOffsetX: isRightSideAttacker ? -(f.endOffsetX ?? f.offsetX ?? 0) : (f.endOffsetX ?? f.offsetX ?? 0),
             endOffsetY: f.endOffsetY ?? f.offsetY ?? 0,
             acceleration: f.acceleration ?? 0,
+            rotationStart: isRightSideAttacker ? -(f.rotationStart ?? 0) : (f.rotationStart ?? 0),
+            rotationEnd: isRightSideAttacker ? -(f.rotationEnd ?? f.rotationStart ?? 0) : (f.rotationEnd ?? f.rotationStart ?? 0),
           }
           setActiveWeaponFrames(prev => [...prev, entry])
           if (f.lifetimeMs != null) {
@@ -367,6 +375,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           setProjTo(tgtPos)
           setProjectileImageUrl(firstFrame.url?.trim() ?? null)
           setProjectileAcceleration(firstFrame.acceleration ?? 0)
+          setProjectileRotationStart(isRightSideAttacker ? -(firstFrame.rotationStart ?? 0) : (firstFrame.rotationStart ?? 0))
+          setProjectileRotationEnd(isRightSideAttacker ? -(firstFrame.rotationEnd ?? firstFrame.rotationStart ?? 0) : (firstFrame.rotationEnd ?? firstFrame.rotationStart ?? 0))
           const flightMs = firstFrame.lifetimeMs ?? firstFrame.speedMs ?? (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
           setProjectileDurationMs(flightMs)
           setShowProjectile(dir)
@@ -377,6 +387,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           setProjTo(tgtPos)
           setProjectileImageUrl(null)
           setProjectileAcceleration(0)
+          setProjectileRotationStart(0)
+          setProjectileRotationEnd(0)
           setProjectileDurationMs(undefined)
           setShowProjectile(dir)
           const flightMs = (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
@@ -405,6 +417,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
               showMs, vanishMs, sizePx: f.sizePx, startSizePx: f.startSizePx, endSizePx: f.endSizePx,
               offsetX: isRightSideDefender ? -(f.offsetX ?? 0) : (f.offsetX ?? 0),
               offsetY: f.offsetY ?? 0,
+              rotationStart: isRightSideDefender ? -(f.rotationStart ?? 0) : (f.rotationStart ?? 0),
+              rotationEnd: isRightSideDefender ? -(f.rotationEnd ?? f.rotationStart ?? 0) : (f.rotationEnd ?? f.rotationStart ?? 0),
             }])
           })
         }
@@ -443,6 +457,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
             endOffsetX: isRightSideDefender ? -(f.endOffsetX ?? f.offsetX ?? 0) : (f.endOffsetX ?? f.offsetX ?? 0),
             endOffsetY: f.endOffsetY ?? f.offsetY ?? 0,
             acceleration: f.acceleration ?? 0,
+            rotationStart: isRightSideDefender ? -(f.rotationStart ?? 0) : (f.rotationStart ?? 0),
+            rotationEnd: isRightSideDefender ? -(f.rotationEnd ?? f.rotationStart ?? 0) : (f.rotationEnd ?? f.rotationStart ?? 0),
           }])
         })
       }
@@ -536,6 +552,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     setShowProjectile(null)
     setProjectileMirrored(false)
     setProjectileAcceleration(0)
+    setProjectileRotationStart(0)
+    setProjectileRotationEnd(0)
     setPartyDmg(null)
     setBossDmg(null)
     setActiveWeaponFrames([])
@@ -609,6 +627,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                 weaponUrl={projectileImageUrl}
                 mirrored={projectileMirrored}
                 acceleration={projectileAcceleration}
+                rotationStart={projectileRotationStart}
+                rotationEnd={projectileRotationEnd}
                 trajectory={DEFAULT_ANIM.projectile}
                 durationMs={projectileDurationMs}
                 from={projFrom}
@@ -665,11 +685,11 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                       {isFront && (
                         <>
                           {activeWeaponFrames.filter(f => f.side === 'party').map(f => (
-                            <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} mirrored={false} id={f.key} />
+                            <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
                           ))}
                           {showPartyImpact && activeImpactFrames.filter(f => f.side === 'party').length > 0
                             ? activeImpactFrames.filter(f => f.side === 'party').map(f => (
-                              <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} mirrored={false} id={f.key} />
+                              <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
                             ))
                             : (
                               <ImpactEffect
@@ -815,11 +835,11 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                 <Box ref={bossPortraitRef} sx={{ position: 'relative' }}>
                   <RaidPortrait url={boss.iconUrl ?? undefined} size={PORTRAIT_SIZE} />
                   {activeWeaponFrames.filter(f => f.side === 'boss').map(f => (
-                    <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} mirrored id={f.key} />
+                    <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
                   ))}
                   {showBossImpact && activeImpactFrames.filter(f => f.side === 'boss').length > 0
                     ? activeImpactFrames.filter(f => f.side === 'boss').map(f => (
-                      <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} mirrored id={f.key} />
+                      <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
                     ))
                     : (
                       <ImpactEffect
@@ -864,7 +884,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                   ))}
                 </Box>
                 {activeBlockFrames.filter(f => f.side === 'boss').map(f => (
-                  <BlockFrame key={f.key} show url={f.url} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} mirrored id={f.key} />
+                  <BlockFrame key={f.key} show url={f.url} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
                 ))}
               </Paper>
             </motion.div>

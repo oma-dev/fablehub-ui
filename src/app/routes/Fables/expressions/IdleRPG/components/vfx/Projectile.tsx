@@ -17,6 +17,10 @@ interface Props {
   mirrored?: boolean
   /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
   acceleration?: number
+  /** Rotation at frame start in degrees. */
+  rotationStart?: number
+  /** Rotation at frame end in degrees. */
+  rotationEnd?: number
   trajectory?: ProjectileType
   /** Override flight duration in ms (when e.g. from AnimationFrames.projectile.speedMs). */
   durationMs?: number
@@ -57,6 +61,8 @@ function WeaponProjectile({
   endSizePx,
   mirrored = false,
   acceleration = 0,
+  rotationStart = 0,
+  rotationEnd,
 }: {
   direction: 'left-to-right' | 'right-to-left'
   weaponUrl: string
@@ -70,8 +76,11 @@ function WeaponProjectile({
   endSizePx?: number
   mirrored?: boolean
   acceleration?: number
+  rotationStart?: number
+  rotationEnd?: number
 }) {
-  const baseRotate = tipRotation(direction)
+  const baseRotation = tipRotation(direction)
+  const finalRotation = rotationEnd ?? rotationStart
   const duration = trajectory === 'arc' ? durationSec * 1.25 : durationSec
   const singleSize = sizePx ?? PROJECTILE_SIZE
   const startSize = startSizePx ?? sizePx ?? PROJECTILE_SIZE
@@ -102,7 +111,6 @@ function WeaponProjectile({
   )
 
   if (trajectory === 'arc') {
-    const sign = direction === 'left-to-right' ? -1 : 1
     return (
       <motion.div
         key={id}
@@ -111,7 +119,7 @@ function WeaponProjectile({
           top: from.y,
           x: '-50%',
           y: '-50%',
-          rotate: baseRotate - 25 * sign,
+          rotate: baseRotation + rotationStart,
           opacity: 0,
           scale: 0.6,
         }}
@@ -120,7 +128,7 @@ function WeaponProjectile({
           top: [from.y, Math.min(from.y, to.y) + ARC_PEAK, to.y],
           x: '-50%',
           y: '-50%',
-          rotate: [baseRotate + 35 * sign, baseRotate, baseRotate - 25 * sign],
+          rotate: baseRotation + finalRotation,
           opacity: [0, 1, 1, 1],
           scale: [0.6, 1, 1],
         }}
@@ -141,7 +149,7 @@ function WeaponProjectile({
         top: from.y,
         x: '-50%',
         y: '-50%',
-        rotate: baseRotate,
+        rotate: baseRotation + rotationStart,
         opacity: 0,
         scale: 0.5,
       }}
@@ -150,7 +158,7 @@ function WeaponProjectile({
         top: to.y,
         x: '-50%',
         y: '-50%',
-        rotate: baseRotate,
+        rotate: baseRotation + finalRotation,
         opacity: 1,
         scale: 1,
       }}
@@ -170,6 +178,8 @@ function OrbProjectile({
   to,
   durationSec,
   acceleration = 0,
+  rotationStart = 0,
+  rotationEnd,
 }: {
   color: string
   id: string | number
@@ -177,13 +187,16 @@ function OrbProjectile({
   to: ProjectilePos
   durationSec: number
   acceleration?: number
+  rotationStart?: number
+  rotationEnd?: number
 }) {
   const motionEase = getAccelerationEase(acceleration)
+  const finalRotation = rotationEnd ?? rotationStart
   return (
     <motion.div
       key={id}
-      initial={{ left: from.x, top: from.y, x: '-50%', y: '-50%', opacity: 0, scale: 0.5 }}
-      animate={{ left: to.x, top: to.y, x: '-50%', y: '-50%', opacity: 1, scale: 1 }}
+      initial={{ left: from.x, top: from.y, x: '-50%', y: '-50%', opacity: 0, scale: 0.5, rotate: rotationStart }}
+      animate={{ left: to.x, top: to.y, x: '-50%', y: '-50%', opacity: 1, scale: 1, rotate: finalRotation }}
       exit={{ opacity: 0, scale: 0.3 }}
       transition={{ duration: durationSec, ease: motionEase }}
       style={{ position: 'absolute', pointerEvents: 'none', zIndex: 10 }}
@@ -204,7 +217,24 @@ function OrbProjectile({
 const FALLBACK_FROM: ProjectilePos = { x: 100, y: 100 }
 const FALLBACK_TO: ProjectilePos = { x: 300, y: 100 }
 
-export default function Projectile({ show, color, direction, id, weaponUrl, mirrored = false, acceleration = 0, trajectory, durationMs, sizePx, startSizePx, endSizePx, from, to }: Props) {
+export default function Projectile({
+  show,
+  color,
+  direction,
+  id,
+  weaponUrl,
+  mirrored = false,
+  acceleration = 0,
+  rotationStart = 0,
+  rotationEnd,
+  trajectory,
+  durationMs,
+  sizePx,
+  startSizePx,
+  endSizePx,
+  from,
+  to,
+}: Props) {
   const start = from ?? (direction === 'left-to-right' ? FALLBACK_FROM : FALLBACK_TO)
   const end = to ?? (direction === 'left-to-right' ? FALLBACK_TO : FALLBACK_FROM)
   const durationSec = durationMs != null ? durationMs / 1000 : PROJECTILE_SPEED
@@ -227,9 +257,22 @@ export default function Projectile({ show, color, direction, id, weaponUrl, mirr
               endSizePx={endSizePx}
               mirrored={mirrored}
               acceleration={acceleration}
+              rotationStart={rotationStart}
+              rotationEnd={rotationEnd}
             />
             )
-          : <OrbProjectile color={color} id={id} from={start} to={end} durationSec={durationSec} acceleration={acceleration} />
+          : (
+            <OrbProjectile
+              color={color}
+              id={id}
+              from={start}
+              to={end}
+              durationSec={durationSec}
+              acceleration={acceleration}
+              rotationStart={rotationStart}
+              rotationEnd={rotationEnd}
+            />
+            )
       )}
     </AnimatePresence>
   )
