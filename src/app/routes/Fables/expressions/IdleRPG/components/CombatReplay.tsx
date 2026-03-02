@@ -704,8 +704,8 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
         </Typography>
       )}
 
-      {/* Arena */}
-      <Box ref={arenaRef} sx={{ display: 'flex', gap: 3, justifyContent: 'center', alignItems: 'flex-start', position: 'relative' }}>
+      {/* Arena: flex 1 so it fills remaining height; center cards vertically; larger gap between cards */}
+      <Box ref={arenaRef} sx={{ flex: 1, display: 'flex', gap: 20, justifyContent: 'center', alignItems: 'center', position: 'relative', minHeight: 0 }}>
 
         {/* Projectile layer — all active projectiles */}
         <AnimatePresence>
