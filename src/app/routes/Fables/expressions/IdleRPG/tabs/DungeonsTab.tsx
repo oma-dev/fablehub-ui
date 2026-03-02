@@ -121,6 +121,13 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
   )
   const playerStats = computePlayerCombatStats(character, pack)
   const playerResource = resolveCharacterResource(pack, character.classId)
+  const abilityAnimations: Record<string, any> = {}
+  for (const ab of (pack.abilities ?? [])) {
+    if (ab.animationFrames) {
+      const r = resolveAnimationFrames(ab.animationFrames, weaponDef?.iconUrl, weaponDef?.animationUrl, weaponDef?.projectileUrl, weaponDef?.impactUrl)
+      if (r) abilityAnimations[ab.id] = r
+    }
+  }
   const boss = currentDungeon?.boss
 
   return (
@@ -444,6 +451,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
           <CombatReplay
             combat={combatResult.combat}
             leftCharacterId={character.id}
+            abilityAnimations={abilityAnimations}
             player={{
               name: character.name,
               level: character.level,

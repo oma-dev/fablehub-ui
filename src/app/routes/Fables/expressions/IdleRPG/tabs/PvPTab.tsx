@@ -214,11 +214,20 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
         const creatureResolvedFrames = resolveAnimationFrames(targetAbility?.animationFrames, targetWeaponDef?.iconUrl, targetWeaponDef?.animationUrl, targetWeaponDef?.projectileUrl, targetWeaponDef?.impactUrl)
         const playerResource = resolveCharacterResource(pack, character.classId)
         const targetResource = resolveCharacterResource(pack, combatResult.targetProfile.character.classId)
+        const abilityAnimations: Record<string, any> = {}
+        for (const ab of (pack.abilities ?? [])) {
+          if (ab.animationFrames) {
+            const r1 = resolveAnimationFrames(ab.animationFrames, weaponDef?.iconUrl, weaponDef?.animationUrl, weaponDef?.projectileUrl, weaponDef?.impactUrl)
+            const r2 = resolveAnimationFrames(ab.animationFrames, targetWeaponDef?.iconUrl, targetWeaponDef?.animationUrl, targetWeaponDef?.projectileUrl, targetWeaponDef?.impactUrl)
+            if (r1 || r2) abilityAnimations[ab.id] = r1 ?? r2
+          }
+        }
         return (
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, overflow: 'auto' }}>
             <CombatReplay
               combat={combatResult.combat}
               leftCharacterId={character.id}
+              abilityAnimations={abilityAnimations}
               player={{
                 name: character.name,
                 level: character.level,

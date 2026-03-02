@@ -317,11 +317,19 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
         const playerStats = computePlayerCombatStats(character, pack)
         const playerResource = resolveCharacterResource(pack, character.classId)
         const creatureResource = resolveCreatureResource(pack, creatureDef?.resourceId)
+        const abilityAnimations: Record<string, any> = {}
+        for (const ab of (pack.abilities ?? [])) {
+          if (ab.animationFrames) {
+            const resolved = resolveAnimationFrames(ab.animationFrames, weaponDef?.iconUrl, weaponDef?.animationUrl, weaponDef?.projectileUrl, weaponDef?.impactUrl)
+            if (resolved) abilityAnimations[ab.id] = resolved
+          }
+        }
         return (
           <Box sx={{ flex: 1 }}>
             <CombatReplay
               combat={combatData.combat}
               leftCharacterId={character.id}
+              abilityAnimations={abilityAnimations}
               player={{
                 name: character.name,
                 level: character.level,

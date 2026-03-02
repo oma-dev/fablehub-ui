@@ -48,6 +48,8 @@ interface Props {
   onFinish: () => void
   /** When provided (e.g. PvP), use this as the left-side combatant ID. Otherwise derived from first event. */
   leftCharacterId?: string
+  /** Per-ability animation overrides keyed by abilityId. When an ability fires, its frames are used instead of the combatant default. */
+  abilityAnimations?: Record<string, AnimationFrames>
 }
 
 const STAT_LABELS: { key: keyof Pick<CombatantInfo, 'ap' | 'arm'>; label: string }[] = [
@@ -305,7 +307,7 @@ interface ActiveBlockFrameEntry {
   offsetY: number
 }
 
-export default function CombatReplay({ combat, player, creature, victory, onFinish, leftCharacterId }: Props) {
+export default function CombatReplay({ combat, player, creature, victory, onFinish, leftCharacterId, abilityAnimations }: Props) {
   const [playerHp, setPlayerHp] = useState(player.maxHp)
   const [creatureHp, setCreatureHp] = useState(creature.maxHp)
   const [playerResourceCurrent, setPlayerResourceCurrent] = useState<number | null>(
@@ -636,7 +638,12 @@ export default function CombatReplay({ combat, player, creature, victory, onFini
           // Pure resource_change groups (regen events with no abilityId) are handled by turn snapshot
           if (group.every(ev => ev.type === 'resource_change')) continue
           const attackerSide = group[0].sourceId === playerId ? 'player' : 'creature'
-          const anim = attackerSide === 'player' ? playerAnim : creatureAnim
+          const groupAbilityId = group[0].abilityId
+          const overrideFrames = groupAbilityId && abilityAnimations?.[groupAbilityId]
+          const baseAnim = attackerSide === 'player' ? playerAnim : creatureAnim
+          const anim = overrideFrames
+            ? getAttackAnimationConfig(undefined, overrideFrames)
+            : baseAnim
           await animateAttack(attackerSide, group, anim)
         }
         // Update status effects and resources after each turn
