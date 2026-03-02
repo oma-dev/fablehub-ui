@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ProjectileType } from './animationConfig'
+import { getAccelerationEase } from './motionEasing'
 
 export interface ProjectilePos {
   x: number
@@ -14,6 +15,8 @@ interface Props {
   weaponUrl?: string | null
   /** Mirror projectile image horizontally. */
   mirrored?: boolean
+  /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
+  acceleration?: number
   trajectory?: ProjectileType
   /** Override flight duration in ms (when e.g. from AnimationFrames.projectile.speedMs). */
   durationMs?: number
@@ -53,6 +56,7 @@ function WeaponProjectile({
   startSizePx,
   endSizePx,
   mirrored = false,
+  acceleration = 0,
 }: {
   direction: 'left-to-right' | 'right-to-left'
   weaponUrl: string
@@ -65,6 +69,7 @@ function WeaponProjectile({
   startSizePx?: number
   endSizePx?: number
   mirrored?: boolean
+  acceleration?: number
 }) {
   const baseRotate = tipRotation(direction)
   const duration = trajectory === 'arc' ? durationSec * 1.25 : durationSec
@@ -74,6 +79,7 @@ function WeaponProjectile({
   const animateSize = startSizePx != null && endSizePx != null && startSizePx !== endSizePx
   const size = animateSize ? endSize : singleSize
   const flightDuration = trajectory === 'arc' ? duration : durationSec
+  const motionEase = getAccelerationEase(acceleration)
 
   const imgStyle = {
     objectFit: 'contain' as const,
@@ -119,7 +125,7 @@ function WeaponProjectile({
           scale: [0.6, 1, 1],
         }}
         exit={{ opacity: 0, scale: 0.3 }}
-        transition={{ duration, ease: 'easeInOut' }}
+        transition={{ duration, ease: motionEase }}
         style={{ position: 'absolute', pointerEvents: 'none', zIndex: 10 }}
       >
         {imgEl}
@@ -149,7 +155,7 @@ function WeaponProjectile({
         scale: 1,
       }}
       exit={{ opacity: 0, scale: 0.3 }}
-      transition={{ duration: durationSec, ease: 'easeIn' }}
+      transition={{ duration: durationSec, ease: motionEase }}
       style={{ position: 'absolute', pointerEvents: 'none', zIndex: 10 }}
     >
       {imgEl}
@@ -162,19 +168,24 @@ function OrbProjectile({
   id,
   from,
   to,
+  durationSec,
+  acceleration = 0,
 }: {
   color: string
   id: string | number
   from: ProjectilePos
   to: ProjectilePos
+  durationSec: number
+  acceleration?: number
 }) {
+  const motionEase = getAccelerationEase(acceleration)
   return (
     <motion.div
       key={id}
       initial={{ left: from.x, top: from.y, x: '-50%', y: '-50%', opacity: 0, scale: 0.5 }}
       animate={{ left: to.x, top: to.y, x: '-50%', y: '-50%', opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.3 }}
-      transition={{ duration: PROJECTILE_SPEED, ease: 'easeIn' }}
+      transition={{ duration: durationSec, ease: motionEase }}
       style={{ position: 'absolute', pointerEvents: 'none', zIndex: 10 }}
     >
       <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
@@ -193,7 +204,7 @@ function OrbProjectile({
 const FALLBACK_FROM: ProjectilePos = { x: 100, y: 100 }
 const FALLBACK_TO: ProjectilePos = { x: 300, y: 100 }
 
-export default function Projectile({ show, color, direction, id, weaponUrl, mirrored = false, trajectory, durationMs, sizePx, startSizePx, endSizePx, from, to }: Props) {
+export default function Projectile({ show, color, direction, id, weaponUrl, mirrored = false, acceleration = 0, trajectory, durationMs, sizePx, startSizePx, endSizePx, from, to }: Props) {
   const start = from ?? (direction === 'left-to-right' ? FALLBACK_FROM : FALLBACK_TO)
   const end = to ?? (direction === 'left-to-right' ? FALLBACK_TO : FALLBACK_FROM)
   const durationSec = durationMs != null ? durationMs / 1000 : PROJECTILE_SPEED
@@ -215,9 +226,10 @@ export default function Projectile({ show, color, direction, id, weaponUrl, mirr
               startSizePx={startSizePx}
               endSizePx={endSizePx}
               mirrored={mirrored}
+              acceleration={acceleration}
             />
             )
-          : <OrbProjectile color={color} id={id} from={start} to={end} />
+          : <OrbProjectile color={color} id={id} from={start} to={end} durationSec={durationSec} acceleration={acceleration} />
       )}
     </AnimatePresence>
   )

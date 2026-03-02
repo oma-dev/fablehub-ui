@@ -36,6 +36,9 @@ export interface AnimFrameForm {
   endSizePx: string
   offsetX: string
   offsetY: string
+  endOffsetX: string
+  endOffsetY: string
+  acceleration: string
 }
 
 export interface AbilityAnimFrames {
@@ -48,25 +51,25 @@ export interface AbilityAnimFrames {
 export const defaultWeaponFrame = (): AnimFrameForm => ({
   enabled: false, imageSource: 'url', url: '', delayMs: '0', fadeInMs: '200', lifetimeMs: '0',
   trajectory: 'straight', showMs: '0', vanishMs: '0',
-  startSizePx: '80', endSizePx: '120', offsetX: '0', offsetY: '0',
+  startSizePx: '80', endSizePx: '120', offsetX: '0', offsetY: '0', endOffsetX: '0', endOffsetY: '0', acceleration: '0',
 })
 
 export const defaultProjectileFrame = (): AnimFrameForm => ({
   enabled: false, imageSource: 'url', url: '', delayMs: '0', fadeInMs: '0', lifetimeMs: '400',
   trajectory: 'arc', showMs: '0', vanishMs: '0',
-  startSizePx: '120', endSizePx: '300', offsetX: '0', offsetY: '0',
+  startSizePx: '120', endSizePx: '300', offsetX: '0', offsetY: '0', endOffsetX: '0', endOffsetY: '0', acceleration: '0',
 })
 
 export const defaultImpactFrame = (): AnimFrameForm => ({
   enabled: false, imageSource: 'url', url: '', delayMs: '0', fadeInMs: '0', lifetimeMs: '600',
   trajectory: 'straight', showMs: '90', vanishMs: '510',
-  startSizePx: '60', endSizePx: '140', offsetX: '0', offsetY: '0',
+  startSizePx: '60', endSizePx: '140', offsetX: '0', offsetY: '0', endOffsetX: '0', endOffsetY: '0', acceleration: '0',
 })
 
 export const defaultBlockFrame = (): AnimFrameForm => ({
   enabled: false, imageSource: 'url', url: '', delayMs: '0', fadeInMs: '0', lifetimeMs: '800',
   trajectory: 'straight', showMs: '320', vanishMs: '480',
-  startSizePx: '100', endSizePx: '140', offsetX: '0', offsetY: '0',
+  startSizePx: '100', endSizePx: '140', offsetX: '0', offsetY: '0', endOffsetX: '0', endOffsetY: '0', acceleration: '0',
 })
 
 export const emptyAnimFrames = (): AbilityAnimFrames => ({
@@ -82,6 +85,8 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
       trajectory: 'straight' as const, showMs: '0', vanishMs: '0',
       startSizePx: String(f.startSizePx ?? f.sizePx ?? 80), endSizePx: String(f.endSizePx ?? f.sizePx ?? 120),
       offsetX: String(f.offsetX ?? 0), offsetY: String(f.offsetY ?? 0),
+      endOffsetX: String(f.endOffsetX ?? f.offsetX ?? 0), endOffsetY: String(f.endOffsetY ?? f.offsetY ?? 0),
+      acceleration: String(f.acceleration ?? 0),
     })),
     projectile: (af.projectile ?? []).map(f => ({
       enabled: true, imageSource: (f.imageSource ?? 'url') as AnimationFrameImageSource, url: f.url ?? '',
@@ -89,6 +94,8 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
       trajectory: (f.trajectory ?? 'arc') as 'straight' | 'arc', showMs: '0', vanishMs: '0',
       startSizePx: String(f.startSizePx ?? f.sizePx ?? 120), endSizePx: String(f.endSizePx ?? f.sizePx ?? 300),
       offsetX: String(f.offsetX ?? 0), offsetY: String(f.offsetY ?? 0),
+      endOffsetX: String(0), endOffsetY: String(0),
+      acceleration: String(f.acceleration ?? 0),
     })),
     impact: (af.impact ?? []).map(f => ({
       enabled: true, imageSource: (f.imageSource ?? 'url') as AnimationFrameImageSource, url: f.url ?? '',
@@ -96,6 +103,8 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
       trajectory: 'straight' as const, showMs: String(f.showMs ?? 90), vanishMs: String(f.vanishMs ?? 510),
       startSizePx: String(f.startSizePx ?? f.sizePx ?? 60), endSizePx: String(f.endSizePx ?? f.sizePx ?? 140),
       offsetX: String(f.offsetX ?? 0), offsetY: String(f.offsetY ?? 0),
+      endOffsetX: String(f.endOffsetX ?? f.offsetX ?? 0), endOffsetY: String(f.endOffsetY ?? f.offsetY ?? 0),
+      acceleration: String(f.acceleration ?? 0),
     })),
     block: (af.block ?? []).map(f => ({
       enabled: true, imageSource: (f.imageSource ?? 'url') as AnimationFrameImageSource, url: f.url ?? '',
@@ -103,6 +112,8 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
       trajectory: 'straight' as const, showMs: String(f.showMs ?? 320), vanishMs: String(f.vanishMs ?? 480),
       startSizePx: String(f.startSizePx ?? f.sizePx ?? 100), endSizePx: String(f.endSizePx ?? f.sizePx ?? 140),
       offsetX: String(f.offsetX ?? 0), offsetY: String(f.offsetY ?? 0),
+      endOffsetX: String(0), endOffsetY: String(0),
+      acceleration: String(0),
     })),
   }
 }
@@ -118,6 +129,9 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     endSizePx: Number(f.endSizePx) || 120,
     ...(Number(f.offsetX) !== 0 ? { offsetX: Number(f.offsetX) } : {}),
     ...(Number(f.offsetY) !== 0 ? { offsetY: Number(f.offsetY) } : {}),
+    ...(Number(f.endOffsetX) !== Number(f.offsetX) ? { endOffsetX: Number(f.endOffsetX) } : {}),
+    ...(Number(f.endOffsetY) !== Number(f.offsetY) ? { endOffsetY: Number(f.endOffsetY) } : {}),
+    ...(Number(f.acceleration) !== 0 ? { acceleration: Number(f.acceleration) } : {}),
   }))
   const projectile = af.projectile.filter(f => f.enabled && f.url.trim()).map(f => ({
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
@@ -129,6 +143,7 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     endSizePx: Number(f.endSizePx) || 300,
     ...(Number(f.offsetX) !== 0 ? { offsetX: Number(f.offsetX) } : {}),
     ...(Number(f.offsetY) !== 0 ? { offsetY: Number(f.offsetY) } : {}),
+    ...(Number(f.acceleration) !== 0 ? { acceleration: Number(f.acceleration) } : {}),
   }))
   const impact = af.impact.filter(f => f.enabled && f.url.trim()).map(f => ({
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
@@ -141,6 +156,9 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     endSizePx: Number(f.endSizePx) || 140,
     ...(Number(f.offsetX) !== 0 ? { offsetX: Number(f.offsetX) } : {}),
     ...(Number(f.offsetY) !== 0 ? { offsetY: Number(f.offsetY) } : {}),
+    ...(Number(f.endOffsetX) !== Number(f.offsetX) ? { endOffsetX: Number(f.endOffsetX) } : {}),
+    ...(Number(f.endOffsetY) !== Number(f.offsetY) ? { endOffsetY: Number(f.endOffsetY) } : {}),
+    ...(Number(f.acceleration) !== 0 ? { acceleration: Number(f.acceleration) } : {}),
   }))
   const block = af.block.filter(f => f.enabled && f.url.trim()).map(f => ({
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
@@ -174,6 +192,25 @@ interface FrameListEditorProps {
 function FrameListEditor({ label, frames, phaseType, onChange, defaultFrame }: FrameListEditorProps) {
   const update = (idx: number, patch: Partial<AnimFrameForm>) => {
     onChange(frames.map((f, i) => i === idx ? { ...f, ...patch } : f))
+  }
+  const updateOffset = (idx: number, axis: 'x' | 'y', value: string) => {
+    const current = frames[idx]
+    if (!current) return
+    if (phaseType === 'weapon' || phaseType === 'impact') {
+      if (axis === 'x') {
+        update(idx, {
+          offsetX: value,
+          ...(current.endOffsetX === current.offsetX ? { endOffsetX: value } : {}),
+        })
+      } else {
+        update(idx, {
+          offsetY: value,
+          ...(current.endOffsetY === current.offsetY ? { endOffsetY: value } : {}),
+        })
+      }
+      return
+    }
+    update(idx, axis === 'x' ? { offsetX: value } : { offsetY: value })
   }
   const remove = (idx: number) => onChange(frames.filter((_, i) => i !== idx))
   const add = () => onChange([...frames, { ...defaultFrame(), enabled: true }])
@@ -220,8 +257,17 @@ function FrameListEditor({ label, frames, phaseType, onChange, defaultFrame }: F
           )}
           <TextField size="small" label="Start size (px)" type="number" value={f.startSizePx} onChange={(e) => update(idx, { startSizePx: e.target.value })} sx={{ width: 100 }} />
           <TextField size="small" label="End size (px)" type="number" value={f.endSizePx} onChange={(e) => update(idx, { endSizePx: e.target.value })} sx={{ width: 100 }} />
-          <TextField size="small" label="Offset X" type="number" value={f.offsetX} onChange={(e) => update(idx, { offsetX: e.target.value })} sx={{ width: 80 }} />
-          <TextField size="small" label="Offset Y" type="number" value={f.offsetY} onChange={(e) => update(idx, { offsetY: e.target.value })} sx={{ width: 80 }} />
+          <TextField size="small" label="Offset X" type="number" value={f.offsetX} onChange={(e) => updateOffset(idx, 'x', e.target.value)} sx={{ width: 80 }} />
+          <TextField size="small" label="Offset Y" type="number" value={f.offsetY} onChange={(e) => updateOffset(idx, 'y', e.target.value)} sx={{ width: 80 }} />
+          {(phaseType === 'weapon' || phaseType === 'impact') && (
+            <>
+              <TextField size="small" label="End Offset X" type="number" value={f.endOffsetX} onChange={(e) => update(idx, { endOffsetX: e.target.value })} sx={{ width: 100 }} />
+              <TextField size="small" label="End Offset Y" type="number" value={f.endOffsetY} onChange={(e) => update(idx, { endOffsetY: e.target.value })} sx={{ width: 100 }} />
+            </>
+          )}
+          {(phaseType === 'weapon' || phaseType === 'impact' || phaseType === 'projectile') && (
+            <TextField size="small" label="Acceleration" type="number" value={f.acceleration} onChange={(e) => update(idx, { acceleration: e.target.value })} sx={{ width: 100 }} />
+          )}
           <IconButton size="small" color="error" onClick={() => remove(idx)}><DeleteIcon fontSize="small" /></IconButton>
         </Box>
       ))}

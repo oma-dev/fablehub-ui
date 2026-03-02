@@ -48,6 +48,7 @@ const CARD_PADDING = 2.5 * SCALE
 const CARD_RADIUS = 3 * SCALE
 const CARD_MAX_WIDTH = Math.round(380 * SCALE)
 const VS_WIDTH = Math.round(70 * SCALE)
+const ARENA_CARD_GAP = 20
 const IMAGE_SOURCE_OPTIONS: { value: AnimationFrameImageSource; label: string }[] = [
   { value: 'url', label: 'Custom URL' },
   { value: 'weaponIcon', label: 'Weapon icon' },
@@ -68,6 +69,9 @@ interface WeaponFrameForm {
   endSizePx: number
   offsetX: number
   offsetY: number
+  endOffsetX: number
+  endOffsetY: number
+  acceleration: number
 }
 interface ProjectileFrameForm {
   enabled: boolean
@@ -81,6 +85,7 @@ interface ProjectileFrameForm {
   endSizePx: number
   offsetX: number
   offsetY: number
+  acceleration: number
 }
 interface ImpactFrameForm {
   enabled: boolean
@@ -95,6 +100,9 @@ interface ImpactFrameForm {
   endSizePx: number
   offsetX: number
   offsetY: number
+  endOffsetX: number
+  endOffsetY: number
+  acceleration: number
 }
 
 const defaultWeaponFrame = (): WeaponFrameForm => ({
@@ -108,6 +116,9 @@ const defaultWeaponFrame = (): WeaponFrameForm => ({
   endSizePx: 120,
   offsetX: 0,
   offsetY: 0,
+  endOffsetX: 0,
+  endOffsetY: 0,
+  acceleration: 0,
 })
 const defaultProjectileFrame = (): ProjectileFrameForm => ({
   enabled: false,
@@ -120,6 +131,7 @@ const defaultProjectileFrame = (): ProjectileFrameForm => ({
   endSizePx: 300,
   offsetX: 0,
   offsetY: 0,
+  acceleration: 0,
 })
 const defaultImpactFrame = (): ImpactFrameForm => ({
   enabled: false,
@@ -133,6 +145,9 @@ const defaultImpactFrame = (): ImpactFrameForm => ({
   endSizePx: 140,
   offsetX: 0,
   offsetY: 0,
+  endOffsetX: 0,
+  endOffsetY: 0,
+  acceleration: 0,
 })
 
 interface BlockFrameForm {
@@ -175,6 +190,9 @@ interface ActiveWeaponFrameEntry {
   endSizePx?: number
   offsetX: number
   offsetY: number
+  endOffsetX: number
+  endOffsetY: number
+  acceleration: number
 }
 interface ActiveProjectileEntry {
   key: number
@@ -186,6 +204,7 @@ interface ActiveProjectileEntry {
   durationMs?: number
   startSizePx?: number
   endSizePx?: number
+  acceleration: number
   color: string
   show: boolean
 }
@@ -198,6 +217,9 @@ interface ActiveImpactFrameEntry {
   endSizePx?: number
   offsetX: number
   offsetY: number
+  endOffsetX: number
+  endOffsetY: number
+  acceleration: number
 }
 interface ActiveBlockFrameEntry {
   key: number
@@ -294,11 +316,40 @@ const CombatantCard = forwardRef<HTMLDivElement, {
             )}
           </Box>
           {(activeWeaponFrames ?? []).map(f => (
-            <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+            <WeaponFrame
+              key={f.key}
+              show
+              url={f.url}
+              fadeInMs={f.fadeInMs}
+              lifetimeMs={f.lifetimeMs}
+              sizePx={f.sizePx}
+              startSizePx={f.startSizePx}
+              endSizePx={f.endSizePx}
+              offsetX={f.offsetX}
+              offsetY={f.offsetY}
+              endOffsetX={f.endOffsetX}
+              endOffsetY={f.endOffsetY}
+              acceleration={f.acceleration}
+              id={f.key}
+            />
           ))}
           {showImpact && (activeImpactFrames ?? []).length > 0
             ? (activeImpactFrames ?? []).map(f => (
-              <ImpactFrame key={f.key} show url={f.url} showMs={f.showMs} vanishMs={f.vanishMs} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} id={f.key} />
+              <ImpactFrame
+                key={f.key}
+                show
+                url={f.url}
+                showMs={f.showMs}
+                vanishMs={f.vanishMs}
+                startSizePx={f.startSizePx}
+                endSizePx={f.endSizePx}
+                offsetX={f.offsetX}
+                offsetY={f.offsetY}
+                endOffsetX={f.endOffsetX}
+                endOffsetY={f.endOffsetY}
+                acceleration={f.acceleration}
+                id={f.key}
+              />
             ))
             : <ImpactEffect show={showImpact} style={impactStyle} color={impactColor} id={`impact-${impactKey}`} />
           }
@@ -341,6 +392,16 @@ function WeaponFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
   resolveUrl: (source: AnimationFrameImageSource, url: string) => string
 }) {
   const set = <K extends keyof WeaponFrameForm>(key: K, val: WeaponFrameForm[K]) => onChange({ ...frame, [key]: val })
+  const setOffsetX = (v: number) => onChange({
+    ...frame,
+    offsetX: v,
+    ...(frame.endOffsetX === frame.offsetX ? { endOffsetX: v } : {}),
+  })
+  const setOffsetY = (v: number) => onChange({
+    ...frame,
+    offsetY: v,
+    ...(frame.endOffsetY === frame.offsetY ? { endOffsetY: v } : {}),
+  })
   return (
     <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -369,8 +430,11 @@ function WeaponFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         <NumField label="Lifetime (ms)" value={frame.lifetimeMs} onChange={(v) => set('lifetimeMs', Math.max(0, v))} min={0} max={5000} step={50} width={120} helperText="0 = whole seq" disabled={!frame.enabled} />
         <NumField label="Start size" value={frame.startSizePx} onChange={(v) => set('startSizePx', Math.max(16, v))} min={16} max={400} step={8} disabled={!frame.enabled} />
         <NumField label="End size" value={frame.endSizePx} onChange={(v) => set('endSizePx', Math.max(16, v))} min={16} max={400} step={8} disabled={!frame.enabled} />
-        <NumField label="Offset X" value={frame.offsetX} onChange={(v) => set('offsetX', v)} min={-300} max={300} step={8} disabled={!frame.enabled} />
-        <NumField label="Offset Y" value={frame.offsetY} onChange={(v) => set('offsetY', v)} min={-300} max={300} step={8} disabled={!frame.enabled} />
+        <NumField label="Offset X" value={frame.offsetX} onChange={setOffsetX} min={-300} max={300} step={8} disabled={!frame.enabled} />
+        <NumField label="Offset Y" value={frame.offsetY} onChange={setOffsetY} min={-300} max={300} step={8} disabled={!frame.enabled} />
+        <NumField label="End X" value={frame.endOffsetX} onChange={(v) => set('endOffsetX', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="final offset" />
+        <NumField label="End Y" value={frame.endOffsetY} onChange={(v) => set('endOffsetY', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="final offset" />
+        <NumField label="Accel" value={frame.acceleration} onChange={(v) => set('acceleration', v)} min={-5} max={5} step={0.1} width={100} disabled={!frame.enabled} />
       </Box>
     </Box>
   )
@@ -421,6 +485,7 @@ function ProjectileFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         <NumField label="End size" value={frame.endSizePx} onChange={(v) => set('endSizePx', Math.max(24, v))} min={24} max={600} step={24} disabled={!frame.enabled} />
         <NumField label="Offset X" value={frame.offsetX} onChange={(v) => set('offsetX', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="start pos" />
         <NumField label="Offset Y" value={frame.offsetY} onChange={(v) => set('offsetY', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="start pos" />
+        <NumField label="Accel" value={frame.acceleration} onChange={(v) => set('acceleration', v)} min={-5} max={5} step={0.1} width={100} disabled={!frame.enabled} />
       </Box>
     </Box>
   )
@@ -435,6 +500,16 @@ function ImpactFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
   resolveUrl: (source: AnimationFrameImageSource, url: string) => string
 }) {
   const set = <K extends keyof ImpactFrameForm>(key: K, val: ImpactFrameForm[K]) => onChange({ ...frame, [key]: val })
+  const setOffsetX = (v: number) => onChange({
+    ...frame,
+    offsetX: v,
+    ...(frame.endOffsetX === frame.offsetX ? { endOffsetX: v } : {}),
+  })
+  const setOffsetY = (v: number) => onChange({
+    ...frame,
+    offsetY: v,
+    ...(frame.endOffsetY === frame.offsetY ? { endOffsetY: v } : {}),
+  })
   return (
     <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -471,8 +546,11 @@ function ImpactFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         <NumField label="Vanish (ms)" value={frame.vanishMs} onChange={(v) => set('vanishMs', Math.max(100, v))} min={100} max={2000} step={50} width={110} helperText="fade-out" disabled={!frame.enabled} />
         <NumField label="Start size" value={frame.startSizePx} onChange={(v) => set('startSizePx', Math.max(16, v))} min={16} max={400} step={8} disabled={!frame.enabled} />
         <NumField label="End size" value={frame.endSizePx} onChange={(v) => set('endSizePx', Math.max(16, v))} min={16} max={400} step={8} disabled={!frame.enabled} />
-        <NumField label="Offset X" value={frame.offsetX} onChange={(v) => set('offsetX', v)} min={-300} max={300} step={8} disabled={!frame.enabled} />
-        <NumField label="Offset Y" value={frame.offsetY} onChange={(v) => set('offsetY', v)} min={-300} max={300} step={8} disabled={!frame.enabled} />
+        <NumField label="Offset X" value={frame.offsetX} onChange={setOffsetX} min={-300} max={300} step={8} disabled={!frame.enabled} />
+        <NumField label="Offset Y" value={frame.offsetY} onChange={setOffsetY} min={-300} max={300} step={8} disabled={!frame.enabled} />
+        <NumField label="End X" value={frame.endOffsetX} onChange={(v) => set('endOffsetX', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="final offset" />
+        <NumField label="End Y" value={frame.endOffsetY} onChange={(v) => set('endOffsetY', v)} min={-300} max={300} step={8} disabled={!frame.enabled} helperText="final offset" />
+        <NumField label="Accel" value={frame.acceleration} onChange={(v) => set('acceleration', v)} min={-5} max={5} step={0.1} width={100} disabled={!frame.enabled} />
       </Box>
     </Box>
   )
@@ -610,6 +688,9 @@ export default function AnimationTest() {
         startSizePx: f.startSizePx, endSizePx: f.endSizePx,
         ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
         ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
+        ...(f.endOffsetX !== f.offsetX ? { endOffsetX: f.endOffsetX } : {}),
+        ...(f.endOffsetY !== f.offsetY ? { endOffsetY: f.endOffsetY } : {}),
+        ...(f.acceleration !== 0 ? { acceleration: f.acceleration } : {}),
       }))
       const p = projectileFrames.filter(f => f.enabled).map(f => ({
         ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
@@ -620,6 +701,7 @@ export default function AnimationTest() {
         startSizePx: f.startSizePx, endSizePx: f.endSizePx,
         ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
         ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
+        ...(f.acceleration !== 0 ? { acceleration: f.acceleration } : {}),
       }))
       const im = impactFrames.filter(f => f.enabled).map(f => ({
         ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
@@ -631,6 +713,9 @@ export default function AnimationTest() {
         startSizePx: f.startSizePx, endSizePx: f.endSizePx,
         ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
         ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
+        ...(f.endOffsetX !== f.offsetX ? { endOffsetX: f.endOffsetX } : {}),
+        ...(f.endOffsetY !== f.offsetY ? { endOffsetY: f.endOffsetY } : {}),
+        ...(f.acceleration !== 0 ? { acceleration: f.acceleration } : {}),
       }))
       const b = blockFrames.filter(f => f.enabled).map(f => ({
         ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
@@ -724,6 +809,8 @@ export default function AnimationTest() {
           delayMs: f.delayMs ?? 0, fadeInMs: f.fadeInMs ?? 200, lifetimeMs: f.lifetimeMs ?? 0,
           startSizePx: f.startSizePx ?? f.sizePx ?? 80, endSizePx: f.endSizePx ?? f.sizePx ?? 120,
           offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+          endOffsetX: f.endOffsetX ?? f.offsetX ?? 0, endOffsetY: f.endOffsetY ?? f.offsetY ?? 0,
+          acceleration: f.acceleration ?? 0,
         })))
         setProjectileFrames((af.projectile ?? []).map((f: any) => ({
           enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
@@ -731,6 +818,7 @@ export default function AnimationTest() {
           trajectory: f.trajectory ?? 'arc',
           startSizePx: f.startSizePx ?? f.sizePx ?? 120, endSizePx: f.endSizePx ?? f.sizePx ?? 300,
           offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+          acceleration: f.acceleration ?? 0,
         })))
         setImpactFrames((af.impact ?? []).map((f: any) => ({
           enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
@@ -738,6 +826,8 @@ export default function AnimationTest() {
           lifetimeMs: f.lifetimeMs ?? 600,
           startSizePx: f.startSizePx ?? f.sizePx ?? 60, endSizePx: f.endSizePx ?? f.sizePx ?? 140,
           offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
+          endOffsetX: f.endOffsetX ?? f.offsetX ?? 0, endOffsetY: f.endOffsetY ?? f.offsetY ?? 0,
+          acceleration: f.acceleration ?? 0,
         })))
         setBlockFrames((af.block ?? []).map((f: any) => ({
           enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
@@ -823,6 +913,9 @@ export default function AnimationTest() {
           endSizePx: f.endSizePx,
           offsetX: f.offsetX,
           offsetY: f.offsetY,
+          endOffsetX: f.endOffsetX,
+          endOffsetY: f.endOffsetY,
+          acceleration: f.acceleration,
         }
         setAttackerWeapon(prev => [...prev, entry])
         if (f.lifetimeMs > 0) {
@@ -858,6 +951,7 @@ export default function AnimationTest() {
           durationMs: f.lifetimeMs,
           startSizePx: f.startSizePx,
           endSizePx: f.endSizePx,
+          acceleration: f.acceleration,
           color: anim.impactColor,
           show: true,
         }
@@ -878,7 +972,7 @@ export default function AnimationTest() {
         const entry: ActiveProjectileEntry = {
           key, direction: dir, imageUrl: null,
           from: getPortraitPos(srcRef), to: tgtPos,
-          trajectory: traj as 'straight' | 'arc', color: anim.impactColor, show: true,
+          trajectory: traj as 'straight' | 'arc', acceleration: 0, color: anim.impactColor, show: true,
         }
         setActiveProjectiles(prev => [...prev, entry])
         const flightMs = (traj === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
@@ -937,6 +1031,9 @@ export default function AnimationTest() {
             endSizePx: f.endSizePx,
             offsetX: f.offsetX,
             offsetY: f.offsetY,
+            endOffsetX: f.endOffsetX,
+            endOffsetY: f.endOffsetY,
+            acceleration: f.acceleration,
           }
           setTargetImpactFrames(prev => [...prev, entry])
         })
@@ -1246,7 +1343,16 @@ export default function AnimationTest() {
       {/* Arena */}
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#0d0b14', display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Typography variant="subtitle2" fontWeight={700} color="text.secondary">Arena</Typography>
-        <Box ref={arenaRef} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 3, position: 'relative' }}>
+        <Box
+          ref={arenaRef}
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: { xs: 3, md: ARENA_CARD_GAP },
+            position: 'relative',
+          }}
+        >
           {/* Projectile layer */}
           <AnimatePresence>
             {activeProjectiles.map(p => (
@@ -1261,6 +1367,7 @@ export default function AnimationTest() {
                 durationMs={p.durationMs}
                 startSizePx={p.startSizePx}
                 endSizePx={p.endSizePx}
+                acceleration={p.acceleration}
                 from={p.from}
                 to={p.to}
               />

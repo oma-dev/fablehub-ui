@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
+import { getAccelerationEase } from './motionEasing'
 
 const DEFAULT_SIZE = 140
 
@@ -19,12 +20,33 @@ interface Props {
   offsetX?: number
   /** Vertical offset in px from target portrait center (positive = down). */
   offsetY?: number
+  /** End horizontal offset in px at the end of this frame's lifetime (positive = right). */
+  endOffsetX?: number
+  /** End vertical offset in px at the end of this frame's lifetime (positive = down). */
+  endOffsetY?: number
+  /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
+  acceleration?: number
   /** Mirror frame horizontally (used for right-side combatants). */
   mirrored?: boolean
   id: string | number
 }
 
-export default function ImpactFrame({ show, url, showMs = 100, vanishMs = 500, sizePx, startSizePx, endSizePx, offsetX = 0, offsetY = 0, mirrored = false, id }: Props) {
+export default function ImpactFrame({
+  show,
+  url,
+  showMs = 100,
+  vanishMs = 500,
+  sizePx,
+  startSizePx,
+  endSizePx,
+  offsetX = 0,
+  offsetY = 0,
+  endOffsetX,
+  endOffsetY,
+  acceleration = 0,
+  mirrored = false,
+  id,
+}: Props) {
   const totalSec = showMs / 1000 + vanishMs / 1000
   let fadeStart = showMs / 1000 / totalSec
   // Keyframe times must be monotonically non-decreasing (Web Animations API requirement)
@@ -34,16 +56,23 @@ export default function ImpactFrame({ show, url, showMs = 100, vanishMs = 500, s
   const baseSize = Math.max(startSize, endSize, 1)
   const initialScale = startSize / baseSize
   const finalScale = endSize / baseSize
+  const targetOffsetX = endOffsetX ?? offsetX
+  const targetOffsetY = endOffsetY ?? offsetY
+  const deltaX = targetOffsetX - offsetX
+  const deltaY = targetOffsetY - offsetY
+  const motionEase = getAccelerationEase(acceleration)
 
   return (
     <AnimatePresence>
       {show && (
         <motion.div
           key={id}
-          initial={{ opacity: 0, scale: initialScale }}
+          initial={{ opacity: 0, scale: initialScale, x: 0, y: 0 }}
           animate={{
             opacity: [0, 1, 1, 0],
             scale: [initialScale, finalScale],
+            x: deltaX,
+            y: deltaY,
             transition: {
               opacity: {
                 times: [0, 0.08, fadeStart, 1],
@@ -51,6 +80,8 @@ export default function ImpactFrame({ show, url, showMs = 100, vanishMs = 500, s
                 ease: 'easeOut',
               },
               scale: { duration: totalSec, ease: 'easeOut' },
+              x: { duration: totalSec, ease: motionEase },
+              y: { duration: totalSec, ease: motionEase },
             },
           }}
           exit={{ opacity: 0 }}

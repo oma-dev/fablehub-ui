@@ -29,6 +29,12 @@ export interface AnimationWeaponFrame {
   offsetX?: number
   /** Vertical offset in px from caster portrait center (positive = down). */
   offsetY?: number
+  /** End horizontal offset in px at the end of this frame's lifetime (positive = right). */
+  endOffsetX?: number
+  /** End vertical offset in px at the end of this frame's lifetime (positive = down). */
+  endOffsetY?: number
+  /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
+  acceleration?: number
 }
 
 /** Optional projectile frame (flies caster → target). */
@@ -52,6 +58,8 @@ export interface AnimationProjectileFrame {
   offsetX?: number
   /** Vertical offset in px applied to the start (caster) position. Target stays fixed. */
   offsetY?: number
+  /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
+  acceleration?: number
 }
 
 /** Optional impact frame (pops at target, fades out). */
@@ -79,6 +87,12 @@ export interface AnimationImpactFrame {
   offsetX?: number
   /** Vertical offset in px from target portrait center (positive = down). */
   offsetY?: number
+  /** End horizontal offset in px at the end of this frame's lifetime (positive = right). */
+  endOffsetX?: number
+  /** End vertical offset in px at the end of this frame's lifetime (positive = down). */
+  endOffsetY?: number
+  /** Motion acceleration curve. 0 = linear, positive = accelerate, negative = decelerate. */
+  acceleration?: number
 }
 
 /** Optional block frame: pops at defender portrait center when a reactive block triggers. */
