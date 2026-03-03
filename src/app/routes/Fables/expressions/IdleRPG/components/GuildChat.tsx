@@ -4,8 +4,8 @@ import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { getGroupMessages, sendGroupMessage } from '../../../../../../services/api'
-import type { CharacterState, GroupMessage } from '../../../../../../services/api'
+import { getGroupMessages, sendGroupMessage } from '@features/idle-rpg/api'
+import type { CharacterState, GroupMessage } from '@features/idle-rpg/api'
 
 interface Props {
   fableId: string
@@ -164,3 +164,4 @@ export default function GuildChat({ fableId, realmId, groupId, character }: Prop
     </Paper>
   )
 }
+

@@ -11,7 +11,7 @@ import IconButton from '@mui/material/IconButton'
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
 import type { AnimationFrameImageSource } from './vfx/animationConfig'
-import type { AnimationFrames } from '../../../../../../services/api'
+import type { AnimationFrames } from '@features/idle-rpg/api'
 import SoundUploadButton from './SoundUploadButton'
 
 const IMAGE_SOURCE_OPTIONS: { value: AnimationFrameImageSource; label: string }[] = [
@@ -347,3 +347,4 @@ export default function AbilityAnimationEditor({ animFrames, onChange, isReactiv
     </Box>
   )
 }
+

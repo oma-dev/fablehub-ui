@@ -20,4 +20,16 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    files: ['src/app/routes/Fables/expressions/IdleRPG/**/*.{ts,tsx}', 'src/app/routes/Fables/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['**/services/api'],
+          paths: [{ name: '../../services/api' }, { name: '../../../services/api' }],
+        },
+      ],
+    },
+  },
 ])

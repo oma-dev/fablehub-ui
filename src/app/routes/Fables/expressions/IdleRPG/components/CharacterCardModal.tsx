@@ -4,7 +4,7 @@ import Dialog from '@mui/material/Dialog'
 import DialogContent from '@mui/material/DialogContent'
 import Typography from '@mui/material/Typography'
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi'
-import type { PlayStateResponse } from '../../../../../../services/api'
+import type { PlayStateResponse } from '@features/idle-rpg/api'
 import CharacterPanel from './CharacterPanel'
 
 interface Props {
@@ -71,3 +71,4 @@ export default function CharacterCardModal({
     </Dialog>
   )
 }
+

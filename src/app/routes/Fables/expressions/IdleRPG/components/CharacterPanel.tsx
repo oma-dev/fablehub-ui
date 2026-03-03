@@ -11,9 +11,9 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import PersonIcon from '@mui/icons-material/Person'
 import ShieldIcon from '@mui/icons-material/Shield'
 import SwordIcon from '@mui/icons-material/SportsMartialArts'
-import type { CharacterState, IdleRpgPackV1, ItemTemplate } from '../../../../../../services/api'
+import type { CharacterState, IdleRpgPackV1, ItemTemplate } from '@features/idle-rpg/api'
 import charBackground from '../../../../../../assets/backgrounds/charBackground.png'
-import { allocateStat, equipItem } from '../../../../../../services/api'
+import { allocateStat, equipItem } from '@features/idle-rpg/api'
 import { computePlayerCombatStats } from '../utils/combatStats'
 import ItemView from './ItemView'
 
@@ -462,3 +462,4 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
     </Box>
   )
 }
+

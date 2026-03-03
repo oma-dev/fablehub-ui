@@ -2,13 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import LinearProgress from '@mui/material/LinearProgress'
 import Paper from '@mui/material/Paper'
-import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
-import PersonIcon from '@mui/icons-material/Person'
-import type { ActiveStatusEffect, AnimationFrames, CombatEventType, CombatResult, CombatTurnEvent, StatusAnimation } from '../../../../../../services/api'
-import charBackground from '../../../../../../assets/backgrounds/charBackground.png'
+import type { ActiveStatusEffect, AnimationFrames, CombatEventType, CombatResult, CombatTurnEvent, StatusAnimation } from '@features/idle-rpg/api'
+import {
+  ReplayHpBar,
+  ReplayPortrait,
+  ReplayResourceBar,
+  ReplayStatusEffectIcons,
+} from '@features/idle-rpg/replay/ui'
+import { useReplayRuntime } from '@features/idle-rpg/replay/hooks'
+import { groupCombatTurnEvents } from '@features/idle-rpg/replay/runtime'
 import { getAttackAnimationConfig, type AttackAnimationConfig, type AnimationBlockFrame } from './vfx/animationConfig'
 import BlockFrame from './vfx/BlockFrame'
 import DamageNumber from './vfx/DamageNumber'
@@ -89,173 +93,6 @@ const VS_WIDTH = Math.round(70 * SCALE)
 const TURN_FONT_SIZE = Math.round(14 * SCALE)
 const RESULT_FONT_SIZE = `${1.5 * SCALE}rem`
 const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
-
-function Portrait({ url, weaponUrl }: { url?: string | null; weaponUrl?: string | null }) {
-  return (
-    <Box sx={{ position: 'relative', width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, flexShrink: 0 }}>
-      <Box
-        sx={{
-          width: PORTRAIT_SIZE,
-          height: PORTRAIT_SIZE,
-          borderRadius: PORTRAIT_BORDER_RADIUS,
-          overflow: 'hidden',
-          bgcolor: '#14121f',
-          backgroundImage: `url(${charBackground})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          border: `${PORTRAIT_BORDER}px solid rgba(168,85,247,0.35)`,
-          boxShadow: '0 0 36px rgba(168,85,247,0.2), inset 0 0 24px rgba(0,0,0,0.3)',
-        }}
-      >
-        {url ? (
-          <Box
-            component="img"
-            src={url}
-            alt="portrait"
-            sx={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))',
-            }}
-          />
-        ) : (
-          <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
-        )}
-      </Box>
-      {weaponUrl && (
-        <Box
-          component="img"
-          src={weaponUrl}
-          alt="weapon"
-          sx={{
-            position: 'absolute',
-            bottom: WEAPON_OFFSET,
-            right: WEAPON_OFFSET,
-            width: WEAPON_SIZE,
-            height: WEAPON_SIZE,
-            objectFit: 'contain',
-            borderRadius: '50%',
-            border: '2px solid rgba(245,158,11,0.5)',
-            bgcolor: '#14121f',
-            boxShadow: '0 0 12px rgba(245,158,11,0.2)',
-            zIndex: 5,
-          }}
-        />
-      )}
-    </Box>
-  )
-}
-
-function HpBar({ current, max }: { current: number; max: number }) {
-  const pct = Math.max(0, Math.min(100, (current / max) * 100))
-  const grad = pct > 50
-    ? 'linear-gradient(90deg, #4ade80, #22c55e)'
-    : pct > 25
-      ? 'linear-gradient(90deg, #fbbf24, #f59e0b)'
-      : 'linear-gradient(90deg, #f87171, #ef4444)'
-  const glowColor = pct > 50 ? 'rgba(34,197,94,0.3)' : pct > 25 ? 'rgba(251,191,36,0.3)' : 'rgba(239,68,68,0.3)'
-  return (
-    <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE }}>HP</Typography>
-        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE }}>{current} / {max}</Typography>
-      </Box>
-      <LinearProgress
-        variant="determinate"
-        value={pct}
-        sx={{
-          height: HP_BAR_HEIGHT,
-          borderRadius: HP_BAR_RADIUS,
-          bgcolor: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(168,85,247,0.1)',
-          transition: 'none',
-          '& .MuiLinearProgress-bar': {
-            transition: 'transform 0.4s ease-out',
-            borderRadius: HP_BAR_RADIUS,
-            background: grad,
-            boxShadow: `0 0 10px ${glowColor}`,
-          },
-        }}
-      />
-    </Box>
-  )
-}
-
-function ResourceBar({ current, max, name, colorHex }: { current: number; max: number; name: string; colorHex: string }) {
-  const pct = Math.max(0, Math.min(100, (current / max) * 100))
-  const color = colorHex.startsWith('#') ? colorHex : `#${colorHex}`
-  return (
-    <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE, color }}>{name}</Typography>
-        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE }}>{current} / {max}</Typography>
-      </Box>
-      <LinearProgress
-        variant="determinate"
-        value={pct}
-        sx={{
-          height: HP_BAR_HEIGHT,
-          borderRadius: HP_BAR_RADIUS,
-          bgcolor: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          transition: 'none',
-          '& .MuiLinearProgress-bar': {
-            transition: 'transform 0.4s ease-out',
-            borderRadius: HP_BAR_RADIUS,
-            background: `linear-gradient(90deg, ${color}aa, ${color})`,
-            boxShadow: `0 0 10px ${color}55`,
-          },
-        }}
-      />
-    </Box>
-  )
-}
-
-const STATUS_ICON_SIZE = 24
-const STATUS_EFFECT_COLORS: Record<string, string> = {
-  buff: '#64b5f6',
-  debuff: '#ef5350',
-}
-
-function StatusEffectIcons({ effects }: { effects: ActiveStatusEffect[] }) {
-  if (effects.length === 0) return null
-  return (
-    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap', mt: 0.5 }}>
-      {effects.map((eff) => (
-        <Tooltip key={eff.id} title={`${eff.name}${eff.description ? `: ${eff.description}` : ''} (${eff.remainingTurns} turns, ${eff.stacks ?? 1}/${eff.maxStacks ?? 1} stacks)`}>
-          {eff.iconUrl ? (
-            <Box
-              component="img"
-              src={eff.iconUrl}
-              alt={eff.name}
-              sx={{ width: STATUS_ICON_SIZE, height: STATUS_ICON_SIZE, borderRadius: '4px', border: `1px solid ${STATUS_EFFECT_COLORS[eff.category ?? 'debuff'] ?? '#666'}` }}
-            />
-          ) : (
-            <Box sx={{
-              width: STATUS_ICON_SIZE,
-              height: STATUS_ICON_SIZE,
-              borderRadius: '4px',
-              bgcolor: STATUS_EFFECT_COLORS[eff.category ?? 'debuff'] ?? '#666',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 10,
-              fontWeight: 700,
-              color: '#fff',
-              border: '1px solid rgba(255,255,255,0.2)',
-            }}>
-              {eff.name.charAt(0).toUpperCase()}
-            </Box>
-          )}
-        </Tooltip>
-      ))}
-    </Box>
-  )
-}
 
 function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'right') {
   const sign = direction === 'left' ? 1 : -1
@@ -413,8 +250,6 @@ export default function CombatReplay({
   const [creatureResourceCurrent, setCreatureResourceCurrent] = useState<number | null>(
     creature.resource ? (creature.resource.isGenerative ? 0 : creature.resource.max) : null
   )
-  const [done, setDone] = useState(false)
-  const [currentTurn, setCurrentTurn] = useState(-1)
   const abortRef = useRef(false)
   const arenaRef = useRef<HTMLDivElement>(null)
   const playerPortraitRef = useRef<HTMLDivElement>(null)
@@ -911,6 +746,62 @@ export default function CombatReplay({
     }
   }, [playerId, triggerStatusBurstForEvent])
 
+  const playTurn = useCallback(async (turn: CombatResult['turns'][number]) => {
+    const groups = groupCombatTurnEvents(turn.events)
+
+    for (const group of groups) {
+      if (abortRef.current) return
+      if (group.kind === 'ambient') {
+        await animateAmbientEvents(group.events)
+        continue
+      }
+      if (group.events.every((event) => event.type === 'resource_change')) continue
+      const sourceEvent = group.events.find((event) => event.type !== 'resource_change') ?? group.events[0]
+      const attackerSide = sourceEvent.sourceId === playerId ? 'player' : 'creature'
+      const groupAbilityId = group.events.find((event) => !!event.abilityId)?.abilityId
+      const overrideFrames = groupAbilityId && abilityAnimations?.[groupAbilityId]
+      const baseAnimation = attackerSide === 'player' ? playerAnim : creatureAnim
+      const animationConfig = overrideFrames
+        ? getAttackAnimationConfig(undefined, overrideFrames)
+        : baseAnimation
+      await animateAttack(attackerSide, group.events, animationConfig)
+    }
+
+    if (turn.activeStatusEffects) {
+      const nextPlayer = turn.activeStatusEffects[playerId] ?? []
+      const nextCreature = turn.activeStatusEffects[creatureId] ?? []
+      setPlayerStatusEffects(nextPlayer)
+      setCreatureStatusEffects(nextCreature)
+      syncLoopStatusParticles(nextPlayer, nextCreature)
+    }
+    if (turn.resources) {
+      if (turn.resources[playerId]) setPlayerResourceCurrent(turn.resources[playerId].current)
+      if (turn.resources[creatureId]) setCreatureResourceCurrent(turn.resources[creatureId].current)
+    }
+  }, [
+    abilityAnimations,
+    animateAmbientEvents,
+    animateAttack,
+    creatureAnim,
+    creatureId,
+    playerAnim,
+    playerId,
+    syncLoopStatusParticles,
+  ])
+
+  const {
+    currentTurn,
+    isFinished: done,
+    stop: stopPlayback,
+    finishAtTurn,
+  } = useReplayRuntime({
+    turns: combat.turns,
+    onPlayTurn: playTurn,
+    abortRef,
+    startDelayMs: 600,
+    betweenTurnsDelayMs: 300,
+  })
+
   useEffect(() => {
     if (introPlayedRef.current) return
     introPlayedRef.current = true
@@ -944,85 +835,8 @@ export default function CombatReplay({
     }
   }, [bossBattleMusicUrl, done])
 
-  useEffect(() => {
-    if (combat.turns.length === 0) {
-      setDone(true)
-      return
-    }
-    abortRef.current = false
-
-    const playTurns = async () => {
-      await sleep(600)
-      for (let i = 0; i < combat.turns.length; i++) {
-        if (abortRef.current) return
-        const turn = combat.turns[i]
-        setCurrentTurn(turn.turnIndex)
-
-        // Prefer castId grouping (new schema). Fall back to legacy sourceId+abilityId grouping when castId is absent.
-        const groups: Array<{ kind: 'cast' | 'ambient'; key?: string; events: CombatTurnEvent[] }> = []
-        for (const ev of turn.events) {
-          const prev = groups[groups.length - 1]
-          const key =
-            ev.castId
-              ? `cast:${ev.castId}`
-              : ev.type === 'block' && prev?.kind === 'cast'
-                ? prev.key
-                : ev.abilityId
-                  ? `legacy:${ev.sourceId}:${ev.abilityId}`
-                  : undefined
-
-          if (!key) {
-            groups.push({ kind: 'ambient', events: [ev] })
-            continue
-          }
-
-          if (prev?.kind === 'cast' && prev.key === key) {
-            prev.events.push(ev)
-          } else {
-            groups.push({ kind: 'cast', key, events: [ev] })
-          }
-        }
-        for (const group of groups) {
-          if (abortRef.current) return
-          if (group.kind === 'ambient') {
-            await animateAmbientEvents(group.events)
-            continue
-          }
-          if (group.events.every(ev => ev.type === 'resource_change')) continue
-          const sourceEvent = group.events.find(ev => ev.type !== 'resource_change') ?? group.events[0]
-          const attackerSide = sourceEvent.sourceId === playerId ? 'player' : 'creature'
-          const groupAbilityId = group.events.find(ev => !!ev.abilityId)?.abilityId
-          const overrideFrames = groupAbilityId && abilityAnimations?.[groupAbilityId]
-          const baseAnim = attackerSide === 'player' ? playerAnim : creatureAnim
-          const anim = overrideFrames
-            ? getAttackAnimationConfig(undefined, overrideFrames)
-            : baseAnim
-          await animateAttack(attackerSide, group.events, anim)
-        }
-        // Update status effects and resources after each turn.
-        if (turn.activeStatusEffects) {
-          const nextPlayer = turn.activeStatusEffects[playerId] ?? []
-          const nextCreature = turn.activeStatusEffects[creatureId] ?? []
-          setPlayerStatusEffects(nextPlayer)
-          setCreatureStatusEffects(nextCreature)
-          syncLoopStatusParticles(nextPlayer, nextCreature)
-        }
-        if (turn.resources) {
-          if (turn.resources[playerId]) setPlayerResourceCurrent(turn.resources[playerId].current)
-          if (turn.resources[creatureId]) setCreatureResourceCurrent(turn.resources[creatureId].current)
-        }
-        if (!abortRef.current) await sleep(300)
-      }
-      if (!abortRef.current) setDone(true)
-    }
-
-    playTurns()
-    return () => { abortRef.current = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   const handleSkip = () => {
-    abortRef.current = true
+    stopPlayback()
     if (bossBgmRef.current) {
       bossBgmRef.current.pause()
       bossBgmRef.current.src = ''
@@ -1059,8 +873,7 @@ export default function CombatReplay({
       if (lastTurn.resources[playerId]) setPlayerResourceCurrent(lastTurn.resources[playerId].current)
       if (lastTurn.resources[creatureId]) setCreatureResourceCurrent(lastTurn.resources[creatureId].current)
     }
-    setCurrentTurn(lastTurn?.turnIndex ?? 0)
-    setDone(true)
+    finishAtTurn(lastTurn?.turnIndex ?? 0)
   }
 
   return (
@@ -1132,7 +945,16 @@ export default function CombatReplay({
             }}
           >
             <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
-              <Portrait url={player.portraitUrl} weaponUrl={player.weaponUrl} />
+              <ReplayPortrait
+                url={player.portraitUrl}
+                weaponUrl={player.weaponUrl}
+                sizePx={PORTRAIT_SIZE}
+                personIconSizePx={PERSON_ICON_SIZE}
+                borderRadius={PORTRAIT_BORDER_RADIUS}
+                borderWidth={PORTRAIT_BORDER}
+                weaponSizePx={WEAPON_SIZE}
+                weaponOffsetPx={WEAPON_OFFSET}
+              />
               {activeStatusLoopParticles.filter(p => p.side === 'player').map(p => (
                 <StatusParticleEffect
                   key={p.key}
@@ -1198,11 +1020,19 @@ export default function CombatReplay({
               <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: NAME_FONT_SIZE }}>{player.name}</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {player.level}</Typography>
             </Box>
-            <HpBar current={playerHp} max={player.maxHp} />
+            <ReplayHpBar current={playerHp} max={player.maxHp} label="HP" fontSizePx={HP_FONT_SIZE} heightPx={HP_BAR_HEIGHT} radius={HP_BAR_RADIUS} />
             {player.resource && playerResourceCurrent !== null && (
-              <ResourceBar current={playerResourceCurrent} max={player.resource.max} name={player.resource.name} colorHex={player.resource.colorHex} />
+              <ReplayResourceBar
+                current={playerResourceCurrent}
+                max={player.resource.max}
+                label={player.resource.name}
+                colorHex={player.resource.colorHex}
+                fontSizePx={HP_FONT_SIZE}
+                heightPx={HP_BAR_HEIGHT}
+                radius={HP_BAR_RADIUS}
+              />
             )}
-            <StatusEffectIcons effects={playerStatusEffects} />
+            <ReplayStatusEffectIcons effects={playerStatusEffects} />
             <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
               {STAT_LABELS.map(({ key, label }) => (
                 <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
@@ -1253,7 +1083,16 @@ export default function CombatReplay({
             }}
           >
             <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
-              <Portrait url={creature.portraitUrl} weaponUrl={creature.weaponUrl} />
+              <ReplayPortrait
+                url={creature.portraitUrl}
+                weaponUrl={creature.weaponUrl}
+                sizePx={PORTRAIT_SIZE}
+                personIconSizePx={PERSON_ICON_SIZE}
+                borderRadius={PORTRAIT_BORDER_RADIUS}
+                borderWidth={PORTRAIT_BORDER}
+                weaponSizePx={WEAPON_SIZE}
+                weaponOffsetPx={WEAPON_OFFSET}
+              />
               {activeStatusLoopParticles.filter(p => p.side === 'creature').map(p => (
                 <StatusParticleEffect
                   key={p.key}
@@ -1319,11 +1158,19 @@ export default function CombatReplay({
               <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: NAME_FONT_SIZE }}>{creature.name}</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {creature.level}</Typography>
             </Box>
-            <HpBar current={creatureHp} max={creature.maxHp} />
+            <ReplayHpBar current={creatureHp} max={creature.maxHp} label="HP" fontSizePx={HP_FONT_SIZE} heightPx={HP_BAR_HEIGHT} radius={HP_BAR_RADIUS} />
             {creature.resource && creatureResourceCurrent !== null && (
-              <ResourceBar current={creatureResourceCurrent} max={creature.resource.max} name={creature.resource.name} colorHex={creature.resource.colorHex} />
+              <ReplayResourceBar
+                current={creatureResourceCurrent}
+                max={creature.resource.max}
+                label={creature.resource.name}
+                colorHex={creature.resource.colorHex}
+                fontSizePx={HP_FONT_SIZE}
+                heightPx={HP_BAR_HEIGHT}
+                radius={HP_BAR_RADIUS}
+              />
             )}
-            <StatusEffectIcons effects={creatureStatusEffects} />
+            <ReplayStatusEffectIcons effects={creatureStatusEffects} />
             <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
               {STAT_LABELS.map(({ key, label }) => (
                 <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
@@ -1385,3 +1232,4 @@ export default function CombatReplay({
     </Box>
   )
 }
+

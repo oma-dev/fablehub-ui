@@ -12,15 +12,15 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi'
 import PersonIcon from '@mui/icons-material/Person'
-import { getDungeons, fightDungeonBoss } from '../../../../../../services/api'
+import { getDungeons, fightDungeonBoss } from '@features/idle-rpg/api'
 import type {
   CharacterState,
   CombatResult,
   DungeonWithBoss,
   IdleRpgPackV1,
   ItemTemplate,
-} from '../../../../../../services/api'
-import { RARITY_NAMES } from '../../../../../../services/api'
+} from '@features/idle-rpg/api'
+import { RARITY_NAMES } from '@features/idle-rpg/api'
 import CombatReplay from '../components/CombatReplay'
 import { resolveAnimationFrames } from '../components/vfx/animationConfig'
 import { computePlayerCombatStats, resolveCharacterResource, resolveCreatureResource } from '../utils/combatStats'
@@ -538,3 +538,4 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
     </Box>
   )
 }
+

@@ -2,13 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import LinearProgress from '@mui/material/LinearProgress'
 import Paper from '@mui/material/Paper'
-import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
-import PersonIcon from '@mui/icons-material/Person'
-import type { ActiveStatusEffect, CombatEventType, CombatResult, CombatTurnEvent, IdleRpgGroup, IdleRpgPackV1, RaidReplayPayload, StatusAnimationParticle } from '../../../../../../services/api'
-import type { IdleRpgGroupMember } from '../../../../../../services/api'
+import type { ActiveStatusEffect, CombatEventType, CombatResult, CombatTurnEvent, IdleRpgGroup, IdleRpgPackV1, RaidReplayPayload, StatusAnimationParticle } from '@features/idle-rpg/api'
+import type { IdleRpgGroupMember } from '@features/idle-rpg/api'
+import {
+  ReplayHpBar,
+  ReplayPortrait,
+  ReplayResourceBar,
+  ReplayStatusEffectIcons,
+} from '@features/idle-rpg/replay/ui'
+import { useReplayRuntime } from '@features/idle-rpg/replay/hooks'
+import { groupCombatTurnEvents } from '@features/idle-rpg/replay/runtime'
 import { getAttackAnimationConfig, type AttackAnimationConfig, type AnimationBlockFrame } from './vfx/animationConfig'
 import BlockFrame from './vfx/BlockFrame'
 import DamageNumber from './vfx/DamageNumber'
@@ -18,7 +23,6 @@ import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from './vfx/Projecti
 import StatusParticleEffect from './vfx/StatusParticleEffect'
 import WeaponFrame from './vfx/WeaponFrame'
 
-import charBackground from '../../../../../../assets/backgrounds/charBackground.png'
 import dungeonBg from '../../../../../../assets/backgrounds/dungeon.png'
 
 // Match CombatReplay layout and styling (same scale, card design, HpBar, Portrait)
@@ -41,11 +45,6 @@ const VS_WIDTH = Math.round(70 * SCALE)
 const TURN_FONT_SIZE = Math.round(14 * SCALE)
 const RESULT_FONT_SIZE = `${1.5 * SCALE}rem`
 const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
-const STATUS_ICON_SIZE = 24
-const STATUS_EFFECT_COLORS: Record<string, string> = {
-  buff: '#64b5f6',
-  debuff: '#ef5350',
-}
 const DAMAGE_NUMBER_EVENT_TYPES = new Set<CombatEventType>(['damage', 'heal', 'dot_tick', 'hot_tick', 'execute'])
 const STATUS_BURST_EVENT_TYPES = new Set<CombatEventType>(['status_applied', 'dot_tick', 'hot_tick'])
 
@@ -81,42 +80,6 @@ interface ActiveStatusParticleEntry {
   loop: boolean
 }
 
-function StatusEffectIcons({ effects }: { effects: ActiveStatusEffect[] }) {
-  if (effects.length === 0) return null
-  return (
-    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap', mt: 0.5 }}>
-      {effects.map((eff) => (
-        <Tooltip key={eff.id} title={`${eff.name}${eff.description ? `: ${eff.description}` : ''} (${eff.remainingTurns} turns, ${eff.stacks ?? 1}/${eff.maxStacks ?? 1} stacks)`}>
-          {eff.iconUrl ? (
-            <Box
-              component="img"
-              src={eff.iconUrl}
-              alt={eff.name}
-              sx={{ width: STATUS_ICON_SIZE, height: STATUS_ICON_SIZE, borderRadius: '4px', border: `1px solid ${STATUS_EFFECT_COLORS[eff.category ?? 'debuff'] ?? '#666'}` }}
-            />
-          ) : (
-            <Box sx={{
-              width: STATUS_ICON_SIZE,
-              height: STATUS_ICON_SIZE,
-              borderRadius: '4px',
-              bgcolor: STATUS_EFFECT_COLORS[eff.category ?? 'debuff'] ?? '#666',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 10,
-              fontWeight: 700,
-              color: '#fff',
-              border: '1px solid rgba(255,255,255,0.2)',
-            }}>
-              {eff.name.charAt(0).toUpperCase()}
-            </Box>
-          )}
-        </Tooltip>
-      ))}
-    </Box>
-  )
-}
-
 function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'right') {
   const sign = direction === 'left' ? 1 : -1
   return {
@@ -136,117 +99,6 @@ function getBossId(combat: CombatResult, partyOrder: string[]): string | null {
     if (!partySet.has(id)) return id
   }
   return null
-}
-
-function RaidPortrait({ url, size }: { url?: string | null; size: number }) {
-  return (
-    <Box sx={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-      <Box
-        sx={{
-          width: size,
-          height: size,
-          borderRadius: PORTRAIT_BORDER_RADIUS,
-          overflow: 'hidden',
-          bgcolor: '#14121f',
-          backgroundImage: `url(${charBackground})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          border: `${PORTRAIT_BORDER}px solid rgba(168,85,247,0.35)`,
-          boxShadow: '0 0 36px rgba(168,85,247,0.2), inset 0 0 24px rgba(0,0,0,0.3)',
-        }}
-      >
-        {url ? (
-          <Box
-            component="img"
-            src={url}
-            alt="portrait"
-            sx={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 20px rgba(168,85,247,0.3))',
-            }}
-          />
-        ) : (
-          <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
-        )}
-      </Box>
-    </Box>
-  )
-}
-
-function RaidHpBar({ current, max }: { current: number; max: number }) {
-  const pct = Math.max(0, Math.min(100, (current / max) * 100))
-  const grad =
-    pct > 50
-      ? 'linear-gradient(90deg, #4ade80, #22c55e)'
-      : pct > 25
-        ? 'linear-gradient(90deg, #fbbf24, #f59e0b)'
-        : 'linear-gradient(90deg, #f87171, #ef4444)'
-  const glowColor =
-    pct > 50 ? 'rgba(34,197,94,0.3)' : pct > 25 ? 'rgba(251,191,36,0.3)' : 'rgba(239,68,68,0.3)'
-  return (
-    <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE }}>
-          HP
-        </Typography>
-        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE }}>
-          {current} / {max}
-        </Typography>
-      </Box>
-      <LinearProgress
-        variant="determinate"
-        value={pct}
-        sx={{
-          height: HP_BAR_HEIGHT,
-          borderRadius: HP_BAR_RADIUS,
-          bgcolor: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(168,85,247,0.1)',
-          transition: 'none',
-          '& .MuiLinearProgress-bar': {
-            transition: 'transform 0.4s ease-out',
-            borderRadius: HP_BAR_RADIUS,
-            background: grad,
-            boxShadow: `0 0 10px ${glowColor}`,
-          },
-        }}
-      />
-    </Box>
-  )
-}
-
-function RaidResourceBar({ current, max, name, colorHex }: { current: number; max: number; name: string; colorHex: string }) {
-  const pct = Math.max(0, Math.min(100, (current / max) * 100))
-  const color = colorHex.startsWith('#') ? colorHex : `#${colorHex}`
-  return (
-    <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE, color }}>{name}</Typography>
-        <Typography variant="caption" fontWeight={700} sx={{ fontSize: HP_FONT_SIZE }}>{current} / {max}</Typography>
-      </Box>
-      <LinearProgress
-        variant="determinate"
-        value={pct}
-        sx={{
-          height: HP_BAR_HEIGHT,
-          borderRadius: HP_BAR_RADIUS,
-          bgcolor: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          transition: 'none',
-          '& .MuiLinearProgress-bar': {
-            transition: 'transform 0.4s ease-out',
-            borderRadius: HP_BAR_RADIUS,
-            background: `linear-gradient(90deg, ${color}aa, ${color})`,
-            boxShadow: `0 0 10px ${color}55`,
-          },
-        }}
-      />
-    </Box>
-  )
 }
 
 interface Props {
@@ -277,8 +129,6 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     if (bossId != null) hp[bossId] = bossMaxHp
     return hp
   })
-  const [currentTurn, setCurrentTurn] = useState(-1)
-  const [finished, setFinished] = useState(false)
   const [partyVariant, setPartyVariant] = useState('idle')
   const [bossVariant, setBossVariant] = useState('idle')
   const [showPartyImpact, setShowPartyImpact] = useState(false)
@@ -375,47 +225,6 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     member
       ? (member.portraitUrl?.trim() || (pack.classes?.find((c) => c.id === member.classId)?.iconUrl ?? null)) ?? null
       : null
-
-  useEffect(() => {
-    if (bossBgmRef.current) {
-      bossBgmRef.current.pause()
-      bossBgmRef.current.src = ''
-      bossBgmRef.current = null
-    }
-    const bgmUrl = boss?.bossBattleMusicUrl?.trim()
-    if (!bgmUrl || finished) return
-    const audio = new Audio(bgmUrl)
-    audio.loop = true
-    audio.volume = 0.35
-    bossBgmRef.current = audio
-    audio.play().catch(() => undefined)
-    return () => {
-      audio.pause()
-      audio.src = ''
-      if (bossBgmRef.current === audio) bossBgmRef.current = null
-    }
-  }, [boss?.bossBattleMusicUrl, finished])
-
-  useEffect(() => {
-    if (finished || !boss || bossIntroPlayedRef.current) return
-    const introUrl = boss.introSoundUrl?.trim()
-    if (!introUrl) {
-      bossIntroPlayedRef.current = true
-      return
-    }
-    bossIntroPlayedRef.current = true
-    playOneShotAudio(introUrl)
-  }, [boss, finished])
-
-  useEffect(() => {
-    if (finished) return
-    const currentFrontId = frontPartyId ?? null
-    if (!currentFrontId || currentFrontId === lastFrontPartyIdRef.current) return
-    lastFrontPartyIdRef.current = currentFrontId
-    const member = getMember(currentFrontId)
-    const introUrl = pack.classes?.find((c) => c.id === member?.classId)?.introSoundUrl?.trim()
-    if (introUrl) playOneShotAudio(introUrl)
-  }, [finished, frontPartyId, group?.members, pack.classes])
 
   const getPortraitPos = useCallback((ref: React.RefObject<HTMLDivElement | null>): ProjectilePos => {
     const arena = arenaRef.current
@@ -760,65 +569,84 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     }
   }, [bossId, triggerStatusBurstForEvent])
 
+  const playTurn = useCallback(async (turn: CombatResult['turns'][number]) => {
+    const groups = groupCombatTurnEvents(turn.events as CombatTurnEvent[])
+
+    for (const group of groups) {
+      if (abortRef.current) return
+      if (group.kind === 'ambient') {
+        await animateAmbientEvents(group.events)
+        continue
+      }
+      if (group.events.every((event) => event.type === 'resource_change')) continue
+      const sourceEvent = group.events.find((event) => event.type !== 'resource_change') ?? group.events[0]
+      const attackerSide = partyOrder.includes(sourceEvent.sourceId) ? 'party' : 'boss'
+      const abilityId = group.events.find((event) => !!event.abilityId)?.abilityId
+      const animationConfig = resolveAbilityAnim(abilityId)
+      await animateAttack(attackerSide, group.events, animationConfig)
+    }
+
+    if (turn.activeStatusEffects) {
+      setStatusEffectsById(turn.activeStatusEffects)
+    }
+  }, [animateAmbientEvents, animateAttack, partyOrder, resolveAbilityAnim])
+
+  const {
+    currentTurn,
+    isFinished: finished,
+    stop: stopPlayback,
+    finishAtTurn,
+  } = useReplayRuntime({
+    turns: combat.turns,
+    onPlayTurn: playTurn,
+    abortRef,
+    startDelayMs: 600,
+    betweenTurnsDelayMs: 300,
+  })
+
   useEffect(() => {
-    if (totalTurns === 0) {
-      setFinished(true)
+    if (bossBgmRef.current) {
+      bossBgmRef.current.pause()
+      bossBgmRef.current.src = ''
+      bossBgmRef.current = null
+    }
+    const bgmUrl = boss?.bossBattleMusicUrl?.trim()
+    if (!bgmUrl || finished) return
+    const audio = new Audio(bgmUrl)
+    audio.loop = true
+    audio.volume = 0.35
+    bossBgmRef.current = audio
+    audio.play().catch(() => undefined)
+    return () => {
+      audio.pause()
+      audio.src = ''
+      if (bossBgmRef.current === audio) bossBgmRef.current = null
+    }
+  }, [boss?.bossBattleMusicUrl, finished])
+
+  useEffect(() => {
+    if (finished || !boss || bossIntroPlayedRef.current) return
+    const introUrl = boss.introSoundUrl?.trim()
+    if (!introUrl) {
+      bossIntroPlayedRef.current = true
       return
     }
-    abortRef.current = false
-    const playTurns = async () => {
-      await sleep(600)
-      for (let i = 0; i < combat.turns.length; i++) {
-        if (abortRef.current) return
-        const turn = combat.turns[i]
-        setCurrentTurn(turn.turnIndex ?? i)
-        const groups: Array<{ kind: 'cast' | 'ambient'; key?: string; events: CombatTurnEvent[] }> = []
-        for (const ev of turn.events as CombatTurnEvent[]) {
-          const prev = groups[groups.length - 1]
-          const key =
-            ev.castId
-              ? `cast:${ev.castId}`
-              : ev.type === 'block' && prev?.kind === 'cast'
-                ? prev.key
-                : ev.abilityId
-                  ? `legacy:${ev.sourceId}:${ev.abilityId}`
-                  : undefined
-          if (!key) {
-            groups.push({ kind: 'ambient', events: [ev] })
-            continue
-          }
-          if (prev?.kind === 'cast' && prev.key === key) {
-            prev.events.push(ev)
-          } else {
-            groups.push({ kind: 'cast', key, events: [ev] })
-          }
-        }
-        for (const grp of groups) {
-          if (abortRef.current) return
-          if (grp.kind === 'ambient') {
-            await animateAmbientEvents(grp.events)
-            continue
-          }
-          if (grp.events.every(ev => ev.type === 'resource_change')) continue
-          const sourceEvent = grp.events.find(ev => ev.type !== 'resource_change') ?? grp.events[0]
-          const attackerSide = partyOrder.includes(sourceEvent.sourceId) ? 'party' : 'boss'
-          const animAbilityId = grp.events.find(ev => !!ev.abilityId)?.abilityId
-          const anim = resolveAbilityAnim(animAbilityId)
-          await animateAttack(attackerSide, grp.events, anim)
-        }
-        if (turn.activeStatusEffects) setStatusEffectsById(turn.activeStatusEffects)
-        if (!abortRef.current) await sleep(300)
-      }
-      if (!abortRef.current) setFinished(true)
-    }
-    playTurns()
-    return () => {
-      abortRef.current = true
-    }
-  }, [combat.turns, totalTurns, partyOrder, animateAmbientEvents, animateAttack, resolveAbilityAnim])
+    bossIntroPlayedRef.current = true
+    playOneShotAudio(introUrl)
+  }, [boss, finished])
+
+  useEffect(() => {
+    if (finished) return
+    const currentFrontId = frontPartyId ?? null
+    if (!currentFrontId || currentFrontId === lastFrontPartyIdRef.current) return
+    lastFrontPartyIdRef.current = currentFrontId
+    const member = getMember(currentFrontId)
+    const introUrl = pack.classes?.find((c) => c.id === member?.classId)?.introSoundUrl?.trim()
+    if (introUrl) playOneShotAudio(introUrl)
+  }, [finished, frontPartyId, group?.members, pack.classes])
 
   const handleSkip = () => {
-    abortRef.current = true
+    stopPlayback()
     if (bossBgmRef.current) {
       bossBgmRef.current.pause()
       bossBgmRef.current.src = ''
@@ -852,8 +680,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     const lastTurn = combat.turns?.[combat.turns.length - 1]
     setStatusEffectsById(lastTurn?.activeStatusEffects ?? {})
     setCombatantHp(hp)
-    setCurrentTurn(combat.turns?.length ? combat.turns.length - 1 : 0)
-    setFinished(true)
+    finishAtTurn(lastTurn?.turnIndex ?? (combat.turns?.length ? combat.turns.length - 1 : 0))
   }
 
   const handleDone = () => {
@@ -965,7 +792,13 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                 const paperContent = (
                   <>
                     <Box ref={isFront ? partyPortraitRef : undefined} sx={{ position: 'relative' }}>
-                      <RaidPortrait url={getMemberPortrait(member)} size={portraitSize} />
+                      <ReplayPortrait
+                        url={getMemberPortrait(member)}
+                        sizePx={portraitSize}
+                        personIconSizePx={PERSON_ICON_SIZE}
+                        borderRadius={PORTRAIT_BORDER_RADIUS}
+                        borderWidth={PORTRAIT_BORDER}
+                      />
                       {isFront && (
                         <>
                           {loopStatusParticles.filter(p => p.side === 'party').map((p, idx) => (
@@ -1039,15 +872,25 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                         Level {member?.level ?? '?'}
                       </Typography>
                     </Box>
-                    <RaidHpBar current={hp} max={maxHp} />
+                    <ReplayHpBar current={hp} max={maxHp} label="HP" fontSizePx={HP_FONT_SIZE} heightPx={HP_BAR_HEIGHT} radius={HP_BAR_RADIUS} />
                     {(() => {
                       const memberCls = pack.classes?.find((c) => c.id === member?.classId)
                       const resDef = memberCls?.resourceId ? (pack.resources ?? []).find((r) => r.id === memberCls.resourceId) : null
                       if (!resDef) return null
                       const resCurrent = resDef.isGenerative ? 0 : resDef.max
-                      return <RaidResourceBar current={resCurrent} max={resDef.max} name={resDef.name} colorHex={resDef.colorHex} />
+                      return (
+                        <ReplayResourceBar
+                          current={resCurrent}
+                          max={resDef.max}
+                          label={resDef.name}
+                          colorHex={resDef.colorHex}
+                          fontSizePx={HP_FONT_SIZE}
+                          heightPx={HP_BAR_HEIGHT}
+                          radius={HP_BAR_RADIUS}
+                        />
+                      )
                     })()}
-                    <StatusEffectIcons effects={statusEffectsById[id] ?? []} />
+                    <ReplayStatusEffectIcons effects={statusEffectsById[id] ?? []} />
                     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                       {STAT_LABELS.map(({ key, label }) => (
                         <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
@@ -1157,7 +1000,13 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                 }}
               >
                 <Box ref={bossPortraitRef} sx={{ position: 'relative' }}>
-                  <RaidPortrait url={boss.iconUrl ?? undefined} size={PORTRAIT_SIZE} />
+                  <ReplayPortrait
+                    url={boss.iconUrl ?? undefined}
+                    sizePx={PORTRAIT_SIZE}
+                    personIconSizePx={PERSON_ICON_SIZE}
+                    borderRadius={PORTRAIT_BORDER_RADIUS}
+                    borderWidth={PORTRAIT_BORDER}
+                  />
                   {loopStatusParticles.filter(p => p.side === 'boss').map((p, idx) => (
                     <StatusParticleEffect
                       key={`boss-loop-${idx}-${p.url}`}
@@ -1227,14 +1076,24 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                     Level {boss.level}
                   </Typography>
                 </Box>
-                <RaidHpBar current={currentHp[bossId] ?? 0} max={bossMaxHp} />
+                <ReplayHpBar current={currentHp[bossId] ?? 0} max={bossMaxHp} label="HP" fontSizePx={HP_FONT_SIZE} heightPx={HP_BAR_HEIGHT} radius={HP_BAR_RADIUS} />
                 {(() => {
                   const bossResDef = boss.resourceId ? (pack.resources ?? []).find((r) => r.id === boss.resourceId) : null
                   if (!bossResDef) return null
                   const resCurrent = bossResDef.isGenerative ? 0 : bossResDef.max
-                  return <RaidResourceBar current={resCurrent} max={bossResDef.max} name={bossResDef.name} colorHex={bossResDef.colorHex} />
+                  return (
+                    <ReplayResourceBar
+                      current={resCurrent}
+                      max={bossResDef.max}
+                      label={bossResDef.name}
+                      colorHex={bossResDef.colorHex}
+                      fontSizePx={HP_FONT_SIZE}
+                      heightPx={HP_BAR_HEIGHT}
+                      radius={HP_BAR_RADIUS}
+                    />
+                  )
                 })()}
-                <StatusEffectIcons effects={bossStatusEffects} />
+                <ReplayStatusEffectIcons effects={bossStatusEffects} />
                 <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                   {STAT_LABELS.map(({ key, label }) => (
                     <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
@@ -1296,3 +1155,4 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     </Box>
   )
 }
+

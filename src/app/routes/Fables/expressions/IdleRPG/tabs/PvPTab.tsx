@@ -15,7 +15,7 @@ import {
   getRealmCharacterPlayState,
   getPvpHistory,
   pvpFight,
-} from '../../../../../../services/api'
+} from '@features/idle-rpg/api'
 import type {
   CharacterState,
   CombatResult,
@@ -23,7 +23,7 @@ import type {
   PlayStateResponse,
   PvpHistoryEntry,
   RealmRosterEntry,
-} from '../../../../../../services/api'
+} from '@features/idle-rpg/api'
 import { computePlayerCombatStats, resolveCharacterResource } from '../utils/combatStats'
 import CharacterCardModal from '../components/CharacterCardModal'
 import CombatReplay from '../components/CombatReplay'
@@ -395,3 +395,4 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
     </Box>
   )
 }
+

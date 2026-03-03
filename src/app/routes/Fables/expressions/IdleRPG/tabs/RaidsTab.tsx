@@ -12,14 +12,14 @@ import {
   getGroup,
   prepareRaidCall,
   markRaidReplayViewed,
-} from '../../../../../../services/api'
+} from '@features/idle-rpg/api'
 import type {
   CharacterState,
   IdleRpgGroup,
   IdleRpgPackV1,
   RaidReplayPayload,
   RaidWithBoss,
-} from '../../../../../../services/api'
+} from '@features/idle-rpg/api'
 import RaidReplayView from '../components/RaidReplayView'
 
 interface Props {
@@ -217,3 +217,4 @@ export default function RaidsTab({ fableId, realmId, character, pack, groupId, o
     </Box>
   )
 }
+

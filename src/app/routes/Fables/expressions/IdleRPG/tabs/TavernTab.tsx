@@ -16,8 +16,8 @@ import Typography from '@mui/material/Typography'
 import CombatReplay from '../components/CombatReplay'
 import { resolveAnimationFrames } from '../components/vfx/animationConfig'
 import { computePlayerCombatStats, resolveCharacterResource, resolveCreatureResource } from '../utils/combatStats'
-import { startQuest, claimQuest } from '../../../../../../services/api'
-import type { CharacterState, CombatResult, IdleRpgPackV1, Quest } from '../../../../../../services/api'
+import { startQuest, claimQuest } from '@features/idle-rpg/api'
+import type { CharacterState, CombatResult, IdleRpgPackV1, Quest } from '@features/idle-rpg/api'
 
 interface Props {
   fableId: string
@@ -414,3 +414,4 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
     </Box>
   )
 }
+

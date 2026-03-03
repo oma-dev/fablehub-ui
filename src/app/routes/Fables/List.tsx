@@ -8,8 +8,8 @@ import CardContent from '@mui/material/CardContent'
 import CircularProgress from '@mui/material/CircularProgress'
 import Container from '@mui/material/Container'
 import Typography from '@mui/material/Typography'
-import { getFables } from '../../../services/api'
-import type { Fable } from '../../../services/api'
+import { getFables } from '@features/fables/api'
+import type { Fable } from '@features/fables/api'
 
 const Fables = () => {
   const [fables, setFables] = useState<Fable[]>([])

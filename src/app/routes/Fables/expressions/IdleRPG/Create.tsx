@@ -22,7 +22,7 @@ import Select from '@mui/material/Select'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import { createIdleRpgRealm, getFable } from '../../../../../services/api'
+import { createIdleRpgRealm, getFable } from '@features/idle-rpg/api'
 import type {
   Ability,
   ClassBlock,
@@ -40,8 +40,8 @@ import type {
   Quest,
   Raid,
   StatusEffectTemplate,
-} from '../../../../../services/api'
-import { RARITY_NAME_TO_NUMBER, RARITY_NAMES } from '../../../../../services/api'
+} from '@features/idle-rpg/api'
+import { RARITY_NAME_TO_NUMBER, RARITY_NAMES } from '@features/idle-rpg/api'
 import { exampleFormState } from './examplePack'
 import AbilityAnimationEditor, { type AbilityAnimFrames, emptyAnimFrames, hydrateAnimFrames, buildAnimationFrames } from './components/AbilityAnimationEditor'
 import EffectsEditor, { type EffectFormRow, createEmptyEffectRow, hydrateEffectRows, buildEffectPayload } from './components/EffectsEditor'
@@ -1670,3 +1670,4 @@ export default function IdleRpgCreate() {
     </Box>
   )
 }
+

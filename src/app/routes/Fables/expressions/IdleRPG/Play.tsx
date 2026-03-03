@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -38,14 +38,14 @@ import {
   getPlayState,
   createCharacter,
   getRealmRoster,
-} from '../../../../../services/api'
+} from '@features/idle-rpg/api'
 import type {
   CharacterState,
   IdleRpgPackV1,
   IdleRpgRealm,
   PlayStateResponse,
-} from '../../../../../services/api'
-import { RARITY_COLORS as RARITY_COLORS_MAP, RARITY_NAMES } from '../../../../../services/api'
+} from '@features/idle-rpg/api'
+import { RARITY_COLORS as RARITY_COLORS_MAP, RARITY_NAMES } from '@features/idle-rpg/api'
 import TavernTab from './tabs/TavernTab'
 import ShopTab from './tabs/ShopTab'
 import GuildTab from './tabs/GuildTab'
@@ -562,7 +562,7 @@ export default function FableIdleRPG() {
                       {isHero && (
                         <Chip
                           icon={<StarIcon sx={{ color: '#ffc145 !important', fontSize: 16 }} />}
-                          label={isTaken ? 'Hero Class â€” Taken' : 'Hero Class'}
+                          label={isTaken ? 'Hero Class — Taken' : 'Hero Class'}
                           size="small"
                           sx={{
                             mt: 1,
@@ -742,3 +742,4 @@ export default function FableIdleRPG() {
     </Box>
   )
 }
+

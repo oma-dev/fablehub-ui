@@ -8,8 +8,8 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
-import { getGuildMemberPlayState } from '../../../../../../services/api'
-import type { CharacterState, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '../../../../../../services/api'
+import { getGuildMemberPlayState } from '@features/idle-rpg/api'
+import type { CharacterState, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '@features/idle-rpg/api'
 import CharacterCardModal from './CharacterCardModal'
 
 const RANK_NAMES: Record<number, string> = {
@@ -138,3 +138,4 @@ export default function GuildRoster({ fableId, realmId, group, pack, viewerChara
     </>
   )
 }
+

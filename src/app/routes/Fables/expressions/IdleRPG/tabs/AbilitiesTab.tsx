@@ -14,8 +14,8 @@ import LockIcon from '@mui/icons-material/Lock'
 import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import { unlockAbility, equipAbilities } from '../../../../../../services/api'
-import type { CharacterState, IdleRpgPackV1, Ability, Effect } from '../../../../../../services/api'
+import { unlockAbility, equipAbilities } from '@features/idle-rpg/api'
+import type { CharacterState, IdleRpgPackV1, Ability, Effect } from '@features/idle-rpg/api'
 
 interface Props {
   fableId: string
@@ -572,3 +572,4 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
     </Box>
   )
 }
+

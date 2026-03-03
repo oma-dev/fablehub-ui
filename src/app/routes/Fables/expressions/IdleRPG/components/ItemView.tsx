@@ -6,8 +6,8 @@ import Fade from '@mui/material/Fade'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import CategoryIcon from '@mui/icons-material/Category'
-import type { ItemTemplate } from '../../../../../../services/api'
-import { RARITY_NAMES } from '../../../../../../services/api'
+import type { ItemTemplate } from '@features/idle-rpg/api'
+import { RARITY_NAMES } from '@features/idle-rpg/api'
 
 /** Rarity 1=common .. 5=legendary; colors keyed by number */
 const RARITY_COLORS: Record<number, string> = {
@@ -256,3 +256,4 @@ export default function ItemView({
     </>
   )
 }
+

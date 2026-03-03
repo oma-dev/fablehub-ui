@@ -6,8 +6,8 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Container from '@mui/material/Container'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
-import { getFable } from '../../../services/api'
-import type { Fable } from '../../../services/api'
+import { getFable } from '@features/fables/api'
+import type { Fable } from '@features/fables/api'
 
 const FableDetail = () => {
   const { fableId } = useParams<{ fableId: string }>()

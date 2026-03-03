@@ -8,8 +8,8 @@ import DialogTitle from '@mui/material/DialogTitle'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
-import { getGroups, getGroup, getGuildChampion, createGroup, joinGroup, getPlayState } from '../../../../../../services/api'
-import type { CharacterState, GuildChampion, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '../../../../../../services/api'
+import { getGroups, getGroup, getGuildChampion, createGroup, joinGroup, getPlayState } from '@features/idle-rpg/api'
+import type { CharacterState, GuildChampion, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '@features/idle-rpg/api'
 import GuildChat from '../components/GuildChat'
 import GuildRoster from '../components/GuildRoster'
 import GuildManagement from '../components/GuildManagement'
@@ -278,3 +278,4 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
     </Box>
   )
 }
+

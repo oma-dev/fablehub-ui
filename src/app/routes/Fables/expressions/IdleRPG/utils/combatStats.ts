@@ -7,7 +7,7 @@ import type {
   IdleRpgPackV1,
   ItemTemplate,
   ScalingSource,
-} from '../../../../../../services/api'
+} from '@features/idle-rpg/api'
 
 export interface ResourceInfo {
   name: string
@@ -196,3 +196,4 @@ export function resolveCreatureResource(pack: IdleRpgPackV1, resourceId?: string
   if (!res) return null
   return { name: res.name, colorHex: res.colorHex, max: res.max, isGenerative: res.isGenerative }
 }
+

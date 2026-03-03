@@ -5,7 +5,7 @@ import Button from '@mui/material/Button'
 import Container from '@mui/material/Container'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { createFable } from '../../../services/api'
+import { createFable } from '@features/fables/api'
 
 const FableCreate = () => {
   const navigate = useNavigate()

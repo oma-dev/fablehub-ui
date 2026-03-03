@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import type { CombatEventType } from '../../../../../../../services/api'
+import type { CombatEventType } from '@features/idle-rpg/api'
 
 const DAMAGE_SCALE = 3
 const DAMAGE_FONT_SIZE = Math.round(22 * DAMAGE_SCALE)
@@ -78,3 +78,4 @@ export default function DamageNumber({ value, type, id, abilityName }: Props) {
     </AnimatePresence>
   )
 }
+

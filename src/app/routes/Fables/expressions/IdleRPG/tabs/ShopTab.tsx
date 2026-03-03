@@ -7,8 +7,8 @@ import Divider from '@mui/material/Divider'
 import Paper from '@mui/material/Paper'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
-import { buyItem, equipItem } from '../../../../../../services/api'
-import type { CharacterState, IdleRpgPackV1, ItemTemplate } from '../../../../../../services/api'
+import { buyItem, equipItem } from '@features/idle-rpg/api'
+import type { CharacterState, IdleRpgPackV1, ItemTemplate } from '@features/idle-rpg/api'
 import CharacterPanel from '../components/CharacterPanel'
 import ItemView from '../components/ItemView'
 
@@ -326,3 +326,4 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
     </Box>
   )
 }
+

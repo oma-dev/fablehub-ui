@@ -3,8 +3,8 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
-import { getRaidCall, setRaidReady, startRaid } from '../../../../../../services/api'
-import type { CharacterState, IdleRpgGroup, IdleRpgPackV1, RaidCallResponse } from '../../../../../../services/api'
+import { getRaidCall, setRaidReady, startRaid } from '@features/idle-rpg/api'
+import type { CharacterState, IdleRpgGroup, IdleRpgPackV1, RaidCallResponse } from '@features/idle-rpg/api'
 
 const RAID_PREPARE_DURATION_MS = 20 * 1000 // 20 seconds (for testing; was 1 hour)
 
@@ -156,3 +156,4 @@ export default function GuildRaids({ fableId, realmId, groupId, group, character
     </Paper>
   )
 }
+

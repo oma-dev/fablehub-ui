@@ -12,8 +12,8 @@ import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { donateToGuild } from '../../../../../../services/api'
-import type { CharacterState, GuildChampion, IdleRpgGroup, IdleRpgPackV1 } from '../../../../../../services/api'
+import { donateToGuild } from '@features/idle-rpg/api'
+import type { CharacterState, GuildChampion, IdleRpgGroup, IdleRpgPackV1 } from '@features/idle-rpg/api'
 
 interface Props {
   group: IdleRpgGroup
@@ -151,3 +151,4 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     </Box>
   )
 }
+

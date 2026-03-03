@@ -19,7 +19,7 @@ import Select from '@mui/material/Select'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import { getIdleRpgRealm, getFable, updateIdleRpgRealm } from '../../../../../services/api'
+import { getIdleRpgRealm, getFable, updateIdleRpgRealm } from '@features/idle-rpg/api'
 import AbilityAnimationEditor, { type AbilityAnimFrames, emptyAnimFrames, hydrateAnimFrames, buildAnimationFrames } from './components/AbilityAnimationEditor'
 import EffectsEditor, { type EffectFormRow, createEmptyEffectRow, hydrateEffectRows, buildEffectPayload } from './components/EffectsEditor'
 import SoundUploadButton from './components/SoundUploadButton'
@@ -39,11 +39,11 @@ import type {
   MerchantListing,
   Raid,
   StatusEffectTemplate,
-} from '../../../../../services/api'
-import { RARITY_NAMES, RARITY_NAME_TO_NUMBER } from '../../../../../services/api'
+} from '@features/idle-rpg/api'
+import { RARITY_NAMES, RARITY_NAME_TO_NUMBER } from '@features/idle-rpg/api'
 import type {
   Quest,
-} from '../../../../../services/api'
+} from '@features/idle-rpg/api'
 
 // --- Helpers (same as Create) ---
 function parseTags(s: string): string[] {
@@ -1671,3 +1671,4 @@ export default function IdleRpgEdit() {
     </Box>
   )
 }
+

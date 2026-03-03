@@ -10,7 +10,7 @@ import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import type { AnimationFrameImageSource, StatusAnimation } from '../../../../../../services/api'
+import type { AnimationFrameImageSource, StatusAnimation } from '@features/idle-rpg/api'
 import SoundUploadButton from './SoundUploadButton'
 
 const IMAGE_SOURCE_OPTIONS: Array<{ value: AnimationFrameImageSource; label: string }> = [
@@ -205,3 +205,4 @@ export default function StatusAnimationEditor({ particles, onChange }: Props) {
     </Box>
   )
 }
+
