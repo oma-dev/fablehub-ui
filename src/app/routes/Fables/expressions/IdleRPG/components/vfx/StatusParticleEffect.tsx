@@ -9,6 +9,8 @@ interface Props {
   url: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   delayMs?: number
   lifetimeMs?: number
   startSizePx?: number
@@ -27,6 +29,7 @@ export default function StatusParticleEffect({
   id,
   url,
   soundUrl,
+  soundVolumePercent,
   delayMs = 0,
   lifetimeMs = 1000,
   startSizePx,
@@ -40,7 +43,7 @@ export default function StatusParticleEffect({
   rotationEnd,
   loop = false,
 }: Props) {
-  useParticleSound(true, soundUrl, id, delayMs)
+  useParticleSound(true, soundUrl, soundVolumePercent, id, delayMs)
 
   const clampedLifetimeMs = Math.max(100, lifetimeMs)
   const startSize = startSizePx ?? endSizePx ?? DEFAULT_SIZE

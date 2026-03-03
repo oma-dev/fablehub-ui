@@ -11,6 +11,8 @@ export interface AnimationWeaponFrame {
   url?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple weapon frames). */
   delayMs?: number
@@ -48,6 +50,8 @@ export interface AnimationProjectileFrame {
   url?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple projectiles). */
   delayMs?: number
@@ -79,6 +83,8 @@ export interface AnimationImpactFrame {
   url?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple impact frames). */
   delayMs?: number
@@ -118,6 +124,8 @@ export interface AnimationBlockFrame {
   url?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   imageSource?: AnimationFrameImageSource
   delayMs?: number
   showMs?: number

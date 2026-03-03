@@ -8,6 +8,8 @@ interface Props {
   url: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   side: 'player' | 'creature'
   showMs?: number
   vanishMs?: number
@@ -32,6 +34,7 @@ export default function BlockFrame({
   show,
   url,
   soundUrl,
+  soundVolumePercent,
   showMs = 100,
   vanishMs = 500,
   sizePx,
@@ -44,7 +47,7 @@ export default function BlockFrame({
   mirrored = false,
   id,
 }: Props) {
-  useParticleSound(show, soundUrl, id)
+  useParticleSound(show, soundUrl, soundVolumePercent, id)
 
   const totalSec = showMs / 1000 + vanishMs / 1000
   let fadeStart = showMs / 1000 / totalSec

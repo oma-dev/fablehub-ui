@@ -27,6 +27,7 @@ export interface AnimFrameForm {
   imageSource: AnimationFrameImageSource
   url: string
   soundUrl: string
+  soundVolumePercent: string
   delayMs: string
   fadeInMs: string
   lifetimeMs: string
@@ -52,25 +53,25 @@ export interface AbilityAnimFrames {
 }
 
 export const defaultWeaponFrame = (): AnimFrameForm => ({
-  enabled: false, imageSource: 'url', url: '', soundUrl: '', delayMs: '0', fadeInMs: '200', lifetimeMs: '0',
+  enabled: false, imageSource: 'url', url: '', soundUrl: '', soundVolumePercent: '100', delayMs: '0', fadeInMs: '200', lifetimeMs: '0',
   trajectory: 'straight', showMs: '0', vanishMs: '0',
   startSizePx: '80', endSizePx: '120', offsetX: '0', offsetY: '0', endOffsetX: '0', endOffsetY: '0', acceleration: '0', rotationStart: '0', rotationEnd: '0',
 })
 
 export const defaultProjectileFrame = (): AnimFrameForm => ({
-  enabled: false, imageSource: 'url', url: '', soundUrl: '', delayMs: '0', fadeInMs: '0', lifetimeMs: '400',
+  enabled: false, imageSource: 'url', url: '', soundUrl: '', soundVolumePercent: '100', delayMs: '0', fadeInMs: '0', lifetimeMs: '400',
   trajectory: 'arc', showMs: '0', vanishMs: '0',
   startSizePx: '120', endSizePx: '300', offsetX: '0', offsetY: '0', endOffsetX: '0', endOffsetY: '0', acceleration: '0', rotationStart: '0', rotationEnd: '0',
 })
 
 export const defaultImpactFrame = (): AnimFrameForm => ({
-  enabled: false, imageSource: 'url', url: '', soundUrl: '', delayMs: '0', fadeInMs: '0', lifetimeMs: '600',
+  enabled: false, imageSource: 'url', url: '', soundUrl: '', soundVolumePercent: '100', delayMs: '0', fadeInMs: '0', lifetimeMs: '600',
   trajectory: 'straight', showMs: '90', vanishMs: '510',
   startSizePx: '60', endSizePx: '140', offsetX: '0', offsetY: '0', endOffsetX: '0', endOffsetY: '0', acceleration: '0', rotationStart: '0', rotationEnd: '0',
 })
 
 export const defaultBlockFrame = (): AnimFrameForm => ({
-  enabled: false, imageSource: 'url', url: '', soundUrl: '', delayMs: '0', fadeInMs: '0', lifetimeMs: '800',
+  enabled: false, imageSource: 'url', url: '', soundUrl: '', soundVolumePercent: '100', delayMs: '0', fadeInMs: '0', lifetimeMs: '800',
   trajectory: 'straight', showMs: '320', vanishMs: '480',
   startSizePx: '100', endSizePx: '140', offsetX: '0', offsetY: '0', endOffsetX: '0', endOffsetY: '0', acceleration: '0', rotationStart: '0', rotationEnd: '0',
 })
@@ -85,6 +86,7 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
     weapon: (af.weapon ?? []).map(f => ({
       enabled: true, imageSource: (f.imageSource ?? 'url') as AnimationFrameImageSource, url: f.url ?? '',
       soundUrl: f.soundUrl ?? '',
+      soundVolumePercent: String(f.soundVolumePercent ?? 100),
       delayMs: String(f.delayMs ?? 0), fadeInMs: String(f.fadeInMs ?? 200), lifetimeMs: String(f.lifetimeMs ?? 0),
       trajectory: 'straight' as const, showMs: '0', vanishMs: '0',
       startSizePx: String(f.startSizePx ?? f.sizePx ?? 80), endSizePx: String(f.endSizePx ?? f.sizePx ?? 120),
@@ -96,6 +98,7 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
     projectile: (af.projectile ?? []).map(f => ({
       enabled: true, imageSource: (f.imageSource ?? 'url') as AnimationFrameImageSource, url: f.url ?? '',
       soundUrl: f.soundUrl ?? '',
+      soundVolumePercent: String(f.soundVolumePercent ?? 100),
       delayMs: String(f.delayMs ?? 0), fadeInMs: '0', lifetimeMs: String(f.lifetimeMs ?? f.speedMs ?? 400),
       trajectory: (f.trajectory ?? 'arc') as 'straight' | 'arc', showMs: '0', vanishMs: '0',
       startSizePx: String(f.startSizePx ?? f.sizePx ?? 120), endSizePx: String(f.endSizePx ?? f.sizePx ?? 300),
@@ -107,6 +110,7 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
     impact: (af.impact ?? []).map(f => ({
       enabled: true, imageSource: (f.imageSource ?? 'url') as AnimationFrameImageSource, url: f.url ?? '',
       soundUrl: f.soundUrl ?? '',
+      soundVolumePercent: String(f.soundVolumePercent ?? 100),
       delayMs: String(f.delayMs ?? 0), fadeInMs: '0', lifetimeMs: String(f.lifetimeMs ?? 600),
       trajectory: 'straight' as const, showMs: String(f.showMs ?? 90), vanishMs: String(f.vanishMs ?? 510),
       startSizePx: String(f.startSizePx ?? f.sizePx ?? 60), endSizePx: String(f.endSizePx ?? f.sizePx ?? 140),
@@ -118,6 +122,7 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
     block: (af.block ?? []).map(f => ({
       enabled: true, imageSource: (f.imageSource ?? 'url') as AnimationFrameImageSource, url: f.url ?? '',
       soundUrl: f.soundUrl ?? '',
+      soundVolumePercent: String(f.soundVolumePercent ?? 100),
       delayMs: String(f.delayMs ?? 0), fadeInMs: '0', lifetimeMs: String(f.lifetimeMs ?? 800),
       trajectory: 'straight' as const, showMs: String(f.showMs ?? 320), vanishMs: String(f.vanishMs ?? 480),
       startSizePx: String(f.startSizePx ?? f.sizePx ?? 100), endSizePx: String(f.endSizePx ?? f.sizePx ?? 140),
@@ -129,11 +134,18 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
   }
 }
 
+function parseSoundVolumePercent(value: string): number {
+  const parsed = Number(value)
+  if (Number.isNaN(parsed)) return 100
+  return Math.min(100, Math.max(0, parsed))
+}
+
 export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | undefined {
   const weapon = af.weapon.filter(f => f.enabled && f.url.trim()).map(f => ({
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
     ...(f.url.trim() ? { url: f.url.trim() } : {}),
     ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
+    ...(f.soundUrl.trim() ? { soundVolumePercent: parseSoundVolumePercent(f.soundVolumePercent) } : {}),
     ...(Number(f.delayMs) > 0 ? { delayMs: Number(f.delayMs) } : {}),
     ...(Number(f.fadeInMs) !== 200 ? { fadeInMs: Number(f.fadeInMs) } : {}),
     ...(Number(f.lifetimeMs) > 0 ? { lifetimeMs: Number(f.lifetimeMs) } : {}),
@@ -151,6 +163,7 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
     ...(f.url.trim() ? { url: f.url.trim() } : {}),
     ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
+    ...(f.soundUrl.trim() ? { soundVolumePercent: parseSoundVolumePercent(f.soundVolumePercent) } : {}),
     ...(Number(f.delayMs) > 0 ? { delayMs: Number(f.delayMs) } : {}),
     trajectory: f.trajectory,
     ...(Number(f.lifetimeMs) > 0 ? { lifetimeMs: Number(f.lifetimeMs) } : {}),
@@ -166,6 +179,7 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
     ...(f.url.trim() ? { url: f.url.trim() } : {}),
     ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
+    ...(f.soundUrl.trim() ? { soundVolumePercent: parseSoundVolumePercent(f.soundVolumePercent) } : {}),
     ...(Number(f.delayMs) > 0 ? { delayMs: Number(f.delayMs) } : {}),
     ...(Number(f.showMs) > 0 ? { showMs: Number(f.showMs) } : {}),
     ...(Number(f.vanishMs) > 0 ? { vanishMs: Number(f.vanishMs) } : {}),
@@ -184,6 +198,7 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
     ...(f.url.trim() ? { url: f.url.trim() } : {}),
     ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
+    ...(f.soundUrl.trim() ? { soundVolumePercent: parseSoundVolumePercent(f.soundVolumePercent) } : {}),
     ...(Number(f.delayMs) > 0 ? { delayMs: Number(f.delayMs) } : {}),
     ...(Number(f.showMs) > 0 ? { showMs: Number(f.showMs) } : {}),
     ...(Number(f.vanishMs) > 0 ? { vanishMs: Number(f.vanishMs) } : {}),
@@ -262,6 +277,15 @@ function FrameListEditor({ label, frames, phaseType, onChange, defaultFrame }: F
             <TextField size="small" label="Sound URL" value={f.soundUrl} onChange={(e) => update(idx, { soundUrl: e.target.value })} sx={{ flex: 1, minWidth: 160 }} />
             <SoundUploadButton disabled={!f.enabled} onUploaded={(url) => update(idx, { soundUrl: url })} />
           </Box>
+          <TextField
+            size="small"
+            label="Sound %"
+            type="number"
+            value={f.soundVolumePercent}
+            onChange={(e) => update(idx, { soundVolumePercent: e.target.value })}
+            sx={{ width: 90 }}
+            inputProps={{ min: 0, max: 100 }}
+          />
           <TextField size="small" label="Delay (ms)" type="number" value={f.delayMs} onChange={(e) => update(idx, { delayMs: e.target.value })} sx={{ width: 90 }} />
           {phaseType === 'weapon' && (
             <TextField size="small" label="Fade-in (ms)" type="number" value={f.fadeInMs} onChange={(e) => update(idx, { fadeInMs: e.target.value })} sx={{ width: 100 }} />

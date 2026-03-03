@@ -15,6 +15,8 @@ interface Props {
   id: string | number
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   weaponUrl?: string | null
   /** Mirror projectile image horizontally. */
   mirrored?: boolean
@@ -226,6 +228,7 @@ export default function Projectile({
   direction,
   id,
   soundUrl,
+  soundVolumePercent,
   weaponUrl,
   mirrored = false,
   acceleration = 0,
@@ -239,7 +242,7 @@ export default function Projectile({
   from,
   to,
 }: Props) {
-  useParticleSound(show, soundUrl, id)
+  useParticleSound(show, soundUrl, soundVolumePercent, id)
 
   const start = from ?? (direction === 'left-to-right' ? FALLBACK_FROM : FALLBACK_TO)
   const end = to ?? (direction === 'left-to-right' ? FALLBACK_TO : FALLBACK_FROM)

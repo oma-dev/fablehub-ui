@@ -61,6 +61,11 @@ function parseKeyValueNumber(s: string): Record<string, number> {
   })
   return out
 }
+function parseSoundVolumePercent(input: string): number {
+  const value = Number(input)
+  if (Number.isNaN(value)) return 100
+  return Math.min(100, Math.max(0, value))
+}
 function serializeKeyValueNumber(obj: Record<string, number> | undefined): string {
   if (!obj) return ''
   return Object.entries(obj).map(([k, v]) => `${k}:${v}`).join(', ')
@@ -129,7 +134,7 @@ type StatusEffectForm = {
   animationParticles: StatusParticleForm[]
 }
 type ClassForm = {
-  id: string; name: string; description: string; iconUrl: string; introSoundUrl: string; isHeroClass: boolean
+  id: string; name: string; description: string; iconUrl: string; introSoundUrl: string; introSoundVolumePercent: string; isHeroClass: boolean
   primaryAttackAbilityId: string
   attackTags: string; attackRequired: boolean; attackAllowEmpty: boolean
   defenseTags: string; defenseRequired: boolean; defenseAllowEmpty: boolean
@@ -138,7 +143,7 @@ type ClassForm = {
 }
 type CreatureForm = {
   id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string
-  iconUrl: string; introSoundUrl: string; backgroundImageUrl: string; bossBattleMusicUrl: string; tags: string; abilityIds: string; resourceId: string; resourceMax: string
+  iconUrl: string; introSoundUrl: string; introSoundVolumePercent: string; backgroundImageUrl: string; bossBattleMusicUrl: string; bossBattleMusicVolumePercent: string; tags: string; abilityIds: string; resourceId: string; resourceMax: string
   mainStats: MainStatValueForm[]; weaponDamage: string; protectiveArmor: string; derivedStatModifiers: DerivedModifierForm[]
 }
 type ItemForm = {
@@ -172,7 +177,7 @@ const emptyStatusEffect = (): StatusEffectForm => ({
   animationParticles: [createEmptyStatusParticle()],
 })
 const emptyClass = (): ClassForm => ({
-  id: '', name: '', description: '', iconUrl: '', introSoundUrl: '', isHeroClass: false,
+  id: '', name: '', description: '', iconUrl: '', introSoundUrl: '', introSoundVolumePercent: '100', isHeroClass: false,
   primaryAttackAbilityId: '',
   attackTags: '', attackRequired: true, attackAllowEmpty: false,
   defenseTags: '', defenseRequired: false, defenseAllowEmpty: true,
@@ -181,7 +186,7 @@ const emptyClass = (): ClassForm => ({
 })
 const emptyCreature = (): CreatureForm => ({
   id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0',
-  iconUrl: '', introSoundUrl: '', backgroundImageUrl: '', bossBattleMusicUrl: '', tags: '', abilityIds: '', resourceId: '', resourceMax: '',
+  iconUrl: '', introSoundUrl: '', introSoundVolumePercent: '100', backgroundImageUrl: '', bossBattleMusicUrl: '', bossBattleMusicVolumePercent: '100', tags: '', abilityIds: '', resourceId: '', resourceMax: '',
   mainStats: [], weaponDamage: '', protectiveArmor: '', derivedStatModifiers: [],
 })
 const emptyItem = (): ItemForm => ({
@@ -354,6 +359,7 @@ function hydrateClasses(pack: IdleRpgPackV1, allowedMainStatIds: string[], fallb
       description: c.description ?? '',
       iconUrl: c.iconUrl ?? '',
       introSoundUrl: c.introSoundUrl ?? '',
+      introSoundVolumePercent: String((c as any).introSoundVolumePercent ?? 100),
       isHeroClass: c.isHeroClass ?? false,
       primaryAttackAbilityId: c.primaryAttackId ?? '',
       attackTags: c.slots?.attack_source?.allowedTagsAny?.join(', ') ?? '',
@@ -382,8 +388,10 @@ function hydrateCreatures(pack: IdleRpgPackV1, allowedMainStatIds: string[], fal
     arm: String(c.arm),
     iconUrl: c.iconUrl ?? '',
     introSoundUrl: c.introSoundUrl ?? '',
+    introSoundVolumePercent: String((c as any).introSoundVolumePercent ?? 100),
     backgroundImageUrl: c.backgroundImageUrl ?? '',
     bossBattleMusicUrl: c.bossBattleMusicUrl ?? '',
+    bossBattleMusicVolumePercent: String((c as any).bossBattleMusicVolumePercent ?? 100),
     tags: c.tags?.join(', ') ?? '',
     abilityIds: (c as any).abilityIds?.join(', ') ?? '',
     resourceId: (c as any).resourceId ?? '',
@@ -626,6 +634,7 @@ export default function IdleRpgEdit() {
           ...(c.description.trim() ? { description: c.description.trim() } : {}),
           ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
           ...(c.introSoundUrl.trim() ? { introSoundUrl: c.introSoundUrl.trim() } : {}),
+          ...(c.introSoundUrl.trim() ? { introSoundVolumePercent: parseSoundVolumePercent(c.introSoundVolumePercent) } : {}),
           ...(c.isHeroClass ? { isHeroClass: true } : {}),
           primaryAttackId: c.primaryAttackAbilityId.trim() || '',
           slots: {
@@ -675,8 +684,10 @@ export default function IdleRpgEdit() {
           arm: Number(c.arm) || 0,
           ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
           ...(c.introSoundUrl.trim() ? { introSoundUrl: c.introSoundUrl.trim() } : {}),
+          ...(c.introSoundUrl.trim() ? { introSoundVolumePercent: parseSoundVolumePercent(c.introSoundVolumePercent) } : {}),
           ...(c.backgroundImageUrl.trim() ? { backgroundImageUrl: c.backgroundImageUrl.trim() } : {}),
           ...(c.bossBattleMusicUrl.trim() ? { bossBattleMusicUrl: c.bossBattleMusicUrl.trim() } : {}),
+          ...(c.bossBattleMusicUrl.trim() ? { bossBattleMusicVolumePercent: parseSoundVolumePercent(c.bossBattleMusicVolumePercent) } : {}),
           ...(c.tags.trim() ? { tags: parseTags(c.tags) } : {}),
           ...(c.abilityIds.trim() ? { abilityIds: parseTags(c.abilityIds) } : {}),
           ...(c.resourceId.trim() ? { resourceId: c.resourceId.trim() } : {}),
@@ -1248,6 +1259,15 @@ export default function IdleRpgEdit() {
                       <TextField size="small" label="Intro Sound URL" value={c.introSoundUrl} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, introSoundUrl: e.target.value } : x))} sx={{ minWidth: 180, flex: 1 }} />
                       <SoundUploadButton onUploaded={(url) => setClasses((p) => p.map((x, j) => j === i ? { ...x, introSoundUrl: url } : x))} />
                     </Box>
+                    <TextField
+                      size="small"
+                      label="Intro Sound %"
+                      type="number"
+                      value={c.introSoundVolumePercent}
+                      onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, introSoundVolumePercent: e.target.value } : x))}
+                      sx={{ width: 130 }}
+                      inputProps={{ min: 0, max: 100 }}
+                    />
                     <FormControlLabel control={<Checkbox size="small" checked={c.isHeroClass} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, isHeroClass: e.target.checked } : x))} />} label={<Typography variant="body2" sx={{ color: c.isHeroClass ? '#ffc145' : 'text.secondary', fontWeight: c.isHeroClass ? 700 : 400 }}>Hero Class</Typography>} />
                   </Box>
                   <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1 }}>
@@ -1362,11 +1382,29 @@ export default function IdleRpgEdit() {
                     <TextField size="small" label="Intro Sound URL" value={c.introSoundUrl} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, introSoundUrl: e.target.value } : x))} sx={{ minWidth: 180, flex: 1 }} />
                     <SoundUploadButton onUploaded={(url) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, introSoundUrl: url } : x))} />
                   </Box>
+                  <TextField
+                    size="small"
+                    label="Intro Sound %"
+                    type="number"
+                    value={c.introSoundVolumePercent}
+                    onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, introSoundVolumePercent: e.target.value } : x))}
+                    sx={{ width: 130 }}
+                    inputProps={{ min: 0, max: 100 }}
+                  />
                   <TextField size="small" label="Boss Bg URL" value={c.backgroundImageUrl} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, backgroundImageUrl: e.target.value } : x))} placeholder="Used in boss replay" sx={{ width: 200 }} />
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', minWidth: 280, flex: 1 }}>
                     <TextField size="small" label="Boss BGM URL" value={c.bossBattleMusicUrl} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, bossBattleMusicUrl: e.target.value } : x))} placeholder="Looping music during boss fight" sx={{ minWidth: 180, flex: 1 }} />
                     <SoundUploadButton onUploaded={(url) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, bossBattleMusicUrl: url } : x))} />
                   </Box>
+                  <TextField
+                    size="small"
+                    label="Boss BGM %"
+                    type="number"
+                    value={c.bossBattleMusicVolumePercent}
+                    onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, bossBattleMusicVolumePercent: e.target.value } : x))}
+                    sx={{ width: 130 }}
+                    inputProps={{ min: 0, max: 100 }}
+                  />
                   <TextField size="small" label="Tags (comma)" value={c.tags} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, tags: e.target.value } : x))} sx={{ flex: 1 }} />
                   <TextField size="small" label="Abilities (comma IDs)" value={c.abilityIds} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, abilityIds: e.target.value } : x))} placeholder="fireball, heal" sx={{ width: 160 }} />
                   <FormControl size="small" sx={{ minWidth: 120 }}>

@@ -336,7 +336,9 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
               abilityAnimations={abilityAnimations}
               statusAnimations={statusAnimations}
               playerIntroSoundUrl={cls?.introSoundUrl}
+              playerIntroSoundVolumePercent={cls?.introSoundVolumePercent}
               creatureIntroSoundUrl={creatureDef?.introSoundUrl}
+              creatureIntroSoundVolumePercent={creatureDef?.introSoundVolumePercent}
               player={{
                 name: character.name,
                 level: character.level,

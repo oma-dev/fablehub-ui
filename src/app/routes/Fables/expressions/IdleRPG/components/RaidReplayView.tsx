@@ -48,8 +48,14 @@ const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
 const DAMAGE_NUMBER_EVENT_TYPES = new Set<CombatEventType>(['damage', 'heal', 'dot_tick', 'hot_tick', 'execute'])
 const STATUS_BURST_EVENT_TYPES = new Set<CombatEventType>(['status_applied', 'dot_tick', 'hot_tick'])
 
-function playOneShotAudio(url: string): void {
+function clampSoundVolume(volumePercent?: number | null): number {
+  if (volumePercent == null || Number.isNaN(volumePercent)) return 1
+  return Math.min(1, Math.max(0, volumePercent / 100))
+}
+
+function playOneShotAudio(url: string, volumePercent = 100): void {
   const audio = new Audio(url)
+  audio.volume = clampSoundVolume(volumePercent)
   audio.play().catch(() => undefined)
 }
 
@@ -66,6 +72,7 @@ interface ActiveStatusParticleEntry {
   side: 'party' | 'boss'
   url: string
   soundUrl?: string
+  soundVolumePercent?: number
   delayMs: number
   lifetimeMs: number
   startSizePx?: number
@@ -138,6 +145,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const [projTo, setProjTo] = useState<ProjectilePos>({ x: 0, y: 0 })
   const [projectileImageUrl, setProjectileImageUrl] = useState<string | null>(null)
   const [projectileSoundUrl, setProjectileSoundUrl] = useState<string | undefined>(undefined)
+  const [projectileSoundVolumePercent, setProjectileSoundVolumePercent] = useState<number>(100)
   const [projectileMirrored, setProjectileMirrored] = useState(false)
   const [projectileAcceleration, setProjectileAcceleration] = useState(0)
   const [projectileRotationStart, setProjectileRotationStart] = useState(0)
@@ -153,6 +161,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     side: 'party' | 'boss'
     url: string
     soundUrl?: string
+    soundVolumePercent?: number
     fadeInMs: number
     lifetimeMs?: number
     sizePx?: number
@@ -171,6 +180,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     side: 'party' | 'boss'
     url: string
     soundUrl?: string
+    soundVolumePercent?: number
     showMs: number
     vanishMs: number
     sizePx?: number
@@ -184,7 +194,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     rotationStart?: number
     rotationEnd?: number
   }
-  type ActiveBF = { key: number; side: 'party' | 'boss'; url: string; soundUrl?: string; showMs: number; vanishMs: number; sizePx?: number; startSizePx?: number; endSizePx?: number; offsetX: number; offsetY: number; rotationStart?: number; rotationEnd?: number }
+  type ActiveBF = { key: number; side: 'party' | 'boss'; url: string; soundUrl?: string; soundVolumePercent?: number; showMs: number; vanishMs: number; sizePx?: number; startSizePx?: number; endSizePx?: number; offsetX: number; offsetY: number; rotationStart?: number; rotationEnd?: number }
   const [activeWeaponFrames, setActiveWeaponFrames] = useState<ActiveWF[]>([])
   const [activeImpactFrames, setActiveImpactFrames] = useState<ActiveIF[]>([])
   const [activeBlockFrames, setActiveBlockFrames] = useState<ActiveBF[]>([])
@@ -275,6 +285,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       side,
       url,
       soundUrl: particle.soundUrl?.trim() || undefined,
+      soundVolumePercent: particle.soundVolumePercent ?? 100,
       delayMs: Math.max(0, particle.delayMs ?? 0),
       lifetimeMs: Math.max(100, particle.lifetimeMs ?? 1000),
       startSizePx: particle.startSizePx ?? particle.sizePx,
@@ -377,7 +388,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         weaponFrames.forEach(async (f) => {
           if (f.delayMs) await sleep(f.delayMs)
           const entry: ActiveWF = {
-            key: ++vfxKeyRef.current, side: attackerSide, url: f.url!.trim(), soundUrl: f.soundUrl?.trim() || undefined,
+            key: ++vfxKeyRef.current, side: attackerSide, url: f.url!.trim(), soundUrl: f.soundUrl?.trim() || undefined, soundVolumePercent: f.soundVolumePercent ?? 100,
             fadeInMs: f.fadeInMs ?? 200, lifetimeMs: f.lifetimeMs, sizePx: f.sizePx,
             startSizePx: f.startSizePx,
             endSizePx: f.endSizePx,
@@ -414,6 +425,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           setProjTo(tgtPos)
           setProjectileImageUrl(firstFrame.url?.trim() ?? null)
           setProjectileSoundUrl(firstFrame.soundUrl?.trim() || undefined)
+          setProjectileSoundVolumePercent(firstFrame.soundVolumePercent ?? 100)
           setProjectileAcceleration(firstFrame.acceleration ?? 0)
           setProjectileRotationStart(isRightSideAttacker ? -(firstFrame.rotationStart ?? 0) : (firstFrame.rotationStart ?? 0))
           setProjectileRotationEnd(isRightSideAttacker ? -(firstFrame.rotationEnd ?? firstFrame.rotationStart ?? 0) : (firstFrame.rotationEnd ?? firstFrame.rotationStart ?? 0))
@@ -427,6 +439,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           setProjTo(tgtPos)
           setProjectileImageUrl(null)
           setProjectileSoundUrl(undefined)
+          setProjectileSoundVolumePercent(100)
           setProjectileAcceleration(0)
           setProjectileRotationStart(0)
           setProjectileRotationEnd(0)
@@ -454,7 +467,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
             if (f.delayMs) await sleep(f.delayMs)
             const { showMs, vanishMs } = resolveBlockTiming(f)
             setActiveBlockFrames(prev => [...prev, {
-              key: ++vfxKeyRef.current, side: defenderSide, url: f.url!.trim(), soundUrl: f.soundUrl?.trim() || undefined,
+              key: ++vfxKeyRef.current, side: defenderSide, url: f.url!.trim(), soundUrl: f.soundUrl?.trim() || undefined, soundVolumePercent: f.soundVolumePercent ?? 100,
               showMs, vanishMs, sizePx: f.sizePx, startSizePx: f.startSizePx, endSizePx: f.endSizePx,
               offsetX: isRightSideDefender ? -(f.offsetX ?? 0) : (f.offsetX ?? 0),
               offsetY: f.offsetY ?? 0,
@@ -491,7 +504,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           if (f.delayMs) await sleep(f.delayMs)
           const { showMs, vanishMs } = resolveImpactTiming(f)
           setActiveImpactFrames(prev => [...prev, {
-            key: ++vfxKeyRef.current, side: defenderSide, url: f.url!.trim(), soundUrl: f.soundUrl?.trim() || undefined,
+            key: ++vfxKeyRef.current, side: defenderSide, url: f.url!.trim(), soundUrl: f.soundUrl?.trim() || undefined, soundVolumePercent: f.soundVolumePercent ?? 100,
             showMs, vanishMs, sizePx: f.sizePx, startSizePx: f.startSizePx, endSizePx: f.endSizePx,
             offsetX: isRightSideDefender ? -(f.offsetX ?? 0) : (f.offsetX ?? 0),
             offsetY: f.offsetY ?? 0,
@@ -611,10 +624,10 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       bossBgmRef.current = null
     }
     const bgmUrl = boss?.bossBattleMusicUrl?.trim()
-    if (!bgmUrl || finished) return
+    if (!bgmUrl) return
     const audio = new Audio(bgmUrl)
     audio.loop = true
-    audio.volume = 0.35
+    audio.volume = clampSoundVolume(boss?.bossBattleMusicVolumePercent ?? 100)
     bossBgmRef.current = audio
     audio.play().catch(() => undefined)
     return () => {
@@ -622,7 +635,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       audio.src = ''
       if (bossBgmRef.current === audio) bossBgmRef.current = null
     }
-  }, [boss?.bossBattleMusicUrl, finished])
+  }, [boss?.bossBattleMusicUrl, boss?.bossBattleMusicVolumePercent])
 
   useEffect(() => {
     if (finished || !boss || bossIntroPlayedRef.current) return
@@ -632,7 +645,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       return
     }
     bossIntroPlayedRef.current = true
-    playOneShotAudio(introUrl)
+    playOneShotAudio(introUrl, boss.introSoundVolumePercent ?? 100)
   }, [boss, finished])
 
   useEffect(() => {
@@ -641,23 +654,20 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     if (!currentFrontId || currentFrontId === lastFrontPartyIdRef.current) return
     lastFrontPartyIdRef.current = currentFrontId
     const member = getMember(currentFrontId)
-    const introUrl = pack.classes?.find((c) => c.id === member?.classId)?.introSoundUrl?.trim()
-    if (introUrl) playOneShotAudio(introUrl)
+    const frontClass = pack.classes?.find((c) => c.id === member?.classId)
+    const introUrl = frontClass?.introSoundUrl?.trim()
+    if (introUrl) playOneShotAudio(introUrl, frontClass?.introSoundVolumePercent ?? 100)
   }, [finished, frontPartyId, group?.members, pack.classes])
 
   const handleSkip = () => {
     stopPlayback()
-    if (bossBgmRef.current) {
-      bossBgmRef.current.pause()
-      bossBgmRef.current.src = ''
-      bossBgmRef.current = null
-    }
     setPartyVariant('idle')
     setBossVariant('idle')
     setShowPartyImpact(false)
     setShowBossImpact(false)
     setShowProjectile(null)
     setProjectileSoundUrl(undefined)
+    setProjectileSoundVolumePercent(100)
     setProjectileMirrored(false)
     setProjectileAcceleration(0)
     setProjectileRotationStart(0)
@@ -684,6 +694,11 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   }
 
   const handleDone = () => {
+    if (bossBgmRef.current) {
+      bossBgmRef.current.pause()
+      bossBgmRef.current.src = ''
+      bossBgmRef.current = null
+    }
     onDone()
   }
 
@@ -736,6 +751,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                 id={`proj-${dmgKeyRef.current}`}
                 weaponUrl={projectileImageUrl}
                 soundUrl={projectileSoundUrl}
+                soundVolumePercent={projectileSoundVolumePercent}
                 mirrored={projectileMirrored}
                 acceleration={projectileAcceleration}
                 rotationStart={projectileRotationStart}
@@ -807,6 +823,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                               id={`party-loop-${idx}-${p.url}`}
                               url={p.url}
                               soundUrl={p.soundUrl}
+                              soundVolumePercent={p.soundVolumePercent}
                               delayMs={p.delayMs}
                               lifetimeMs={p.lifetimeMs}
                               startSizePx={p.startSizePx}
@@ -827,6 +844,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                               id={p.key}
                               url={p.url}
                               soundUrl={p.soundUrl}
+                              soundVolumePercent={p.soundVolumePercent}
                               delayMs={p.delayMs}
                               lifetimeMs={p.lifetimeMs}
                               startSizePx={p.startSizePx}
@@ -841,11 +859,11 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                             />
                           ))}
                           {activeWeaponFrames.filter(f => f.side === 'party').map(f => (
-                            <WeaponFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
+                            <WeaponFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
                           ))}
                           {showPartyImpact && activeImpactFrames.filter(f => f.side === 'party').length > 0
                             ? activeImpactFrames.filter(f => f.side === 'party').map(f => (
-                              <ImpactFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
+                              <ImpactFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
                             ))
                             : (
                               <ImpactEffect
@@ -1013,6 +1031,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                       id={`boss-loop-${idx}-${p.url}`}
                       url={p.url}
                       soundUrl={p.soundUrl}
+                      soundVolumePercent={p.soundVolumePercent}
                       delayMs={p.delayMs}
                       lifetimeMs={p.lifetimeMs}
                       startSizePx={p.startSizePx}
@@ -1033,6 +1052,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                       id={p.key}
                       url={p.url}
                       soundUrl={p.soundUrl}
+                      soundVolumePercent={p.soundVolumePercent}
                       delayMs={p.delayMs}
                       lifetimeMs={p.lifetimeMs}
                       startSizePx={p.startSizePx}
@@ -1047,11 +1067,11 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                     />
                   ))}
                   {activeWeaponFrames.filter(f => f.side === 'boss').map(f => (
-                    <WeaponFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+                    <WeaponFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
                   ))}
                   {showBossImpact && activeImpactFrames.filter(f => f.side === 'boss').length > 0
                     ? activeImpactFrames.filter(f => f.side === 'boss').map(f => (
-                      <ImpactFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+                      <ImpactFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
                     ))
                     : (
                       <ImpactEffect
@@ -1107,7 +1127,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                   ))}
                 </Box>
                 {activeBlockFrames.filter(f => f.side === 'boss').map(f => (
-                  <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+                  <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
                 ))}
               </Paper>
             </motion.div>

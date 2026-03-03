@@ -25,6 +25,7 @@ export type StatusParticleForm = {
   imageSource: AnimationFrameImageSource
   url: string
   soundUrl: string
+  soundVolumePercent: string
   delayMs: string
   lifetimeMs: string
   startSizePx: string
@@ -44,6 +45,7 @@ export function createEmptyStatusParticle(): StatusParticleForm {
     imageSource: 'url',
     url: '',
     soundUrl: '',
+    soundVolumePercent: '100',
     delayMs: '0',
     lifetimeMs: '1000',
     startSizePx: '72',
@@ -70,6 +72,7 @@ export function hydrateStatusAnimationParticles(animation?: StatusAnimation | nu
     imageSource: particle.imageSource ?? 'url',
     url: particle.url ?? '',
     soundUrl: particle.soundUrl ?? '',
+    soundVolumePercent: asNumberString(particle.soundVolumePercent, '100'),
     delayMs: asNumberString(particle.delayMs, '0'),
     lifetimeMs: asNumberString(particle.lifetimeMs, '1000'),
     startSizePx: asNumberString(particle.startSizePx ?? particle.sizePx, '72'),
@@ -92,6 +95,12 @@ function parseNumber(input: string): number | undefined {
   return Number.isNaN(n) ? undefined : n
 }
 
+function parseSoundVolumePercent(input: string): number {
+  const n = Number(input)
+  if (Number.isNaN(n)) return 100
+  return Math.min(100, Math.max(0, n))
+}
+
 export function buildStatusAnimation(particles: StatusParticleForm[]): StatusAnimation | undefined {
   const built = particles
     .map((particle) => {
@@ -101,6 +110,7 @@ export function buildStatusAnimation(particles: StatusParticleForm[]): StatusAni
       }
       if (particle.url.trim()) out.url = particle.url.trim()
       if (particle.soundUrl.trim()) out.soundUrl = particle.soundUrl.trim()
+      if (particle.soundUrl.trim()) out.soundVolumePercent = parseSoundVolumePercent(particle.soundVolumePercent)
       const delayMs = parseNumber(particle.delayMs)
       if (delayMs != null) out.delayMs = delayMs
       const lifetimeMs = parseNumber(particle.lifetimeMs)
@@ -183,6 +193,15 @@ export default function StatusAnimationEditor({ particles, onChange }: Props) {
               onUploaded={(url) => onChange(particles.map((x, i) => i === index ? { ...x, soundUrl: url } : x))}
             />
           </Box>
+          <TextField
+            size="small"
+            label="Sound %"
+            type="number"
+            value={particle.soundVolumePercent}
+            onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, soundVolumePercent: e.target.value } : x))}
+            sx={{ width: 110 }}
+            inputProps={{ min: 0, max: 100 }}
+          />
           <TextField size="small" label="Delay (ms)" type="number" value={particle.delayMs} onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, delayMs: e.target.value } : x))} sx={{ width: 110 }} />
           <TextField size="small" label="Lifetime (ms)" type="number" value={particle.lifetimeMs} onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, lifetimeMs: e.target.value } : x))} sx={{ width: 120 }} />
           <TextField size="small" label="Start size" type="number" value={particle.startSizePx} onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, startSizePx: e.target.value } : x))} sx={{ width: 110 }} />

@@ -10,6 +10,8 @@ interface Props {
   url: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   /** Fade-in duration in ms. Default 200. */
   fadeInMs?: number
   /**
@@ -46,6 +48,7 @@ interface Props {
 export default function WeaponFrame({
   show, url,
   soundUrl,
+  soundVolumePercent,
   fadeInMs = DEFAULT_FADE_IN_MS,
   lifetimeMs,
   sizePx, startSizePx, endSizePx,
@@ -57,7 +60,7 @@ export default function WeaponFrame({
   mirrored = false,
   id,
 }: Props) {
-  useParticleSound(show, soundUrl, id)
+  useParticleSound(show, soundUrl, soundVolumePercent, id)
 
   const startSize = startSizePx ?? sizePx ?? DEFAULT_SIZE
   const endSize = endSizePx ?? sizePx ?? DEFAULT_SIZE

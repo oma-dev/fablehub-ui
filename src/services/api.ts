@@ -60,6 +60,8 @@ export interface AnimationWeaponFrame {
   url?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple weapon frames). */
   delayMs?: number
@@ -94,6 +96,8 @@ export interface AnimationProjectileFrame {
   url?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple projectiles). */
   delayMs?: number
@@ -125,6 +129,8 @@ export interface AnimationImpactFrame {
   url?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple impact frames). */
   delayMs?: number
@@ -161,6 +167,8 @@ export interface AnimationBlockFrame {
   url?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   imageSource?: AnimationFrameImageSource
   delayMs?: number
   showMs?: number
@@ -190,6 +198,8 @@ export interface StatusAnimationParticle {
   url?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
+  /** Optional sound volume in percent (0-100). Default 100. */
+  soundVolumePercent?: number
   imageSource?: AnimationFrameImageSource
   delayMs?: number
   lifetimeMs?: number
@@ -401,6 +411,8 @@ export interface ClassBlock {
   iconUrl?: string
   /** Optional intro sound played when this class enters combat replay. */
   introSoundUrl?: string
+  /** Optional intro sound volume in percent (0-100). Default 100. */
+  introSoundVolumePercent?: number
   /** When true, only one character per realm may pick this class. */
   isHeroClass?: boolean
   scaling?: { damageMainStat?: string; secondaryBenefits?: Record<string, string[]> }
@@ -434,10 +446,14 @@ export interface CreatureTemplate {
   iconUrl?: string
   /** Optional intro sound played when this creature enters combat replay. */
   introSoundUrl?: string
+  /** Optional intro sound volume in percent (0-100). Default 100. */
+  introSoundVolumePercent?: number
   /** Optional combat replay background image URL (typically used by bosses). */
   backgroundImageUrl?: string
   /** Optional looping boss battle music URL used during boss combat replay. */
   bossBattleMusicUrl?: string
+  /** Optional boss music volume in percent (0-100). Default 100. */
+  bossBattleMusicVolumePercent?: number
   tags?: string[]
   abilityIds?: string[]
   resourceId?: string

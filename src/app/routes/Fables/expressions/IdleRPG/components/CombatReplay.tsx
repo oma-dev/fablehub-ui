@@ -61,10 +61,16 @@ interface Props {
   statusAnimations?: Record<string, StatusAnimation>
   /** Optional intro sound for left-side combatant (typically class intro). */
   playerIntroSoundUrl?: string | null
+  /** Optional intro sound volume percent for left-side combatant. */
+  playerIntroSoundVolumePercent?: number | null
   /** Optional intro sound for right-side combatant (typically creature/class intro). */
   creatureIntroSoundUrl?: string | null
+  /** Optional intro sound volume percent for right-side combatant. */
+  creatureIntroSoundVolumePercent?: number | null
   /** Optional looping boss music while replay is active. */
   bossBattleMusicUrl?: string | null
+  /** Optional boss music volume percent. */
+  bossBattleMusicVolumePercent?: number | null
 }
 
 const STAT_LABELS: { key: keyof Pick<CombatantInfo, 'ap' | 'arm'>; label: string }[] = [
@@ -113,6 +119,7 @@ interface ActiveWeaponFrame {
   side: 'player' | 'creature'
   url: string
   soundUrl?: string
+  soundVolumePercent?: number
   fadeInMs: number
   /** When set, the component self-animates fade-out; when absent, stays until sequence end cleanup. */
   lifetimeMs?: number
@@ -133,6 +140,7 @@ interface ActiveProjectileEntry {
   direction: 'left-to-right' | 'right-to-left'
   imageUrl: string | null
   soundUrl?: string
+  soundVolumePercent?: number
   mirrored?: boolean
   from: ProjectilePos
   to: ProjectilePos
@@ -153,6 +161,7 @@ interface ActiveImpactFrame {
   side: 'player' | 'creature'
   url: string
   soundUrl?: string
+  soundVolumePercent?: number
   showMs: number
   vanishMs: number
   sizePx?: number
@@ -172,6 +181,7 @@ interface ActiveBlockFrameEntry {
   side: 'player' | 'creature'
   url: string
   soundUrl?: string
+  soundVolumePercent?: number
   showMs: number
   vanishMs: number
   sizePx?: number
@@ -189,6 +199,7 @@ interface ActiveStatusParticleEntry {
   side: 'player' | 'creature'
   url: string
   soundUrl?: string
+  soundVolumePercent?: number
   delayMs: number
   lifetimeMs: number
   startSizePx?: number
@@ -206,13 +217,19 @@ interface ActiveStatusParticleEntry {
 const DAMAGE_NUMBER_EVENT_TYPES = new Set<CombatEventType>(['damage', 'heal', 'dot_tick', 'hot_tick', 'execute'])
 const STATUS_BURST_EVENT_TYPES = new Set<CombatEventType>(['status_applied', 'dot_tick', 'hot_tick'])
 
-function playOneShotAudio(url: string, delayMs = 0): () => void {
+function clampSoundVolume(volumePercent?: number | null): number {
+  if (volumePercent == null || Number.isNaN(volumePercent)) return 1
+  return Math.min(1, Math.max(0, volumePercent / 100))
+}
+
+function playOneShotAudio(url: string, volumePercent = 100, delayMs = 0): () => void {
   let audio: HTMLAudioElement | null = null
   let timeoutId: number | null = null
   let cancelled = false
   const start = () => {
     if (cancelled) return
     audio = new Audio(url)
+    audio.volume = clampSoundVolume(volumePercent)
     audio.play().catch(() => undefined)
   }
   if (delayMs > 0) timeoutId = window.setTimeout(start, delayMs)
@@ -239,8 +256,11 @@ export default function CombatReplay({
   abilityAnimations,
   statusAnimations,
   playerIntroSoundUrl,
+  playerIntroSoundVolumePercent,
   creatureIntroSoundUrl,
+  creatureIntroSoundVolumePercent,
   bossBattleMusicUrl,
+  bossBattleMusicVolumePercent,
 }: Props) {
   const [playerHp, setPlayerHp] = useState(player.maxHp)
   const [creatureHp, setCreatureHp] = useState(creature.maxHp)
@@ -321,6 +341,7 @@ export default function CombatReplay({
     particle: {
       url?: string
       soundUrl?: string
+      soundVolumePercent?: number
       imageSource?: 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact'
       delayMs?: number
       lifetimeMs?: number
@@ -357,6 +378,7 @@ export default function CombatReplay({
       side,
       url,
       soundUrl: particle.soundUrl?.trim() || undefined,
+      soundVolumePercent: particle.soundVolumePercent ?? 100,
       delayMs: Math.max(0, particle.delayMs ?? 0),
       lifetimeMs: Math.max(100, particle.lifetimeMs ?? 1000),
       startSizePx: particle.startSizePx ?? particle.sizePx,
@@ -487,6 +509,7 @@ export default function CombatReplay({
           side: attackerSide,
           url: f.url!.trim(),
           soundUrl: f.soundUrl?.trim() || undefined,
+          soundVolumePercent: f.soundVolumePercent ?? 100,
           fadeInMs: f.fadeInMs ?? 200,
           lifetimeMs: f.lifetimeMs,
           sizePx: f.sizePx,
@@ -534,6 +557,7 @@ export default function CombatReplay({
           direction: dir,
           imageUrl: f.url?.trim() ?? weaponUrlFallback ?? null,
           soundUrl: f.soundUrl?.trim() || undefined,
+          soundVolumePercent: f.soundVolumePercent ?? 100,
           mirrored: isRightSideAttacker,
           from: {
             x: srcPos.x + (isRightSideAttacker ? -(f.offsetX ?? 0) : (f.offsetX ?? 0)),
@@ -580,6 +604,7 @@ export default function CombatReplay({
             side: defenderSide,
             url: f.url!.trim(),
             soundUrl: f.soundUrl?.trim() || undefined,
+            soundVolumePercent: f.soundVolumePercent ?? 100,
             showMs,
             vanishMs,
             sizePx: f.sizePx,
@@ -644,6 +669,7 @@ export default function CombatReplay({
           side: attackerSide === 'player' ? 'creature' : 'player',
           url: f.url!.trim(),
           soundUrl: f.soundUrl?.trim() || undefined,
+          soundVolumePercent: f.soundVolumePercent ?? 100,
           showMs,
           vanishMs,
           sizePx: f.sizePx,
@@ -808,12 +834,12 @@ export default function CombatReplay({
     const cleanups: Array<() => void> = []
     const playerIntro = playerIntroSoundUrl?.trim()
     const creatureIntro = creatureIntroSoundUrl?.trim()
-    if (playerIntro) cleanups.push(playOneShotAudio(playerIntro))
-    if (creatureIntro) cleanups.push(playOneShotAudio(creatureIntro, playerIntro ? 140 : 0))
+    if (playerIntro) cleanups.push(playOneShotAudio(playerIntro, playerIntroSoundVolumePercent ?? 100))
+    if (creatureIntro) cleanups.push(playOneShotAudio(creatureIntro, creatureIntroSoundVolumePercent ?? 100, playerIntro ? 140 : 0))
     return () => {
       cleanups.forEach((cleanup) => cleanup())
     }
-  }, [playerIntroSoundUrl, creatureIntroSoundUrl])
+  }, [playerIntroSoundUrl, playerIntroSoundVolumePercent, creatureIntroSoundUrl, creatureIntroSoundVolumePercent])
 
   useEffect(() => {
     if (bossBgmRef.current) {
@@ -822,10 +848,10 @@ export default function CombatReplay({
       bossBgmRef.current = null
     }
     const bgmUrl = bossBattleMusicUrl?.trim()
-    if (!bgmUrl || done) return
+    if (!bgmUrl) return
     const audio = new Audio(bgmUrl)
     audio.loop = true
-    audio.volume = 0.35
+    audio.volume = clampSoundVolume(bossBattleMusicVolumePercent ?? 100)
     bossBgmRef.current = audio
     audio.play().catch(() => undefined)
     return () => {
@@ -833,15 +859,10 @@ export default function CombatReplay({
       audio.src = ''
       if (bossBgmRef.current === audio) bossBgmRef.current = null
     }
-  }, [bossBattleMusicUrl, done])
+  }, [bossBattleMusicUrl, bossBattleMusicVolumePercent])
 
   const handleSkip = () => {
     stopPlayback()
-    if (bossBgmRef.current) {
-      bossBgmRef.current.pause()
-      bossBgmRef.current.src = ''
-      bossBgmRef.current = null
-    }
     setPlayerVariant('idle')
     setCreatureVariant('idle')
     setShowPlayerImpact(false)
@@ -874,6 +895,15 @@ export default function CombatReplay({
       if (lastTurn.resources[creatureId]) setCreatureResourceCurrent(lastTurn.resources[creatureId].current)
     }
     finishAtTurn(lastTurn?.turnIndex ?? 0)
+  }
+
+  const handleContinue = () => {
+    if (bossBgmRef.current) {
+      bossBgmRef.current.pause()
+      bossBgmRef.current.src = ''
+      bossBgmRef.current = null
+    }
+    onFinish()
   }
 
   return (
@@ -910,6 +940,7 @@ export default function CombatReplay({
               direction={p.direction}
               id={p.key}
               soundUrl={p.soundUrl}
+              soundVolumePercent={p.soundVolumePercent}
               weaponUrl={p.imageUrl}
               mirrored={p.mirrored}
               trajectory={p.trajectory}
@@ -961,6 +992,7 @@ export default function CombatReplay({
                   id={p.key}
                   url={p.url}
                   soundUrl={p.soundUrl}
+                  soundVolumePercent={p.soundVolumePercent}
                   delayMs={p.delayMs}
                   lifetimeMs={p.lifetimeMs}
                   startSizePx={p.startSizePx}
@@ -981,6 +1013,7 @@ export default function CombatReplay({
                   id={p.key}
                   url={p.url}
                   soundUrl={p.soundUrl}
+                  soundVolumePercent={p.soundVolumePercent}
                   delayMs={p.delayMs}
                   lifetimeMs={p.lifetimeMs}
                   startSizePx={p.startSizePx}
@@ -995,11 +1028,11 @@ export default function CombatReplay({
                 />
               ))}
               {activeWeaponFrames.filter(f => f.side === 'player').map(f => (
-                <WeaponFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
+                <WeaponFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
               ))}
               {showPlayerImpact && activeImpactFrames.filter(f => f.side === 'player').length > 0
                 ? activeImpactFrames.filter(f => f.side === 'player').map(f => (
-                  <ImpactFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
+                  <ImpactFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
                 ))
                 : (
                   <ImpactEffect
@@ -1042,7 +1075,7 @@ export default function CombatReplay({
               ))}
             </Box>
             {activeBlockFrames.filter(f => f.side === 'player').map(f => (
-              <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} side="player" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
+              <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} side="player" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
             ))}
           </Paper>
         </motion.div>
@@ -1099,6 +1132,7 @@ export default function CombatReplay({
                   id={p.key}
                   url={p.url}
                   soundUrl={p.soundUrl}
+                  soundVolumePercent={p.soundVolumePercent}
                   delayMs={p.delayMs}
                   lifetimeMs={p.lifetimeMs}
                   startSizePx={p.startSizePx}
@@ -1119,6 +1153,7 @@ export default function CombatReplay({
                   id={p.key}
                   url={p.url}
                   soundUrl={p.soundUrl}
+                  soundVolumePercent={p.soundVolumePercent}
                   delayMs={p.delayMs}
                   lifetimeMs={p.lifetimeMs}
                   startSizePx={p.startSizePx}
@@ -1133,11 +1168,11 @@ export default function CombatReplay({
                 />
               ))}
               {activeWeaponFrames.filter(f => f.side === 'creature').map(f => (
-                <WeaponFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+                <WeaponFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
               ))}
               {showCreatureImpact && activeImpactFrames.filter(f => f.side === 'creature').length > 0
                 ? activeImpactFrames.filter(f => f.side === 'creature').map(f => (
-                  <ImpactFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+                  <ImpactFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
                 ))
                 : (
                   <ImpactEffect
@@ -1180,7 +1215,7 @@ export default function CombatReplay({
               ))}
             </Box>
             {activeBlockFrames.filter(f => f.side === 'creature').map(f => (
-              <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+              <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
             ))}
           </Paper>
         </motion.div>
@@ -1220,7 +1255,7 @@ export default function CombatReplay({
             <Button
               variant="contained"
               color="primary"
-              onClick={onFinish}
+              onClick={handleContinue}
               size="large"
               sx={{ px: 5, py: 1.5, fontSize: BUTTON_FONT_SIZE }}
             >
