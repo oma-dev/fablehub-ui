@@ -50,7 +50,28 @@ export interface AbilityAnimFrames {
   projectile: AnimFrameForm[]
   impact: AnimFrameForm[]
   block: AnimFrameForm[]
+  card: AbilityCardAnimationForm
 }
+
+export interface AbilityCardAnimationForm {
+  attackerAnimation: 'none' | 'cast' | 'lunge'
+  targetAnimation: 'none' | 'hit'
+  lungeGapPx: string
+  lungeDelayMs: string
+  lungeStartSpeed: string
+  accelerationLunge: string
+  accelerationReturn: string
+}
+
+export const defaultCardAnimation = (): AbilityCardAnimationForm => ({
+  attackerAnimation: 'cast',
+  targetAnimation: 'hit',
+  lungeGapPx: '0',
+  lungeDelayMs: '0',
+  lungeStartSpeed: '0',
+  accelerationLunge: '0',
+  accelerationReturn: '0',
+})
 
 export const defaultWeaponFrame = (): AnimFrameForm => ({
   enabled: false, imageSource: 'url', url: '', soundUrl: '', soundVolumePercent: '100', delayMs: '0', fadeInMs: '200', lifetimeMs: '0',
@@ -78,6 +99,7 @@ export const defaultBlockFrame = (): AnimFrameForm => ({
 
 export const emptyAnimFrames = (): AbilityAnimFrames => ({
   weapon: [], projectile: [], impact: [], block: [],
+  card: defaultCardAnimation(),
 })
 
 export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrames {
@@ -131,6 +153,15 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
       acceleration: String(0),
       rotationStart: String(f.rotationStart ?? 0), rotationEnd: String(f.rotationEnd ?? f.rotationStart ?? 0),
     })),
+    card: {
+      attackerAnimation: af.card?.attacker ?? 'cast',
+      targetAnimation: af.card?.target ?? 'hit',
+      lungeGapPx: String(af.card?.lungeGapPx ?? 0),
+      lungeDelayMs: String(af.card?.lungeDelayMs ?? 0),
+      lungeStartSpeed: String(af.card?.lungeStartSpeed ?? 0),
+      accelerationLunge: String(af.card?.accelerationLunge ?? 0),
+      accelerationReturn: String(af.card?.accelerationReturn ?? 0),
+    },
   }
 }
 
@@ -210,12 +241,30 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     ...(Number(f.rotationStart) !== 0 ? { rotationStart: Number(f.rotationStart) } : {}),
     ...(Number(f.rotationEnd) !== Number(f.rotationStart) ? { rotationEnd: Number(f.rotationEnd) } : {}),
   }))
-  if (!weapon.length && !projectile.length && !impact.length && !block.length) return undefined
+  const card = {
+    attacker: af.card.attackerAnimation,
+    target: af.card.targetAnimation,
+    ...(Number(af.card.lungeGapPx) !== 0 ? { lungeGapPx: Number(af.card.lungeGapPx) } : {}),
+    ...(Number(af.card.lungeDelayMs) !== 0 ? { lungeDelayMs: Number(af.card.lungeDelayMs) } : {}),
+    ...(Number(af.card.lungeStartSpeed) !== 0 ? { lungeStartSpeed: Number(af.card.lungeStartSpeed) } : {}),
+    ...(Number(af.card.accelerationLunge) !== 0 ? { accelerationLunge: Number(af.card.accelerationLunge) } : {}),
+    ...(Number(af.card.accelerationReturn) !== 0 ? { accelerationReturn: Number(af.card.accelerationReturn) } : {}),
+  } as const
+  const hasOnlyDefaultCard =
+    card.attacker === 'cast'
+    && card.target === 'hit'
+    && card.lungeGapPx == null
+    && card.lungeDelayMs == null
+    && card.lungeStartSpeed == null
+    && card.accelerationLunge == null
+    && card.accelerationReturn == null
+  if (!weapon.length && !projectile.length && !impact.length && !block.length && hasOnlyDefaultCard) return undefined
   return {
     ...(weapon.length ? { weapon } : {}),
     ...(projectile.length ? { projectile } : {}),
     ...(impact.length ? { impact } : {}),
     ...(block.length ? { block } : {}),
+    ...(hasOnlyDefaultCard ? {} : { card }),
   }
 }
 
@@ -335,9 +384,86 @@ interface Props {
 }
 
 export default function AbilityAnimationEditor({ animFrames, onChange, isReactive }: Props) {
+  const lungeMode = animFrames.card.attackerAnimation === 'lunge'
   return (
     <Box sx={{ mt: 1, p: 1.5, bgcolor: 'rgba(168,85,247,0.04)', borderRadius: 1, border: '1px solid rgba(168,85,247,0.15)' }}>
       <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>Animation Frames</Typography>
+      <Box sx={{ mb: 1.5, display: 'flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center' }}>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Caster card</InputLabel>
+          <Select
+            value={animFrames.card.attackerAnimation}
+            label="Caster card"
+            onChange={(e) => onChange({
+              ...animFrames,
+              card: { ...animFrames.card, attackerAnimation: e.target.value as 'none' | 'cast' | 'lunge' },
+            })}
+          >
+            <MenuItem value="none">none</MenuItem>
+            <MenuItem value="cast">cast</MenuItem>
+            <MenuItem value="lunge">lunge</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Target card</InputLabel>
+          <Select
+            value={animFrames.card.targetAnimation}
+            label="Target card"
+            onChange={(e) => onChange({
+              ...animFrames,
+              card: { ...animFrames.card, targetAnimation: e.target.value as 'none' | 'hit' },
+            })}
+          >
+            <MenuItem value="none">none</MenuItem>
+            <MenuItem value="hit">hit</MenuItem>
+          </Select>
+        </FormControl>
+        <TextField
+          size="small"
+          label="Lunge gap (px)"
+          type="number"
+          value={animFrames.card.lungeGapPx}
+          onChange={(e) => onChange({ ...animFrames, card: { ...animFrames.card, lungeGapPx: e.target.value } })}
+          sx={{ width: 130 }}
+          disabled={!lungeMode}
+        />
+        <TextField
+          size="small"
+          label="Lunge delay (ms)"
+          type="number"
+          value={animFrames.card.lungeDelayMs}
+          onChange={(e) => onChange({ ...animFrames, card: { ...animFrames.card, lungeDelayMs: e.target.value } })}
+          sx={{ width: 130 }}
+          disabled={!lungeMode}
+        />
+        <TextField
+          size="small"
+          label="Lunge start speed"
+          type="number"
+          value={animFrames.card.lungeStartSpeed}
+          onChange={(e) => onChange({ ...animFrames, card: { ...animFrames.card, lungeStartSpeed: e.target.value } })}
+          sx={{ width: 140 }}
+          disabled={!lungeMode}
+        />
+        <TextField
+          size="small"
+          label="Accel lunge"
+          type="number"
+          value={animFrames.card.accelerationLunge}
+          onChange={(e) => onChange({ ...animFrames, card: { ...animFrames.card, accelerationLunge: e.target.value } })}
+          sx={{ width: 120 }}
+          disabled={!lungeMode}
+        />
+        <TextField
+          size="small"
+          label="Accel return"
+          type="number"
+          value={animFrames.card.accelerationReturn}
+          onChange={(e) => onChange({ ...animFrames, card: { ...animFrames.card, accelerationReturn: e.target.value } })}
+          sx={{ width: 120 }}
+          disabled={!lungeMode}
+        />
+      </Box>
       <FrameListEditor
         label="Weapon (caster portrait)"
         frames={animFrames.weapon}
@@ -345,13 +471,19 @@ export default function AbilityAnimationEditor({ animFrames, onChange, isReactiv
         onChange={(frames) => onChange({ ...animFrames, weapon: frames })}
         defaultFrame={defaultWeaponFrame}
       />
-      <FrameListEditor
-        label="Projectile (caster → target)"
-        frames={animFrames.projectile}
-        phaseType="projectile"
-        onChange={(frames) => onChange({ ...animFrames, projectile: frames })}
-        defaultFrame={defaultProjectileFrame}
-      />
+      {lungeMode ? (
+        <Typography variant="caption" color="warning.main" sx={{ display: 'block', mb: 1 }}>
+          Projectile frames are disabled while caster card animation is set to lunge.
+        </Typography>
+      ) : (
+        <FrameListEditor
+          label="Projectile (caster → target)"
+          frames={animFrames.projectile}
+          phaseType="projectile"
+          onChange={(frames) => onChange({ ...animFrames, projectile: frames })}
+          defaultFrame={defaultProjectileFrame}
+        />
+      )}
       <FrameListEditor
         label="Impact (target portrait)"
         frames={animFrames.impact}

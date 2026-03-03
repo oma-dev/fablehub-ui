@@ -99,6 +99,43 @@ const VS_WIDTH = Math.round(70 * SCALE)
 const TURN_FONT_SIZE = Math.round(14 * SCALE)
 const RESULT_FONT_SIZE = `${1.5 * SCALE}rem`
 const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
+const CARD_LUNGE_DURATION_MS = 260
+const CARD_RETURN_DURATION_MS = 240
+
+type CardMotionEase = 'linear' | [number, number, number, number]
+type CardMotionTransition = { type: 'tween'; duration: number; ease: CardMotionEase }
+
+const DEFAULT_CARD_MOTION_TRANSITION: CardMotionTransition = {
+  type: 'tween',
+  duration: CARD_RETURN_DURATION_MS / 1000,
+  ease: [0.42, 0.0, 0.58, 1.0],
+}
+
+function resolveCardMotionEase(acceleration = 0, startSpeed = 0): CardMotionEase {
+  const clamped = Math.max(-100, Math.min(100, acceleration))
+  const intensity = Math.abs(clamped) / 100
+  const clampedStartSpeed = Math.max(-100, Math.min(100, startSpeed))
+  const normalizedStartSpeed = clampedStartSpeed / 100
+  const y1 = Math.max(0, Math.min(0.95, 0.25 + normalizedStartSpeed * 0.65))
+  if (clamped > 0) {
+    const x1 = 0.45 - (0.3 * intensity)
+    return [x1, y1, 1, 1]
+  }
+  if (clamped < 0) {
+    const x2 = 0.55 + (0.35 * intensity)
+    return [0, y1, x2, 1]
+  }
+  if (clampedStartSpeed !== 0) return [0.25, y1, 0.85, 1]
+  return 'linear'
+}
+
+function resolveCardMotionDurationMs(baseDurationMs: number, acceleration = 0): number {
+  const clamped = Math.max(-100, Math.min(100, acceleration))
+  const factor = clamped >= 0
+    ? (1 - (0.55 * (clamped / 100)))
+    : (1 + (0.75 * (Math.abs(clamped) / 100)))
+  return Math.max(90, Math.round(baseDurationMs * factor))
+}
 
 function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'right') {
   const sign = direction === 'left' ? 1 : -1
@@ -285,6 +322,10 @@ export default function CombatReplay({
 
   const [playerVariant, setPlayerVariant] = useState<string>('idle')
   const [creatureVariant, setCreatureVariant] = useState<string>('idle')
+  const [playerCardOffsetX, setPlayerCardOffsetX] = useState(0)
+  const [creatureCardOffsetX, setCreatureCardOffsetX] = useState(0)
+  const [playerCardTransition, setPlayerCardTransition] = useState<CardMotionTransition>(DEFAULT_CARD_MOTION_TRANSITION)
+  const [creatureCardTransition, setCreatureCardTransition] = useState<CardMotionTransition>(DEFAULT_CARD_MOTION_TRANSITION)
   const [showPlayerImpact, setShowPlayerImpact] = useState(false)
   const [showCreatureImpact, setShowCreatureImpact] = useState(false)
 
@@ -324,6 +365,43 @@ export default function CombatReplay({
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+  const setCardMotion = useCallback((
+    side: 'player' | 'creature',
+    destinationX: number,
+    durationMs: number,
+    acceleration = 0,
+    startSpeed = 0,
+  ) => {
+    const transition: CardMotionTransition = {
+      type: 'tween',
+      duration: durationMs / 1000,
+      ease: resolveCardMotionEase(acceleration, startSpeed),
+    }
+    if (side === 'player') {
+      setPlayerCardTransition(transition)
+      setPlayerCardOffsetX(destinationX)
+      return
+    }
+    setCreatureCardTransition(transition)
+    setCreatureCardOffsetX(destinationX)
+  }, [])
+
+  const getCardLungeDestinationX = useCallback((
+    attackerSide: 'player' | 'creature',
+    lungeGapPx: number,
+  ): number => {
+    const attackerCard = attackerSide === 'player' ? playerCardRef.current : creatureCardRef.current
+    const defenderCard = attackerSide === 'player' ? creatureCardRef.current : playerCardRef.current
+    if (!attackerCard || !defenderCard) return 0
+    const attackerRect = attackerCard.getBoundingClientRect()
+    const defenderRect = defenderCard.getBoundingClientRect()
+    const currentGapPx = attackerSide === 'player'
+      ? defenderRect.left - attackerRect.right
+      : attackerRect.left - defenderRect.right
+    const travelPx = currentGapPx - lungeGapPx
+    return attackerSide === 'player' ? travelPx : -travelPx
+  }, [])
 
   const resolveStatusParticleUrl = useCallback((
     side: 'player' | 'creature',
@@ -478,6 +556,15 @@ export default function CombatReplay({
     const setTargetVariant = attackerSide === 'player' ? setCreatureVariant : setPlayerVariant
     const frames = anim.frames
     const isRightSideAttacker = attackerSide === 'creature'
+    const attackerCardAnimation = frames?.card?.attacker ?? 'cast'
+    const targetCardAnimation = frames?.card?.target ?? 'hit'
+    const shouldLunge = attackerCardAnimation === 'lunge'
+    const lungeGapPx = frames?.card?.lungeGapPx ?? 0
+    const lungeDelayMs = Math.max(0, frames?.card?.lungeDelayMs ?? 0)
+    const lungeStartSpeed = frames?.card?.lungeStartSpeed ?? 0
+    const lungeAcceleration = frames?.card?.accelerationLunge ?? 0
+    const returnAcceleration = frames?.card?.accelerationReturn ?? 0
+    let usedLunge = false
 
     // Step 1: Spend resource BEFORE the animation fires — standard gaming feel
     const hasResourceCost = events.some(ev => ev.type === 'resource_change' && ev.resourceAfter)
@@ -494,9 +581,13 @@ export default function CombatReplay({
       if (abortRef.current) return
     }
 
-    // Step 2: Cast animation begins
-    setAttackerVariant('cast')
-    await sleep(160)
+    // Step 2: Card movement begins
+    if (attackerCardAnimation === 'cast') {
+      setAttackerVariant('cast')
+      await sleep(160)
+    } else {
+      setAttackerVariant('idle')
+    }
 
     // --- Weapon frames (all fired concurrently) ---
     const weaponFrames = (frames?.weapon ?? []).filter(f => f.url?.trim())
@@ -529,7 +620,7 @@ export default function CombatReplay({
           setActiveWeaponFrames(prev => prev.filter(e => e.key !== entry.key))
         }
       })
-      await sleep(maxWeaponMs)
+      if (!shouldLunge) await sleep(maxWeaponMs)
     }
 
     // Detect block events in this group
@@ -538,7 +629,7 @@ export default function CombatReplay({
 
     // --- Projectile frames ---
     const projFrames = frames?.projectile ?? []
-    if (anim.projectile && projFrames.length > 0) {
+    if (!shouldLunge && anim.projectile && projFrames.length > 0) {
       const srcRef = attackerSide === 'player' ? playerPortraitRef : creaturePortraitRef
       const tgtRef = attackerSide === 'player' ? creaturePortraitRef : playerPortraitRef
       const tgtPos = getPortraitPos(tgtRef)
@@ -581,6 +672,15 @@ export default function CombatReplay({
         setTimeout(() => setActiveProjectiles(prev => prev.filter(p => p.key !== key)), 400)
       })
       await sleep(maxProjMs)
+    }
+
+    if (shouldLunge) {
+      if (lungeDelayMs > 0) await sleep(lungeDelayMs)
+      const lungeDurationMs = resolveCardMotionDurationMs(CARD_LUNGE_DURATION_MS, lungeAcceleration)
+      const destinationX = getCardLungeDestinationX(attackerSide, lungeGapPx)
+      setCardMotion(attackerSide, destinationX, lungeDurationMs, lungeAcceleration, lungeStartSpeed)
+      await sleep(lungeDurationMs)
+      usedLunge = true
     }
 
     if (abortRef.current) return
@@ -637,8 +737,14 @@ export default function CombatReplay({
       await sleep(maxBlockMs)
 
       setActiveBlockFrames([])
-      setAttackerVariant('return')
-      await sleep(280)
+      if (usedLunge) {
+        const returnDurationMs = resolveCardMotionDurationMs(CARD_RETURN_DURATION_MS, returnAcceleration)
+        setCardMotion(attackerSide, 0, returnDurationMs, returnAcceleration)
+        await sleep(returnDurationMs)
+      } else {
+        setAttackerVariant('return')
+        await sleep(280)
+      }
       setAttackerVariant('idle')
       setPlayerDmg(null)
       setCreatureDmg(null)
@@ -697,7 +803,8 @@ export default function CombatReplay({
     for (const ev of events) triggerStatusBurstForEvent(ev)
 
     setTargetImpact(true)
-    setTargetVariant('hit')
+    if (targetCardAnimation === 'hit') setTargetVariant('hit')
+    else setTargetVariant('idle')
     for (const ev of targetEvents) {
       const isOnPlayer = ev.targetId === playerId
       dmgKeyRef.current++
@@ -732,14 +839,28 @@ export default function CombatReplay({
     setActiveWeaponFrames([])
     setActiveImpactFrames([])
     setTargetImpact(false)
-    setAttackerVariant('return')
+    if (usedLunge) {
+      const returnDurationMs = resolveCardMotionDurationMs(CARD_RETURN_DURATION_MS, returnAcceleration)
+      setCardMotion(attackerSide, 0, returnDurationMs, returnAcceleration)
+      await sleep(returnDurationMs)
+    } else {
+      setAttackerVariant('return')
+      await sleep(280)
+    }
     setTargetVariant('idle')
-    await sleep(280)
 
     setAttackerVariant('idle')
     setPlayerDmg(null)
     setCreatureDmg(null)
-  }, [playerId, player.weaponUrl, creature.weaponUrl, getPortraitPos, triggerStatusBurstForEvent])
+  }, [
+    playerId,
+    player.weaponUrl,
+    creature.weaponUrl,
+    getPortraitPos,
+    triggerStatusBurstForEvent,
+    getCardLungeDestinationX,
+    setCardMotion,
+  ])
 
   const animateAmbientEvents = useCallback(async (events: CombatTurnEvent[]) => {
     for (const ev of events) {
@@ -865,6 +986,8 @@ export default function CombatReplay({
     stopPlayback()
     setPlayerVariant('idle')
     setCreatureVariant('idle')
+    setPlayerCardOffsetX(0)
+    setCreatureCardOffsetX(0)
     setShowPlayerImpact(false)
     setShowCreatureImpact(false)
     setActiveWeaponFrames([])
@@ -959,23 +1082,28 @@ export default function CombatReplay({
 
         {/* Player card */}
         <motion.div
-          variants={playerVariants}
-          animate={playerVariant}
+          animate={{ x: playerCardOffsetX }}
+          transition={playerCardTransition}
           style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
         >
-          <Paper
-            ref={playerCardRef}
-            variant="outlined"
-            sx={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              gap: CARD_GAP, p: CARD_PADDING, pt: 0, borderRadius: CARD_RADIUS,
-              bgcolor: '#14121f',
-              borderColor: 'rgba(99,102,241,0.45)',
-              boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(99,102,241,0.12)',
-              position: 'relative', overflow: 'visible',
-            }}
+          <motion.div
+            variants={playerVariants}
+            animate={playerVariant}
+            style={{ position: 'relative' }}
           >
-            <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
+            <Paper
+              ref={playerCardRef}
+              variant="outlined"
+              sx={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: CARD_GAP, p: CARD_PADDING, pt: 0, borderRadius: CARD_RADIUS,
+                bgcolor: '#14121f',
+                borderColor: 'rgba(99,102,241,0.45)',
+                boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(99,102,241,0.12)',
+                position: 'relative', overflow: 'visible',
+              }}
+            >
+              <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
               <ReplayPortrait
                 url={player.portraitUrl}
                 weaponUrl={player.weaponUrl}
@@ -1074,10 +1202,11 @@ export default function CombatReplay({
                 </Box>
               ))}
             </Box>
-            {activeBlockFrames.filter(f => f.side === 'player').map(f => (
-              <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} side="player" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
-            ))}
-          </Paper>
+              {activeBlockFrames.filter(f => f.side === 'player').map(f => (
+                <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} side="player" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
+              ))}
+            </Paper>
+          </motion.div>
         </motion.div>
 
         {/* Center: VS label */}
@@ -1099,23 +1228,28 @@ export default function CombatReplay({
 
         {/* Creature card */}
         <motion.div
-          variants={creatureVariants}
-          animate={creatureVariant}
+          animate={{ x: creatureCardOffsetX }}
+          transition={creatureCardTransition}
           style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
         >
-          <Paper
-            ref={creatureCardRef}
-            variant="outlined"
-            sx={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              gap: CARD_GAP, p: CARD_PADDING, pt: 0, borderRadius: CARD_RADIUS,
-              bgcolor: '#1a1414',
-              borderColor: 'rgba(239,68,68,0.4)',
-              boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(239,68,68,0.1)',
-              position: 'relative', overflow: 'visible',
-            }}
+          <motion.div
+            variants={creatureVariants}
+            animate={creatureVariant}
+            style={{ position: 'relative' }}
           >
-            <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
+            <Paper
+              ref={creatureCardRef}
+              variant="outlined"
+              sx={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: CARD_GAP, p: CARD_PADDING, pt: 0, borderRadius: CARD_RADIUS,
+                bgcolor: '#1a1414',
+                borderColor: 'rgba(239,68,68,0.4)',
+                boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(239,68,68,0.1)',
+                position: 'relative', overflow: 'visible',
+              }}
+            >
+              <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
               <ReplayPortrait
                 url={creature.portraitUrl}
                 weaponUrl={creature.weaponUrl}
@@ -1214,10 +1348,11 @@ export default function CombatReplay({
                 </Box>
               ))}
             </Box>
-            {activeBlockFrames.filter(f => f.side === 'creature').map(f => (
-              <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
-            ))}
-          </Paper>
+              {activeBlockFrames.filter(f => f.side === 'creature').map(f => (
+                <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+              ))}
+            </Paper>
+          </motion.div>
         </motion.div>
       </Box>
 

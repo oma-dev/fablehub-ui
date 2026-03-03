@@ -55,6 +55,43 @@ const CARD_RADIUS = 3 * SCALE
 const CARD_MAX_WIDTH = Math.round(380 * SCALE)
 const VS_WIDTH = Math.round(70 * SCALE)
 const ARENA_CARD_GAP = 20
+const CARD_LUNGE_DURATION_MS = 260
+const CARD_RETURN_DURATION_MS = 240
+
+type CardMotionEase = 'linear' | [number, number, number, number]
+type CardMotionTransition = { type: 'tween'; duration: number; ease: CardMotionEase }
+
+const DEFAULT_CARD_MOTION_TRANSITION: CardMotionTransition = {
+  type: 'tween',
+  duration: CARD_RETURN_DURATION_MS / 1000,
+  ease: [0.42, 0.0, 0.58, 1.0],
+}
+
+function resolveCardMotionEase(acceleration = 0, startSpeed = 0): CardMotionEase {
+  const clamped = Math.max(-100, Math.min(100, acceleration))
+  const intensity = Math.abs(clamped) / 100
+  const clampedStartSpeed = Math.max(-100, Math.min(100, startSpeed))
+  const normalizedStartSpeed = clampedStartSpeed / 100
+  const y1 = Math.max(0, Math.min(0.95, 0.25 + normalizedStartSpeed * 0.65))
+  if (clamped > 0) {
+    const x1 = 0.45 - (0.3 * intensity)
+    return [x1, y1, 1, 1]
+  }
+  if (clamped < 0) {
+    const x2 = 0.55 + (0.35 * intensity)
+    return [0, y1, x2, 1]
+  }
+  if (clampedStartSpeed !== 0) return [0.25, y1, 0.85, 1]
+  return 'linear'
+}
+
+function resolveCardMotionDurationMs(baseDurationMs: number, acceleration = 0): number {
+  const clamped = Math.max(-100, Math.min(100, acceleration))
+  const factor = clamped >= 0
+    ? (1 - (0.55 * (clamped / 100)))
+    : (1 + (0.75 * (Math.abs(clamped) / 100)))
+  return Math.max(90, Math.round(baseDurationMs * factor))
+}
 const IMAGE_SOURCE_OPTIONS: { value: AnimationFrameImageSource; label: string }[] = [
   { value: 'url', label: 'Custom URL' },
   { value: 'weaponIcon', label: 'Weapon icon' },
@@ -312,6 +349,8 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   label: string
   variant: string
   variants: ReturnType<typeof getMotionVariants>
+  cardOffsetX?: number
+  cardTransition?: CardMotionTransition
   showImpact: boolean
   impactStyle: ImpactStyle
   impactColor: string
@@ -329,6 +368,8 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   label,
   variant,
   variants,
+  cardOffsetX = 0,
+  cardTransition = DEFAULT_CARD_MOTION_TRANSITION,
   showImpact,
   impactStyle,
   impactColor,
@@ -347,19 +388,24 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   const borderColor = isPlayer ? 'rgba(99,102,241,0.45)' : 'rgba(239,68,68,0.4)'
   const glowColor = isPlayer ? 'rgba(99,102,241,0.12)' : 'rgba(239,68,68,0.1)'
   return (
-    <motion.div variants={variants} animate={variant} style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}>
-      <Paper
-        ref={cardRef}
-        variant="outlined"
-        sx={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          gap: CARD_GAP, p: CARD_PADDING, pt: 0, borderRadius: CARD_RADIUS,
-          bgcolor: isPlayer ? '#14121f' : '#1a1414',
-          borderColor,
-          boxShadow: `0 0 24px rgba(0,0,0,0.4), 0 0 20px ${glowColor}`,
-          position: 'relative', overflow: 'visible',
-        }}
-      >
+    <motion.div
+      animate={{ x: cardOffsetX }}
+      transition={cardTransition}
+      style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
+    >
+      <motion.div variants={variants} animate={variant}>
+        <Paper
+          ref={cardRef}
+          variant="outlined"
+          sx={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: CARD_GAP, p: CARD_PADDING, pt: 0, borderRadius: CARD_RADIUS,
+            bgcolor: isPlayer ? '#14121f' : '#1a1414',
+            borderColor,
+            boxShadow: `0 0 24px rgba(0,0,0,0.4), 0 0 20px ${glowColor}`,
+            position: 'relative', overflow: 'visible',
+          }}
+        >
         <Box ref={ref} sx={{ position: 'relative', width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, flexShrink: 0 }}>
           <Box
             sx={{
@@ -477,7 +523,8 @@ const CombatantCard = forwardRef<HTMLDivElement, {
         {(activeBlockFrames ?? []).map(f => (
           <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} side={side} showMs={f.showMs} vanishMs={f.vanishMs} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={f.mirrored} id={f.key} />
         ))}
-      </Paper>
+        </Paper>
+      </motion.div>
     </motion.div>
   )
 })
@@ -757,6 +804,13 @@ export default function AnimationTest() {
   const [playerPortraitUrl, setPlayerPortraitUrl] = useState('')
   const [creaturePortraitUrl, setCreaturePortraitUrl] = useState('')
   const [trajectoryOverride, setTrajectoryOverride] = useState<'auto' | 'straight' | 'arc'>('auto')
+  const [attackerCardAnimation, setAttackerCardAnimation] = useState<'none' | 'cast' | 'lunge'>('cast')
+  const [targetCardAnimation, setTargetCardAnimation] = useState<'none' | 'hit'>('hit')
+  const [lungeGapPx, setLungeGapPx] = useState(0)
+  const [lungeDelayMs, setLungeDelayMs] = useState(0)
+  const [lungeStartSpeed, setLungeStartSpeed] = useState(0)
+  const [accelerationLunge, setAccelerationLunge] = useState(0)
+  const [accelerationReturn, setAccelerationReturn] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [logLines, setLogLines] = useState<string[]>([])
 
@@ -782,6 +836,10 @@ export default function AnimationTest() {
 
   const [playerVariant, setPlayerVariant] = useState('idle')
   const [creatureVariant, setCreatureVariant] = useState('idle')
+  const [playerCardOffsetX, setPlayerCardOffsetX] = useState(0)
+  const [creatureCardOffsetX, setCreatureCardOffsetX] = useState(0)
+  const [playerCardTransition, setPlayerCardTransition] = useState<CardMotionTransition>(DEFAULT_CARD_MOTION_TRANSITION)
+  const [creatureCardTransition, setCreatureCardTransition] = useState<CardMotionTransition>(DEFAULT_CARD_MOTION_TRANSITION)
   const [showPlayerImpact, setShowPlayerImpact] = useState(false)
   const [showCreatureImpact, setShowCreatureImpact] = useState(false)
   const [playerDmg, setPlayerDmg] = useState<{ value: number; type: 'damage' | 'heal' | 'block'; key: number } | null>(null)
@@ -886,12 +944,30 @@ export default function AnimationTest() {
         ...(f.rotationStart !== 0 ? { rotationStart: f.rotationStart } : {}),
         ...(f.rotationEnd !== f.rotationStart ? { rotationEnd: f.rotationEnd } : {}),
       }))
-      if (!w.length && !p.length && !im.length && !b.length) return undefined
+      const card = {
+        attacker: attackerCardAnimation,
+        target: targetCardAnimation,
+        ...(lungeGapPx !== 0 ? { lungeGapPx } : {}),
+        ...(lungeDelayMs !== 0 ? { lungeDelayMs } : {}),
+        ...(lungeStartSpeed !== 0 ? { lungeStartSpeed } : {}),
+        ...(accelerationLunge !== 0 ? { accelerationLunge } : {}),
+        ...(accelerationReturn !== 0 ? { accelerationReturn } : {}),
+      }
+      const hasDefaultCard =
+        card.attacker === 'cast'
+        && card.target === 'hit'
+        && card.lungeGapPx == null
+        && card.lungeDelayMs == null
+        && card.lungeStartSpeed == null
+        && card.accelerationLunge == null
+        && card.accelerationReturn == null
+      if (!w.length && !p.length && !im.length && !b.length && hasDefaultCard) return undefined
       return {
         ...(w.length ? { weapon: w } : {}),
         ...(p.length ? { projectile: p } : {}),
         ...(im.length ? { impact: im } : {}),
         ...(b.length ? { block: b } : {}),
+        ...(hasDefaultCard ? {} : { card }),
       }
     }
     const ability: Record<string, unknown> = {
@@ -926,7 +1002,18 @@ export default function AnimationTest() {
   }, [abilityId, abilityName, abilityType, abilityDescription, abilityIconUrl, cooldownTurns,
     resourceCostId, resourceCostAmount, unlockCost, minLevel, effectKind, effectAmount,
     effectPercentage, effectLifestealPct, reactiveBaseChance, reactiveScalingStat, reactiveScalingCoeff,
-    weaponFrames, projectileFrames, impactFrames, blockFrames])
+    weaponFrames,
+    projectileFrames,
+    impactFrames,
+    blockFrames,
+    attackerCardAnimation,
+    targetCardAnimation,
+    lungeGapPx,
+    lungeDelayMs,
+    lungeStartSpeed,
+    accelerationLunge,
+    accelerationReturn,
+  ])
 
   const handleExportJson = useCallback(() => {
     const json = JSON.stringify(buildAbilityJson(), null, 2)
@@ -1005,6 +1092,13 @@ export default function AnimationTest() {
           rotationStart: f.rotationStart ?? 0,
           rotationEnd: f.rotationEnd ?? f.rotationStart ?? 0,
         })))
+        setAttackerCardAnimation(af.card?.attacker ?? 'cast')
+        setTargetCardAnimation(af.card?.target ?? 'hit')
+        setLungeGapPx(Number(af.card?.lungeGapPx ?? 0))
+        setLungeDelayMs(Number(af.card?.lungeDelayMs ?? 0))
+        setLungeStartSpeed(Number(af.card?.lungeStartSpeed ?? 0))
+        setAccelerationLunge(Number(af.card?.accelerationLunge ?? 0))
+        setAccelerationReturn(Number(af.card?.accelerationReturn ?? 0))
       }
       setJsonImportText('')
     } catch {
@@ -1030,6 +1124,40 @@ export default function AnimationTest() {
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+  const setCardMotion = useCallback((
+    side: 'player' | 'creature',
+    destinationX: number,
+    durationMs: number,
+    acceleration = 0,
+    startSpeed = 0,
+  ) => {
+    const transition: CardMotionTransition = {
+      type: 'tween',
+      duration: durationMs / 1000,
+      ease: resolveCardMotionEase(acceleration, startSpeed),
+    }
+    if (side === 'player') {
+      setPlayerCardTransition(transition)
+      setPlayerCardOffsetX(destinationX)
+      return
+    }
+    setCreatureCardTransition(transition)
+    setCreatureCardOffsetX(destinationX)
+  }, [])
+
+  const getCardLungeDestinationX = useCallback((side: 'player' | 'creature', gapPx: number): number => {
+    const attackerCard = side === 'player' ? playerCardRef.current : creatureCardRef.current
+    const defenderCard = side === 'player' ? creatureCardRef.current : playerCardRef.current
+    if (!attackerCard || !defenderCard) return 0
+    const attackerRect = attackerCard.getBoundingClientRect()
+    const defenderRect = defenderCard.getBoundingClientRect()
+    const currentGapPx = side === 'player'
+      ? defenderRect.left - attackerRect.right
+      : attackerRect.left - defenderRect.right
+    const travelPx = currentGapPx - gapPx
+    return side === 'player' ? travelPx : -travelPx
+  }, [])
 
   const resolveFrameUrl = useCallback((source: AnimationFrameImageSource, customUrl: string): string => {
     if (source === 'weaponIcon') return weaponUrl?.trim() || ''
@@ -1150,13 +1278,19 @@ export default function AnimationTest() {
     const sideLabel = side === 'player' ? 'Player' : 'Creature'
     const isRightSideAttacker = side === 'creature'
     const isRightSideDefender = side === 'player'
+    const shouldLunge = attackerCardAnimation === 'lunge'
+    let usedLunge = false
 
 
     const isBlocked = simulateBlock && blockFrames.some(f => f.enabled)
     log(`${sideLabel} attacks with "${styleId}"${isBlocked ? ' (BLOCKED!)' : ''}`)
 
-    setAttVar('cast')
-    await sleep(160)
+    if (attackerCardAnimation === 'cast') {
+      setAttVar('cast')
+      await sleep(160)
+    } else {
+      setAttVar('idle')
+    }
 
     // --- Weapon frames ---
     const activeWeaponForms = weaponFrames.filter(f => f.enabled)
@@ -1196,7 +1330,7 @@ export default function AnimationTest() {
 
     // --- Projectile frames (lifetimeMs = flight duration) ---
     const activeProjForms = projectileFrames.filter(f => f.enabled)
-    if (activeProjForms.length > 0) {
+    if (!shouldLunge && activeProjForms.length > 0) {
       const dir = side === 'player' ? 'left-to-right' as const : 'right-to-left' as const
       const srcRef = side === 'player' ? playerPortraitRef : creaturePortraitRef
       const tgtRef = side === 'player' ? creaturePortraitRef : playerPortraitRef
@@ -1232,7 +1366,7 @@ export default function AnimationTest() {
         setTimeout(() => setActiveProjectiles(prev => prev.filter(p => p.key !== key)), 400)
       })
       await sleep(maxProjMs)
-    } else {
+    } else if (!shouldLunge) {
       const traj = trajectoryOverride === 'auto' ? anim.projectile : trajectoryOverride
       if (traj) {
         const dir = side === 'player' ? 'left-to-right' as const : 'right-to-left' as const
@@ -1253,6 +1387,15 @@ export default function AnimationTest() {
         setTimeout(() => setActiveProjectiles(prev => prev.filter(p => p.key !== key)), 400)
         await sleep(flightMs)
       }
+    }
+
+    if (shouldLunge) {
+      if (lungeDelayMs > 0) await sleep(lungeDelayMs)
+      const lungeDurationMs = resolveCardMotionDurationMs(CARD_LUNGE_DURATION_MS, accelerationLunge)
+      const destinationX = getCardLungeDestinationX(side, lungeGapPx)
+      setCardMotion(side, destinationX, lungeDurationMs, accelerationLunge, lungeStartSpeed)
+      await sleep(lungeDurationMs)
+      usedLunge = true
     }
 
     // --- Block frames (if blocked) ---
@@ -1319,7 +1462,8 @@ export default function AnimationTest() {
         })
         const dmgValue = Math.floor(Math.random() * 30) + 5
         setTgtImpact(true)
-        setTgtVar('hit')
+        if (targetCardAnimation === 'hit') setTgtVar('hit')
+        else setTgtVar('idle')
         dmgKeyRef.current++
         setTgtDmg({ value: dmgValue, type: 'damage', key: dmgKeyRef.current })
         log(`  Impact → ${dmgValue} damage`)
@@ -1327,7 +1471,8 @@ export default function AnimationTest() {
       } else {
         const dmgValue = Math.floor(Math.random() * 30) + 5
         setTgtImpact(true)
-        setTgtVar('hit')
+        if (targetCardAnimation === 'hit') setTgtVar('hit')
+        else setTgtVar('idle')
         dmgKeyRef.current++
         setTgtDmg({ value: dmgValue, type: 'damage', key: dmgKeyRef.current })
         log(`  Impact → ${dmgValue} damage`)
@@ -1339,17 +1484,43 @@ export default function AnimationTest() {
     setTargetImpactFrames([])
     setActiveBlockFrames([])
     setTgtImpact(false)
-    setAttVar('return')
+    if (usedLunge) {
+      const returnDurationMs = resolveCardMotionDurationMs(CARD_RETURN_DURATION_MS, accelerationReturn)
+      setCardMotion(side, 0, returnDurationMs, accelerationReturn)
+      await sleep(returnDurationMs)
+    } else {
+      setAttVar('return')
+      await sleep(280)
+    }
     setTgtVar('idle')
-    await sleep(280)
     setAttVar('idle')
     setTgtDmg(null)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [log, weaponFrames, projectileFrames, impactFrames, blockFrames, simulateBlock, trajectoryOverride, resolveFrameUrl, getPortraitPos])
+  }, [
+    log,
+    weaponFrames,
+    projectileFrames,
+    impactFrames,
+    blockFrames,
+    simulateBlock,
+    trajectoryOverride,
+    resolveFrameUrl,
+    getPortraitPos,
+    attackerCardAnimation,
+    targetCardAnimation,
+    lungeGapPx,
+    lungeDelayMs,
+    lungeStartSpeed,
+    accelerationLunge,
+    accelerationReturn,
+    getCardLungeDestinationX,
+    setCardMotion,
+  ])
 
   const handlePlay = useCallback(async () => {
     if (playing) return
     setPlaying(true)
+    setPlayerCardOffsetX(0)
+    setCreatureCardOffsetX(0)
     setLogLines([])
     await runAttack('player', attackerAnim, attackerStyle)
     await sleep(400)
@@ -1361,6 +1532,8 @@ export default function AnimationTest() {
   const handlePlayerAttack = useCallback(async () => {
     if (playing) return
     setPlaying(true)
+    setPlayerCardOffsetX(0)
+    setCreatureCardOffsetX(0)
     await runAttack('player', attackerAnim, attackerStyle)
     setPlaying(false)
   }, [playing, attackerAnim, attackerStyle, runAttack])
@@ -1368,6 +1541,8 @@ export default function AnimationTest() {
   const handleCreatureAttack = useCallback(async () => {
     if (playing) return
     setPlaying(true)
+    setPlayerCardOffsetX(0)
+    setCreatureCardOffsetX(0)
     await runAttack('creature', defenderAnim, defenderStyle)
     setPlaying(false)
   }, [playing, defenderAnim, defenderStyle, runAttack])
@@ -1405,10 +1580,31 @@ export default function AnimationTest() {
           </Select>
         </FormControl>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Chip size="small" label="motion: cast" color="info" variant="outlined" />
+          <Chip size="small" label={`caster card: ${attackerCardAnimation}`} color="info" variant="outlined" />
+          <Chip size="small" label={`target card: ${targetCardAnimation}`} color="info" variant="outlined" />
           <Chip size="small" label={`projectile: ${attackerAnim.projectile ?? 'none'}`} color={attackerAnim.projectile ? 'success' : 'default'} variant="outlined" />
           <Chip size="small" label="impact: generic" sx={{ borderColor: attackerAnim.impactColor, color: attackerAnim.impactColor }} variant="outlined" />
         </Box>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel>Caster card</InputLabel>
+          <Select value={attackerCardAnimation} label="Caster card" onChange={(e) => setAttackerCardAnimation(e.target.value as 'none' | 'cast' | 'lunge')}>
+            <MenuItem value="none">None</MenuItem>
+            <MenuItem value="cast">Cast</MenuItem>
+            <MenuItem value="lunge">Lunge</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel>Target card</InputLabel>
+          <Select value={targetCardAnimation} label="Target card" onChange={(e) => setTargetCardAnimation(e.target.value as 'none' | 'hit')}>
+            <MenuItem value="none">None</MenuItem>
+            <MenuItem value="hit">Hit</MenuItem>
+          </Select>
+        </FormControl>
+        <NumField label="Lunge gap (px)" value={lungeGapPx} onChange={setLungeGapPx} min={-300} max={400} step={5} />
+        <NumField label="Lunge delay (ms)" value={lungeDelayMs} onChange={setLungeDelayMs} min={0} max={3000} step={10} />
+        <NumField label="Lunge start speed" value={lungeStartSpeed} onChange={setLungeStartSpeed} min={-100} max={100} step={1} />
+        <NumField label="Lunge accel" value={accelerationLunge} onChange={setAccelerationLunge} min={-100} max={100} step={1} />
+        <NumField label="Return accel" value={accelerationReturn} onChange={setAccelerationReturn} min={-100} max={100} step={1} />
       </Paper>
 
       {/* Portrait URLs */}
@@ -1481,17 +1677,25 @@ export default function AnimationTest() {
             <Typography variant="subtitle2" fontWeight={700} color="text.secondary">② Projectile (caster → target)</Typography>
             <Button size="small" startIcon={<AddIcon />} onClick={() => setProjectileFrames(prev => [...prev, defaultProjectileFrame()])}>Add</Button>
           </Box>
-          {projectileFrames.map((f, i) => (
-            <ProjectileFrameEditor
-              key={i}
-              frame={f}
-              idx={i}
-              onChange={(updated) => setProjectileFrames(prev => prev.map((x, j) => j === i ? updated : x))}
-              onRemove={() => setProjectileFrames(prev => prev.filter((_, j) => j !== i))}
-              resolveUrl={resolveFrameUrl}
-            />
-          ))}
-          {projectileFrames.length === 0 && <Typography variant="body2" color="text.disabled" sx={{ ml: 1 }}>No projectile frames. Click Add to create one.</Typography>}
+          {attackerCardAnimation === 'lunge' ? (
+            <Typography variant="body2" color="warning.main" sx={{ ml: 1 }}>
+              Projectile frames are ignored while caster card animation is set to lunge.
+            </Typography>
+          ) : (
+            <>
+              {projectileFrames.map((f, i) => (
+                <ProjectileFrameEditor
+                  key={i}
+                  frame={f}
+                  idx={i}
+                  onChange={(updated) => setProjectileFrames(prev => prev.map((x, j) => j === i ? updated : x))}
+                  onRemove={() => setProjectileFrames(prev => prev.filter((_, j) => j !== i))}
+                  resolveUrl={resolveFrameUrl}
+                />
+              ))}
+              {projectileFrames.length === 0 && <Typography variant="body2" color="text.disabled" sx={{ ml: 1 }}>No projectile frames. Click Add to create one.</Typography>}
+            </>
+          )}
         </Box>
 
         {/* Impact frames */}
@@ -1691,6 +1895,8 @@ export default function AnimationTest() {
             label="Player"
             variant={playerVariant}
             variants={playerVariants}
+            cardOffsetX={playerCardOffsetX}
+            cardTransition={playerCardTransition}
             showImpact={showPlayerImpact}
             impactStyle="generic"
             impactColor={defenderAnim.impactColor}
@@ -1727,6 +1933,8 @@ export default function AnimationTest() {
             label="Creature"
             variant={creatureVariant}
             variants={creatureVariants}
+            cardOffsetX={creatureCardOffsetX}
+            cardTransition={creatureCardTransition}
             showImpact={showCreatureImpact}
             impactStyle="generic"
             impactColor={attackerAnim.impactColor}

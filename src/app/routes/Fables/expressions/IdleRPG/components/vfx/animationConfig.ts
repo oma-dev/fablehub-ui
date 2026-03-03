@@ -143,11 +143,28 @@ export interface AnimationBlockFrame {
 }
 
 /** Attack animation as arrays of optional PNG frames per phase. Multiple entries play concurrently. */
+export type CardAttackerAnimation = 'none' | 'cast' | 'lunge'
+export type CardTargetAnimation = 'none' | 'hit'
+
+export interface CardAnimationConfig {
+  attacker?: CardAttackerAnimation
+  target?: CardTargetAnimation
+  /** 0 = borders touch, positive = gap, negative = overlap */
+  lungeGapPx?: number
+  /** Delay in ms from weapon phase start to lunge movement start. */
+  lungeDelayMs?: number
+  /** Initial lunge speed curve control (0 = neutral, positive = faster start). */
+  lungeStartSpeed?: number
+  accelerationLunge?: number
+  accelerationReturn?: number
+}
+
 export interface AnimationFrames {
   weapon?: AnimationWeaponFrame[]
   projectile?: AnimationProjectileFrame[]
   impact?: AnimationImpactFrame[]
   block?: AnimationBlockFrame[]
+  card?: CardAnimationConfig
 }
 
 export type ProjectileType = 'straight' | 'arc' | null
@@ -213,8 +230,9 @@ export function getAttackAnimationConfig(
   const hasProjectile = (animationFrames?.projectile?.length ?? 0) > 0
   const hasImpact = (animationFrames?.impact?.length ?? 0) > 0
   const hasBlock = (animationFrames?.block?.length ?? 0) > 0
+  const hasCard = !!animationFrames?.card
 
-  if (animationFrames && (hasWeapon || hasProjectile || hasImpact || hasBlock)) {
+  if (animationFrames && (hasWeapon || hasProjectile || hasImpact || hasBlock || hasCard)) {
     // Use trajectory from first projectile frame, else fallback
     const projectile: ProjectileType = hasProjectile
       ? animationFrames.projectile![0].trajectory
@@ -261,6 +279,10 @@ export function resolveAnimationFrames(
   if (!frames) return null
   const result: AnimationFrames = {}
 
+  if (frames.card) {
+    result.card = { ...frames.card }
+  }
+
   if (frames.weapon?.length) {
     const resolved = frames.weapon.flatMap((f) => {
       const url = resolveFrameUrl(f, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
@@ -301,6 +323,6 @@ export function resolveAnimationFrames(
     if (resolved.length) result.block = resolved
   }
 
-  if (!result.weapon && !result.projectile && !result.impact && !result.block) return null
+  if (!result.weapon && !result.projectile && !result.impact && !result.block && !result.card) return null
   return result
 }

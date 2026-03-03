@@ -45,8 +45,45 @@ const VS_WIDTH = Math.round(70 * SCALE)
 const TURN_FONT_SIZE = Math.round(14 * SCALE)
 const RESULT_FONT_SIZE = `${1.5 * SCALE}rem`
 const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
+const CARD_LUNGE_DURATION_MS = 260
+const CARD_RETURN_DURATION_MS = 240
 const DAMAGE_NUMBER_EVENT_TYPES = new Set<CombatEventType>(['damage', 'heal', 'dot_tick', 'hot_tick', 'execute'])
 const STATUS_BURST_EVENT_TYPES = new Set<CombatEventType>(['status_applied', 'dot_tick', 'hot_tick'])
+
+type CardMotionEase = 'linear' | [number, number, number, number]
+type CardMotionTransition = { type: 'tween'; duration: number; ease: CardMotionEase }
+
+const DEFAULT_CARD_MOTION_TRANSITION: CardMotionTransition = {
+  type: 'tween',
+  duration: CARD_RETURN_DURATION_MS / 1000,
+  ease: [0.42, 0.0, 0.58, 1.0],
+}
+
+function resolveCardMotionEase(acceleration = 0, startSpeed = 0): CardMotionEase {
+  const clamped = Math.max(-100, Math.min(100, acceleration))
+  const intensity = Math.abs(clamped) / 100
+  const clampedStartSpeed = Math.max(-100, Math.min(100, startSpeed))
+  const normalizedStartSpeed = clampedStartSpeed / 100
+  const y1 = Math.max(0, Math.min(0.95, 0.25 + normalizedStartSpeed * 0.65))
+  if (clamped > 0) {
+    const x1 = 0.45 - (0.3 * intensity)
+    return [x1, y1, 1, 1]
+  }
+  if (clamped < 0) {
+    const x2 = 0.55 + (0.35 * intensity)
+    return [0, y1, x2, 1]
+  }
+  if (clampedStartSpeed !== 0) return [0.25, y1, 0.85, 1]
+  return 'linear'
+}
+
+function resolveCardMotionDurationMs(baseDurationMs: number, acceleration = 0): number {
+  const clamped = Math.max(-100, Math.min(100, acceleration))
+  const factor = clamped >= 0
+    ? (1 - (0.55 * (clamped / 100)))
+    : (1 + (0.75 * (Math.abs(clamped) / 100)))
+  return Math.max(90, Math.round(baseDurationMs * factor))
+}
 
 function clampSoundVolume(volumePercent?: number | null): number {
   if (volumePercent == null || Number.isNaN(volumePercent)) return 1
@@ -126,6 +163,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const arenaRef = useRef<HTMLDivElement>(null)
   const partyPortraitRef = useRef<HTMLDivElement>(null)
   const bossPortraitRef = useRef<HTMLDivElement>(null)
+  const frontPartyCardRef = useRef<HTMLDivElement>(null)
 
   const partyVariants = useMemo(() => getMotionVariants(DEFAULT_ANIM, 'left'), [])
   const bossVariants = useMemo(() => getMotionVariants(DEFAULT_ANIM, 'right'), [])
@@ -138,6 +176,10 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   })
   const [partyVariant, setPartyVariant] = useState('idle')
   const [bossVariant, setBossVariant] = useState('idle')
+  const [partyCardOffsetX, setPartyCardOffsetX] = useState(0)
+  const [bossCardOffsetX, setBossCardOffsetX] = useState(0)
+  const [partyCardTransition, setPartyCardTransition] = useState<CardMotionTransition>(DEFAULT_CARD_MOTION_TRANSITION)
+  const [bossCardTransition, setBossCardTransition] = useState<CardMotionTransition>(DEFAULT_CARD_MOTION_TRANSITION)
   const [showPartyImpact, setShowPartyImpact] = useState(false)
   const [showBossImpact, setShowBossImpact] = useState(false)
   const [showProjectile, setShowProjectile] = useState<'left-to-right' | 'right-to-left' | null>(null)
@@ -251,6 +293,43 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+  const setCardMotion = useCallback((
+    side: 'party' | 'boss',
+    destinationX: number,
+    durationMs: number,
+    acceleration = 0,
+    startSpeed = 0,
+  ) => {
+    const transition: CardMotionTransition = {
+      type: 'tween',
+      duration: durationMs / 1000,
+      ease: resolveCardMotionEase(acceleration, startSpeed),
+    }
+    if (side === 'party') {
+      setPartyCardTransition(transition)
+      setPartyCardOffsetX(destinationX)
+      return
+    }
+    setBossCardTransition(transition)
+    setBossCardOffsetX(destinationX)
+  }, [])
+
+  const getCardLungeDestinationX = useCallback((
+    attackerSide: 'party' | 'boss',
+    lungeGapPx: number,
+  ): number => {
+    const attackerCard = attackerSide === 'party' ? frontPartyCardRef.current : bossCardRef.current
+    const defenderCard = attackerSide === 'party' ? bossCardRef.current : frontPartyCardRef.current
+    if (!attackerCard || !defenderCard) return 0
+    const attackerRect = attackerCard.getBoundingClientRect()
+    const defenderRect = defenderCard.getBoundingClientRect()
+    const currentGapPx = attackerSide === 'party'
+      ? defenderRect.left - attackerRect.right
+      : attackerRect.left - defenderRect.right
+    const travelPx = currentGapPx - lungeGapPx
+    return attackerSide === 'party' ? travelPx : -travelPx
+  }, [])
 
   const resolveStatusParticleUrl = useCallback((
     side: 'party' | 'boss',
@@ -368,6 +447,15 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       const setTargetVariant = attackerSide === 'party' ? setBossVariant : setPartyVariant
       const frames = anim.frames
       const isRightSideAttacker = attackerSide === 'boss'
+      const attackerCardAnimation = frames?.card?.attacker ?? 'cast'
+      const targetCardAnimation = frames?.card?.target ?? 'hit'
+      const shouldLunge = attackerCardAnimation === 'lunge'
+      const lungeGapPx = frames?.card?.lungeGapPx ?? 0
+      const lungeDelayMs = Math.max(0, frames?.card?.lungeDelayMs ?? 0)
+      const lungeStartSpeed = frames?.card?.lungeStartSpeed ?? 0
+      const lungeAcceleration = frames?.card?.accelerationLunge ?? 0
+      const returnAcceleration = frames?.card?.accelerationReturn ?? 0
+      let usedLunge = false
 
       // Resource events first
       const hasResourceCost = events.some(ev => ev.type === 'resource_change' && ev.resourceAfter)
@@ -376,8 +464,12 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         if (abortRef.current) return
       }
 
-      setAttackerVariant('cast')
-      await sleep(160)
+      if (attackerCardAnimation === 'cast') {
+        setAttackerVariant('cast')
+        await sleep(160)
+      } else {
+        setAttackerVariant('idle')
+      }
 
       // Detect block
       const blockEvent = events.find(ev => ev.type === 'block' && ev.blocked)
@@ -408,7 +500,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
             setActiveWeaponFrames(prev => prev.filter(e => e.key !== entry.key))
           }
         })
-        await sleep(maxWeaponMs)
+        if (!shouldLunge) await sleep(maxWeaponMs)
       }
 
       // Projectile
@@ -419,7 +511,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       const tgtPos = getPortraitPos(tgtRef)
 
       const projFrames = frames?.projectile ?? []
-      if (anim.projectile) {
+      if (!shouldLunge && anim.projectile) {
         setProjectileMirrored(isRightSideAttacker)
         if (projFrames.length > 0) {
           const firstFrame = projFrames[0]
@@ -451,6 +543,15 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           await sleep(flightMs)
           setShowProjectile(null)
         }
+      }
+
+      if (shouldLunge) {
+        if (lungeDelayMs > 0) await sleep(lungeDelayMs)
+        const lungeDurationMs = resolveCardMotionDurationMs(CARD_LUNGE_DURATION_MS, lungeAcceleration)
+        const destinationX = getCardLungeDestinationX(attackerSide, lungeGapPx)
+        setCardMotion(attackerSide, destinationX, lungeDurationMs, lungeAcceleration, lungeStartSpeed)
+        await sleep(lungeDurationMs)
+        usedLunge = true
       }
 
       if (abortRef.current) return
@@ -486,8 +587,14 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         await sleep(maxBlockMs)
         setActiveBlockFrames([])
         setActiveWeaponFrames([])
-        setAttackerVariant('return')
-        await sleep(280)
+        if (usedLunge) {
+          const returnDurationMs = resolveCardMotionDurationMs(CARD_RETURN_DURATION_MS, returnAcceleration)
+          setCardMotion(attackerSide, 0, returnDurationMs, returnAcceleration)
+          await sleep(returnDurationMs)
+        } else {
+          setAttackerVariant('return')
+          await sleep(280)
+        }
         setAttackerVariant('idle')
         setTargetDmg(null)
         return
@@ -520,7 +627,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       }
 
       setTargetImpact(true)
-      setTargetVariant('hit')
+      if (targetCardAnimation === 'hit') setTargetVariant('hit')
+      else setTargetVariant('idle')
 
       const combatEvents = events
         .filter(ev => ev.type !== 'resource_change' && ev.type !== 'block')
@@ -552,14 +660,27 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       setActiveWeaponFrames([])
       setActiveImpactFrames([])
       setTargetImpact(false)
-      setAttackerVariant('return')
+      if (usedLunge) {
+        const returnDurationMs = resolveCardMotionDurationMs(CARD_RETURN_DURATION_MS, returnAcceleration)
+        setCardMotion(attackerSide, 0, returnDurationMs, returnAcceleration)
+        await sleep(returnDurationMs)
+      } else {
+        setAttackerVariant('return')
+        await sleep(280)
+      }
       setTargetVariant('idle')
-      await sleep(280)
 
       setAttackerVariant('idle')
       setTargetDmg(null)
     },
-    [getPortraitPos, bossId, partyOrder, triggerStatusBurstForEvent],
+    [
+      getPortraitPos,
+      bossId,
+      partyOrder,
+      triggerStatusBurstForEvent,
+      getCardLungeDestinationX,
+      setCardMotion,
+    ],
   )
 
   const animateAmbientEvents = useCallback(async (events: CombatTurnEvent[]) => {
@@ -665,6 +786,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     stopPlayback()
     setPartyVariant('idle')
     setBossVariant('idle')
+    setPartyCardOffsetX(0)
+    setBossCardOffsetX(0)
     setShowPartyImpact(false)
     setShowBossImpact(false)
     setShowProjectile(null)
@@ -949,10 +1072,12 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                   >
                     <Box>
                       {isFront ? (
-                        <motion.div variants={partyVariants} animate={partyVariant}>
-                          <Paper variant="outlined" sx={paperSx}>
-                            {paperContent}
-                          </Paper>
+                        <motion.div animate={{ x: partyCardOffsetX }} transition={partyCardTransition}>
+                          <motion.div variants={partyVariants} animate={partyVariant}>
+                            <Paper ref={frontPartyCardRef} variant="outlined" sx={paperSx}>
+                              {paperContent}
+                            </Paper>
+                          </motion.div>
                         </motion.div>
                       ) : (
                         <Paper variant="outlined" sx={paperSx}>
@@ -996,29 +1121,30 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           {/* Boss card (same style as CombatReplay creature card) */}
           {bossId && boss && (
             <motion.div
-              variants={bossVariants}
-              animate={bossVariant}
+              animate={{ x: bossCardOffsetX }}
+              transition={bossCardTransition}
               style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
             >
-              <Paper
-                ref={bossCardRef}
-                variant="outlined"
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: CARD_GAP,
-                  p: CARD_PADDING,
-                  pt: 0,
-                  borderRadius: CARD_RADIUS,
-                  flex: 1,
-                  maxWidth: CARD_MAX_WIDTH,
-                  bgcolor: '#1a1414',
-                  borderColor: 'rgba(239,68,68,0.4)',
-                  boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(239,68,68,0.1)',
-                  position: 'relative', overflow: 'visible',
-                }}
-              >
+              <motion.div variants={bossVariants} animate={bossVariant} style={{ position: 'relative' }}>
+                <Paper
+                  ref={bossCardRef}
+                  variant="outlined"
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: CARD_GAP,
+                    p: CARD_PADDING,
+                    pt: 0,
+                    borderRadius: CARD_RADIUS,
+                    flex: 1,
+                    maxWidth: CARD_MAX_WIDTH,
+                    bgcolor: '#1a1414',
+                    borderColor: 'rgba(239,68,68,0.4)',
+                    boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(239,68,68,0.1)',
+                    position: 'relative', overflow: 'visible',
+                  }}
+                >
                 <Box ref={bossPortraitRef} sx={{ position: 'relative' }}>
                   <ReplayPortrait
                     url={boss.iconUrl ?? undefined}
@@ -1128,10 +1254,11 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                     </Box>
                   ))}
                 </Box>
-                {activeBlockFrames.filter(f => f.side === 'boss').map(f => (
-                  <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
-                ))}
-              </Paper>
+                  {activeBlockFrames.filter(f => f.side === 'boss').map(f => (
+                    <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+                  ))}
+                </Paper>
+              </motion.div>
             </motion.div>
           )}
         </Box>

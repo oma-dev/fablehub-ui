@@ -186,11 +186,25 @@ export interface AnimationBlockFrame {
 }
 
 /** Attack animation as arrays of optional PNG frames per phase. Multiple entries play concurrently. */
+export type CardAttackerAnimation = 'none' | 'cast' | 'lunge'
+export type CardTargetAnimation = 'none' | 'hit'
+
+export interface CardAnimationConfig {
+  attacker?: CardAttackerAnimation
+  target?: CardTargetAnimation
+  lungeGapPx?: number
+  lungeDelayMs?: number
+  lungeStartSpeed?: number
+  accelerationLunge?: number
+  accelerationReturn?: number
+}
+
 export interface AnimationFrames {
   weapon?: AnimationWeaponFrame[]
   projectile?: AnimationProjectileFrame[]
   impact?: AnimationImpactFrame[]
   block?: AnimationBlockFrame[]
+  card?: CardAnimationConfig
 }
 
 /** Status animation particle shown around the holder card center in replay. */
