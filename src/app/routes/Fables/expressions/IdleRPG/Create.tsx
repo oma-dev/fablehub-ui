@@ -39,10 +39,13 @@ import type {
   MerchantListing,
   Quest,
   Raid,
+  StatusEffectTemplate,
 } from '../../../../../services/api'
 import { RARITY_NAME_TO_NUMBER, RARITY_NAMES } from '../../../../../services/api'
 import { exampleFormState } from './examplePack'
 import AbilityAnimationEditor, { type AbilityAnimFrames, emptyAnimFrames, hydrateAnimFrames, buildAnimationFrames } from './components/AbilityAnimationEditor'
+import EffectsEditor, { type EffectFormRow, createEmptyEffectRow, hydrateEffectRows, buildEffectPayload } from './components/EffectsEditor'
+import StatusAnimationEditor, { type StatusParticleForm, createEmptyStatusParticle, hydrateStatusAnimationParticles, buildStatusAnimation } from './components/StatusAnimationEditor'
 
 // --- Helpers ---
 function parseTags(s: string): string[] {
@@ -97,8 +100,6 @@ const DERIVED_STATS: Array<{ id: DerivedStatId; label: string }> = [
 const SLOTS = ['attack_source', 'defense_layer'] as const
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
 const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate', 'reactive']
-const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal'] as const
-
 type DerivedScaleForm = {
   sourceKind: 'main_stat' | 'equipped_weapon_damage' | 'equipped_protective_armor'
   sourceStatId: string
@@ -177,30 +178,6 @@ function buildDerivedStats(rows: DerivedStatForm[]): Partial<Record<DerivedStatI
   return out
 }
 
-function hydrateScalingRows(
-  rows: Array<{ percent?: number; source: { kind: 'main_stat'; statId: string } | { kind: 'equipped_weapon_damage' } | { kind: 'equipped_protective_armor' } }> | undefined,
-  fallbackMainStatId: string,
-): DerivedScaleForm[] {
-  return (rows ?? []).map((term) => ({
-    sourceKind: term.source.kind,
-    sourceStatId: term.source.kind === 'main_stat' ? term.source.statId : fallbackMainStatId,
-    percent: String(term.percent ?? 0),
-  }))
-}
-
-function buildScalingRows(rows: DerivedScaleForm[]): Array<{ percent: number; source: { kind: 'main_stat'; statId: string } | { kind: 'equipped_weapon_damage' } | { kind: 'equipped_protective_armor' } }> {
-  return rows
-    .filter((s) => s.percent.trim() !== '' && !Number.isNaN(Number(s.percent)))
-    .map((s) => ({
-      percent: Number(s.percent),
-      source: s.sourceKind === 'main_stat'
-        ? { kind: 'main_stat' as const, statId: s.sourceStatId.trim() || 'STR' }
-        : s.sourceKind === 'equipped_weapon_damage'
-          ? { kind: 'equipped_weapon_damage' as const }
-          : { kind: 'equipped_protective_armor' as const },
-    }))
-}
-
 function hydrateDerivedModifiers(mods: DerivedStatModifier[] | undefined): DerivedModifierForm[] {
   return (mods ?? []).map((m) => ({
     statId: m.statId,
@@ -248,11 +225,20 @@ type ResourceForm = { id: string; name: string; description: string; colorHex: s
 type AbilityForm = {
   id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string
   cooldownTurns: string; resourceCostId: string; resourceCostAmount: string; unlockCost: string; minLevel: string
-  effectKind: string; effectAmount: string; effectPercentage: string; effectLifestealPct: string
-  effectScalingTerms: DerivedScaleForm[]
+  effects: EffectFormRow[]
   derivedStatModifiers: DerivedModifierForm[]
   animFrames: AbilityAnimFrames
   reactiveBaseChance: string; reactiveScalingStat: string; reactiveScalingCoeff: string
+}
+type StatusEffectForm = {
+  id: string
+  name: string
+  description: string
+  iconUrl: string
+  category: 'buff' | 'debuff'
+  maxStacks: string
+  effects: EffectFormRow[]
+  animationParticles: StatusParticleForm[]
 }
 type ClassForm = {
   id: string
@@ -293,11 +279,20 @@ const emptyResource = (): ResourceForm => ({ id: '', name: '', description: '', 
 const emptyAbility = (): AbilityForm => ({
   id: '', name: '', abilityType: 'regular', description: '', iconUrl: '',
   cooldownTurns: '0', resourceCostId: '', resourceCostAmount: '0', unlockCost: '1', minLevel: '1',
-  effectKind: 'damage', effectAmount: '0', effectPercentage: '0', effectLifestealPct: '0',
-  effectScalingTerms: [],
+  effects: [createEmptyEffectRow()],
   derivedStatModifiers: [],
   animFrames: emptyAnimFrames(),
   reactiveBaseChance: '0.2', reactiveScalingStat: '', reactiveScalingCoeff: '0',
+})
+const emptyStatusEffect = (): StatusEffectForm => ({
+  id: '',
+  name: '',
+  description: '',
+  iconUrl: '',
+  category: 'debuff',
+  maxStacks: '1',
+  effects: [createEmptyEffectRow()],
+  animationParticles: [createEmptyStatusParticle()],
 })
 const emptyClass = (): ClassForm => ({
   id: '', name: '', description: '', iconUrl: '', isHeroClass: false,
@@ -344,6 +339,7 @@ export default function IdleRpgCreate() {
   const [resources, setResources] = useState<ResourceForm[]>([])
   // Abilities (optional catalog; classes reference by id)
   const [abilities, setAbilities] = useState<AbilityForm[]>([])
+  const [statusEffects, setStatusEffects] = useState<StatusEffectForm[]>([])
   // Classes
   const [classes, setClasses] = useState<ClassForm[]>([emptyClass()])
   // Creatures, items, quests, merchant, loot tables
@@ -393,16 +389,22 @@ export default function IdleRpgCreate() {
       resourceCostAmount: String((a as any).cost?.resourceCost?.amount ?? 0),
       unlockCost: String((a as any).unlockCost ?? 1),
       minLevel: String((a as any).requirements?.minLevel ?? 1),
-      effectKind: (a as any).effects?.[0]?.kind ?? 'damage',
-      effectAmount: String((a as any).effects?.[0]?.amount ?? 0),
-      effectPercentage: String((a as any).effects?.[0]?.percentage ?? 0),
-      effectLifestealPct: String((a as any).effects?.[0]?.lifestealPercent ?? 0),
-      effectScalingTerms: hydrateScalingRows((a as any).effects?.[0]?.scalingTerms, defaultMainStatId),
+      effects: hydrateEffectRows((a as any).effects, defaultMainStatId),
       derivedStatModifiers: hydrateDerivedModifiers((a as any).derivedStatModifiers),
       animFrames: hydrateAnimFrames(a.animationFrames),
       reactiveBaseChance: String((a as any).reactiveConfig?.baseChance ?? 0.2),
       reactiveScalingStat: (a as any).reactiveConfig?.scalingStat ?? '',
       reactiveScalingCoeff: String((a as any).reactiveConfig?.scalingCoeff ?? 0),
+    })))
+    setStatusEffects((pack.statusEffects ?? []).map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description ?? '',
+      iconUrl: s.iconUrl ?? '',
+      category: s.category ?? 'debuff',
+      maxStacks: String(s.maxStacks ?? 1),
+      effects: hydrateEffectRows(s.effects as any[], defaultMainStatId),
+      animationParticles: hydrateStatusAnimationParticles(s.animation),
     })))
     setClasses(pack.classes.map((c) => {
       return {
@@ -519,17 +521,27 @@ export default function IdleRpgCreate() {
       resourceCostAmount: a.resourceCostAmount ?? '0',
       unlockCost: a.unlockCost ?? '1',
       minLevel: a.minLevel ?? '1',
-      effectKind: a.effectKind ?? 'damage',
-      effectAmount: a.effectAmount ?? '0',
-      effectPercentage: a.effectPercentage ?? '0',
-      effectLifestealPct: a.effectLifestealPct ?? '0',
-      effectScalingTerms: [],
+      effects: hydrateEffectRows(
+        (a as any).effects ?? (
+          (a as any).effectKind
+            ? [{
+              kind: (a as any).effectKind,
+              target: 'enemy',
+              amount: Number((a as any).effectAmount ?? '0'),
+              percentage: Number((a as any).effectPercentage ?? '0'),
+              lifestealPercent: Number((a as any).effectLifestealPct ?? '0'),
+            }]
+            : []
+        ),
+        defaultMainStats[0]?.id ?? 'STR',
+      ),
       derivedStatModifiers: [],
       animFrames: (a as any).animFrames ?? emptyAnimFrames(),
       reactiveBaseChance: (a as any).reactiveBaseChance ?? '0.2',
       reactiveScalingStat: (a as any).reactiveScalingStat ?? '',
       reactiveScalingCoeff: (a as any).reactiveScalingCoeff ?? '0',
     })))
+    setStatusEffects([])
     setClasses(ex.classes.map((c) => ({
       ...c,
       isHeroClass: c.isHeroClass ?? false,
@@ -627,8 +639,8 @@ export default function IdleRpgCreate() {
     const abilityList: Ability[] = abilities
       .filter((a) => a.id.trim() && a.name.trim())
       .map((a) => {
-        const effectScalingTerms = buildScalingRows(a.effectScalingTerms)
         const derivedStatModifiers = buildDerivedModifiers(a.derivedStatModifiers)
+        const abilityEffects = buildEffectPayload(a.effects)
         const def: Ability = {
           id: a.id.trim(),
           name: a.name.trim(),
@@ -641,13 +653,7 @@ export default function IdleRpgCreate() {
           } : {}),
           ...(Number(a.unlockCost) > 0 ? { unlockCost: Number(a.unlockCost) } : {}),
           ...(Number(a.minLevel) > 1 ? { requirements: { minLevel: Number(a.minLevel) } } : {}),
-          ...(a.effectKind ? { effects: [{
-            kind: a.effectKind as any,
-            ...(Number(a.effectAmount) > 0 ? { amount: Number(a.effectAmount) } : {}),
-            ...(Number(a.effectPercentage) > 0 ? { percentage: Number(a.effectPercentage) } : {}),
-            ...(effectScalingTerms.length > 0 ? { scalingTerms: effectScalingTerms } : {}),
-            ...(a.effectKind === 'lifesteal' && Number(a.effectLifestealPct) > 0 ? { lifestealPercent: Number(a.effectLifestealPct) } : {}),
-          }] } : {}),
+          ...(abilityEffects.length > 0 ? { effects: abilityEffects } : {}),
           ...(derivedStatModifiers.length > 0 ? { derivedStatModifiers } : {}),
         }
         const animationFrames = buildAnimationFrames(a.animFrames)
@@ -825,6 +831,23 @@ export default function IdleRpgCreate() {
       }
     })
 
+    const statusEffectList: StatusEffectTemplate[] = statusEffects
+      .filter((s) => s.id.trim() && s.name.trim())
+      .map((s) => {
+        const effects = buildEffectPayload(s.effects).filter((e) => e.kind !== 'apply_status')
+        const animation = buildStatusAnimation(s.animationParticles)
+        return {
+          id: s.id.trim(),
+          name: s.name.trim(),
+          ...(s.description.trim() ? { description: s.description.trim() } : {}),
+          ...(s.iconUrl.trim() ? { iconUrl: s.iconUrl.trim() } : {}),
+          category: s.category,
+          maxStacks: Math.max(1, Number(s.maxStacks) || 1),
+          effects,
+          ...(animation ? { animation } : {}),
+        }
+      })
+
     return {
       version: 1,
       ...(validMainStats.length > 0 ? { mainStats: validMainStats } : {}),
@@ -837,6 +860,7 @@ export default function IdleRpgCreate() {
       economy: { currencies: validCurrencies },
       ...(resourceList.length > 0 ? { resources: resourceList } : {}),
       ...(abilityList.length > 0 ? { abilities: abilityList } : {}),
+      ...(statusEffectList.length > 0 ? { statusEffects: statusEffectList } : {}),
       classes: classBlocks,
       creatures: creatureList,
       items: itemList,
@@ -1120,72 +1144,13 @@ export default function IdleRpgCreate() {
                       <TextField size="small" label="Cost amount" type="number" value={a.resourceCostAmount} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, resourceCostAmount: e.target.value } : x))} sx={{ width: 100 }} />
                       <TextField size="small" label="Unlock cost (Ability pts)" type="number" value={a.unlockCost} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, unlockCost: e.target.value } : x))} sx={{ width: 150 }} />
                       <TextField size="small" label="Min level" type="number" value={a.minLevel} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, minLevel: e.target.value } : x))} sx={{ width: 90 }} />
-                      <FormControl size="small" sx={{ minWidth: 120 }}>
-                        <InputLabel>Effect kind</InputLabel>
-                        <Select value={a.effectKind} label="Effect kind" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effectKind: e.target.value } : x))}>
-                          {EFFECT_KINDS.map((k) => <MenuItem key={k} value={k}>{k}</MenuItem>)}
-                        </Select>
-                      </FormControl>
-                      <TextField size="small" label="Effect amount" type="number" value={a.effectAmount} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effectAmount: e.target.value } : x))} sx={{ width: 110 }} />
-                      <TextField size="small" label="Effect %" type="number" value={a.effectPercentage} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effectPercentage: e.target.value } : x))} sx={{ width: 90 }} />
-                      {a.effectKind === 'lifesteal' && (
-                        <TextField size="small" label="Lifesteal %" type="number" value={a.effectLifestealPct} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effectLifestealPct: e.target.value } : x))} sx={{ width: 100 }} />
-                      )}
-                      <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>Effect scaling terms</Typography>
-                      {a.effectScalingTerms.map((term, ti) => (
-                        <Box key={ti} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
-                          <FormControl size="small" sx={{ minWidth: 200 }}>
-                            <InputLabel>Source</InputLabel>
-                            <Select
-                              value={term.sourceKind}
-                              label="Source"
-                              onChange={(e) => setAbilities((p) => p.map((x, j) => j !== i ? x : {
-                                ...x,
-                                effectScalingTerms: x.effectScalingTerms.map((sx, sj) => sj === ti ? { ...sx, sourceKind: e.target.value as DerivedScaleForm['sourceKind'] } : sx),
-                              }))}
-                            >
-                              <MenuItem value="main_stat">Main stat</MenuItem>
-                              <MenuItem value="equipped_weapon_damage">Equipped weapon damage</MenuItem>
-                              <MenuItem value="equipped_protective_armor">Equipped protective armor</MenuItem>
-                            </Select>
-                          </FormControl>
-                          {term.sourceKind === 'main_stat' && (
-                            <FormControl size="small" sx={{ minWidth: 140 }}>
-                              <InputLabel>Main stat</InputLabel>
-                              <Select
-                                value={term.sourceStatId}
-                                label="Main stat"
-                                onChange={(e) => setAbilities((p) => p.map((x, j) => j !== i ? x : {
-                                  ...x,
-                                  effectScalingTerms: x.effectScalingTerms.map((sx, sj) => sj === ti ? { ...sx, sourceStatId: e.target.value } : sx),
-                                }))}
-                              >
-                                {mainStatIds.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-                              </Select>
-                            </FormControl>
-                          )}
-                          <TextField
-                            size="small"
-                            label="Percent"
-                            type="number"
-                            value={term.percent}
-                            onChange={(e) => setAbilities((p) => p.map((x, j) => j !== i ? x : {
-                              ...x,
-                              effectScalingTerms: x.effectScalingTerms.map((sx, sj) => sj === ti ? { ...sx, percent: e.target.value } : sx),
-                            }))}
-                            sx={{ width: 120 }}
-                          />
-                          <IconButton size="small" color="error" onClick={() => setAbilities((p) => p.map((x, j) => j !== i ? x : { ...x, effectScalingTerms: x.effectScalingTerms.filter((_, sj) => sj !== ti) }))}>−</IconButton>
-                        </Box>
-                      ))}
-                      <Button
-                        type="button"
-                        size="small"
-                        variant="outlined"
-                        onClick={() => setAbilities((p) => p.map((x, j) => j !== i ? x : { ...x, effectScalingTerms: [...x.effectScalingTerms, { ...emptyDerivedScale(), sourceStatId: fallbackMainStatId }] }))}
-                      >
-                        + Add effect scaling term
-                      </Button>
+                      <EffectsEditor
+                        effects={a.effects}
+                        onChange={(next) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effects: next } : x))}
+                        mainStatIds={mainStatIds}
+                        fallbackMainStatId={fallbackMainStatId}
+                        statusEffectOptions={statusEffects.map((s) => ({ id: s.id, name: s.name }))}
+                      />
                     </Box>
                   {a.abilityType === 'passive' && (
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%', mt: 1 }}>
@@ -1234,6 +1199,46 @@ export default function IdleRpgCreate() {
                 </Box>
               ))}
               <Button type="button" size="small" variant="outlined" onClick={() => setAbilities((p) => [...p, emptyAbility()])}>+ Add ability</Button>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Status Effects</Typography></AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Define reusable status effects for `apply_status` effects.
+              </Typography>
+              {statusEffects.map((s, i) => (
+                <Paper key={i} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <TextField size="small" label="ID" value={s.id} onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} sx={{ width: 140 }} />
+                    <TextField size="small" label="Name" value={s.name} onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 180 }} />
+                    <FormControl size="small" sx={{ minWidth: 120 }}>
+                      <InputLabel>Category</InputLabel>
+                      <Select value={s.category} label="Category" onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, category: e.target.value as 'buff' | 'debuff' } : x))}>
+                        <MenuItem value="buff">buff</MenuItem>
+                        <MenuItem value="debuff">debuff</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField size="small" label="Max stacks" type="number" value={s.maxStacks} onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, maxStacks: e.target.value } : x))} sx={{ width: 120 }} />
+                    <TextField size="small" label="Icon URL" value={s.iconUrl} onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ flex: 1, minWidth: 160 }} />
+                    <IconButton size="small" color="error" onClick={() => setStatusEffects((p) => p.filter((_, j) => j !== i))}>−</IconButton>
+                    <TextField size="small" label="Description" value={s.description} onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} sx={{ width: '100%' }} />
+                    <EffectsEditor
+                      effects={s.effects}
+                      onChange={(next) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, effects: next } : x))}
+                      mainStatIds={mainStatIds}
+                      fallbackMainStatId={fallbackMainStatId}
+                      allowApplyStatus={false}
+                    />
+                    <StatusAnimationEditor
+                      particles={s.animationParticles}
+                      onChange={(next) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, animationParticles: next } : x))}
+                    />
+                  </Box>
+                </Paper>
+              ))}
+              <Button type="button" size="small" variant="outlined" onClick={() => setStatusEffects((p) => [...p, emptyStatusEffect()])}>+ Add status effect</Button>
             </AccordionDetails>
           </Accordion>
 

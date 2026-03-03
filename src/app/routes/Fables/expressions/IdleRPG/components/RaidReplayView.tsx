@@ -4,9 +4,10 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import LinearProgress from '@mui/material/LinearProgress'
 import Paper from '@mui/material/Paper'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import PersonIcon from '@mui/icons-material/Person'
-import type { CombatEventType, CombatResult, CombatTurnEvent, IdleRpgGroup, IdleRpgPackV1, RaidReplayPayload } from '../../../../../../services/api'
+import type { ActiveStatusEffect, CombatEventType, CombatResult, CombatTurnEvent, IdleRpgGroup, IdleRpgPackV1, RaidReplayPayload, StatusAnimationParticle } from '../../../../../../services/api'
 import type { IdleRpgGroupMember } from '../../../../../../services/api'
 import { getAttackAnimationConfig, type AttackAnimationConfig, type AnimationBlockFrame } from './vfx/animationConfig'
 import BlockFrame from './vfx/BlockFrame'
@@ -14,6 +15,7 @@ import DamageNumber from './vfx/DamageNumber'
 import ImpactEffect from './vfx/ImpactEffect'
 import ImpactFrame from './vfx/ImpactFrame'
 import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from './vfx/Projectile'
+import StatusParticleEffect from './vfx/StatusParticleEffect'
 import WeaponFrame from './vfx/WeaponFrame'
 
 import charBackground from '../../../../../../assets/backgrounds/charBackground.png'
@@ -39,6 +41,13 @@ const VS_WIDTH = Math.round(70 * SCALE)
 const TURN_FONT_SIZE = Math.round(14 * SCALE)
 const RESULT_FONT_SIZE = `${1.5 * SCALE}rem`
 const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
+const STATUS_ICON_SIZE = 24
+const STATUS_EFFECT_COLORS: Record<string, string> = {
+  buff: '#64b5f6',
+  debuff: '#ef5350',
+}
+const DAMAGE_NUMBER_EVENT_TYPES = new Set<CombatEventType>(['damage', 'heal', 'dot_tick', 'hot_tick', 'execute'])
+const STATUS_BURST_EVENT_TYPES = new Set<CombatEventType>(['status_applied', 'dot_tick', 'hot_tick'])
 
 const STAT_LABELS = [
   { key: 'ap', label: 'Attack' },
@@ -47,6 +56,60 @@ const STAT_LABELS = [
 
 /** Default animation for raid replay (no per-ability data stored). */
 const DEFAULT_ANIM = getAttackAnimationConfig('melee_slash', null)
+
+interface ActiveStatusParticleEntry {
+  key: number
+  side: 'party' | 'boss'
+  url: string
+  delayMs: number
+  lifetimeMs: number
+  startSizePx?: number
+  endSizePx?: number
+  offsetX: number
+  offsetY: number
+  endOffsetX?: number
+  endOffsetY?: number
+  acceleration?: number
+  rotationStart?: number
+  rotationEnd?: number
+  loop: boolean
+}
+
+function StatusEffectIcons({ effects }: { effects: ActiveStatusEffect[] }) {
+  if (effects.length === 0) return null
+  return (
+    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap', mt: 0.5 }}>
+      {effects.map((eff) => (
+        <Tooltip key={eff.id} title={`${eff.name}${eff.description ? `: ${eff.description}` : ''} (${eff.remainingTurns} turns, ${eff.stacks ?? 1}/${eff.maxStacks ?? 1} stacks)`}>
+          {eff.iconUrl ? (
+            <Box
+              component="img"
+              src={eff.iconUrl}
+              alt={eff.name}
+              sx={{ width: STATUS_ICON_SIZE, height: STATUS_ICON_SIZE, borderRadius: '4px', border: `1px solid ${STATUS_EFFECT_COLORS[eff.category ?? 'debuff'] ?? '#666'}` }}
+            />
+          ) : (
+            <Box sx={{
+              width: STATUS_ICON_SIZE,
+              height: STATUS_ICON_SIZE,
+              borderRadius: '4px',
+              bgcolor: STATUS_EFFECT_COLORS[eff.category ?? 'debuff'] ?? '#666',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 10,
+              fontWeight: 700,
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.2)',
+            }}>
+              {eff.name.charAt(0).toUpperCase()}
+            </Box>
+          )}
+        </Tooltip>
+      ))}
+    </Box>
+  )
+}
 
 function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'right') {
   const sign = direction === 'left' ? 1 : -1
@@ -263,6 +326,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const [activeWeaponFrames, setActiveWeaponFrames] = useState<ActiveWF[]>([])
   const [activeImpactFrames, setActiveImpactFrames] = useState<ActiveIF[]>([])
   const [activeBlockFrames, setActiveBlockFrames] = useState<ActiveBF[]>([])
+  const [activeStatusBurstParticles, setActiveStatusBurstParticles] = useState<ActiveStatusParticleEntry[]>([])
+  const [statusEffectsById, setStatusEffectsById] = useState<Record<string, ActiveStatusEffect[]>>({})
   const bossCardRef = useRef<HTMLDivElement>(null)
   /** IDs of party members who just died; kept in the list until fade-out completes so we can animate. */
   const [justDiedIds, setJustDiedIds] = useState<string[]>([])
@@ -278,6 +343,19 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const bossLookupId = replay.bossCreatureId || bossId
   const boss = bossLookupId ? pack.creatures?.find((c) => c.id === bossLookupId) : null
   const bossReplayBackground = replay.bossBackgroundImageUrl ?? boss?.backgroundImageUrl
+  const frontPartyId = useMemo(
+    () => displayPartyIds.find((id) => !justDiedIds.includes(id)) ?? displayPartyIds[0] ?? null,
+    [displayPartyIds, justDiedIds],
+  )
+  const frontPartyStatusEffects = frontPartyId ? (statusEffectsById[frontPartyId] ?? []) : []
+  const bossStatusEffects = bossId ? (statusEffectsById[bossId] ?? []) : []
+  const statusAnimationsByTemplateId = useMemo(() => {
+    const map = new Map<string, { particles?: StatusAnimationParticle[] }>()
+    for (const status of (pack.statusEffects ?? [])) {
+      map.set(status.id, status.animation ?? {})
+    }
+    return map
+  }, [pack.statusEffects])
 
   const getMember = (id: string): IdleRpgGroupMember | undefined =>
     group?.members?.find((m) => m.id === id)
@@ -299,6 +377,104 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+  const resolveStatusParticleUrl = useCallback((
+    side: 'party' | 'boss',
+    _holderId: string | null,
+    particle: StatusAnimationParticle,
+  ): string => {
+    const source = particle.imageSource ?? 'url'
+    if (source === 'url') return particle.url?.trim() ?? ''
+    if (side === 'party') return ''
+    return ''
+  }, [])
+
+  const buildStatusParticleEntry = useCallback((
+    side: 'party' | 'boss',
+    holderId: string | null,
+    particle: StatusAnimationParticle,
+    loop: boolean,
+  ): Omit<ActiveStatusParticleEntry, 'key'> | null => {
+    const url = resolveStatusParticleUrl(side, holderId, particle)
+    if (!url) return null
+    const isRightSide = side === 'boss'
+    const offsetX = isRightSide ? -(particle.offsetX ?? 0) : (particle.offsetX ?? 0)
+    const offsetY = particle.offsetY ?? 0
+    const endOffsetX = isRightSide
+      ? -(particle.endOffsetX ?? particle.offsetX ?? 0)
+      : (particle.endOffsetX ?? particle.offsetX ?? 0)
+    const endOffsetY = particle.endOffsetY ?? particle.offsetY ?? 0
+    const rotationStart = isRightSide ? -(particle.rotationStart ?? 0) : (particle.rotationStart ?? 0)
+    const rotationEnd = isRightSide
+      ? -(particle.rotationEnd ?? particle.rotationStart ?? 0)
+      : (particle.rotationEnd ?? particle.rotationStart ?? 0)
+
+    return {
+      side,
+      url,
+      delayMs: Math.max(0, particle.delayMs ?? 0),
+      lifetimeMs: Math.max(100, particle.lifetimeMs ?? 1000),
+      startSizePx: particle.startSizePx ?? particle.sizePx,
+      endSizePx: particle.endSizePx ?? particle.sizePx ?? particle.startSizePx,
+      offsetX,
+      offsetY,
+      endOffsetX,
+      endOffsetY,
+      acceleration: particle.acceleration ?? 0,
+      rotationStart,
+      rotationEnd,
+      loop,
+    }
+  }, [resolveStatusParticleUrl])
+
+  const loopStatusParticles = useMemo(() => {
+    const entries: Array<Omit<ActiveStatusParticleEntry, 'key'>> = []
+    for (const status of frontPartyStatusEffects) {
+      const particles = statusAnimationsByTemplateId.get(status.templateId)?.particles ?? []
+      for (const particle of particles) {
+        if (!particle.loop) continue
+        const entry = buildStatusParticleEntry('party', frontPartyId, particle, true)
+        if (entry) entries.push(entry)
+      }
+    }
+    for (const status of bossStatusEffects) {
+      const particles = statusAnimationsByTemplateId.get(status.templateId)?.particles ?? []
+      for (const particle of particles) {
+        if (!particle.loop) continue
+        const entry = buildStatusParticleEntry('boss', bossId ?? null, particle, true)
+        if (entry) entries.push(entry)
+      }
+    }
+    return entries
+  }, [bossId, bossStatusEffects, buildStatusParticleEntry, frontPartyId, frontPartyStatusEffects, statusAnimationsByTemplateId])
+
+  const triggerStatusBurstForEvent = useCallback((event: CombatTurnEvent) => {
+    if (!STATUS_BURST_EVENT_TYPES.has(event.type)) return
+    const statusTemplateId =
+      event.statusTemplateId
+      ?? Object.values(statusEffectsById).flat().find((status) => status.id === event.statusEffectId)?.templateId
+    if (!statusTemplateId) return
+
+    const side: 'party' | 'boss' | null =
+      event.targetId === bossId ? 'boss'
+      : partyOrder.includes(event.targetId) ? 'party'
+      : null
+    if (!side) return
+
+    const holderId = side === 'party' ? event.targetId : bossId ?? null
+    const particles = statusAnimationsByTemplateId.get(statusTemplateId)?.particles ?? []
+    for (const particle of particles) {
+      if (particle.loop) continue
+      const built = buildStatusParticleEntry(side, holderId, particle, false)
+      if (!built) continue
+      const key = ++vfxKeyRef.current
+      setActiveStatusBurstParticles(prev => [...prev, { ...built, key }])
+      const removeAfterMs = built.delayMs + built.lifetimeMs + 150
+      setTimeout(() => {
+        setActiveStatusBurstParticles(prev => prev.filter(p => p.key !== key))
+      }, removeAfterMs)
+    }
+  }, [bossId, buildStatusParticleEntry, partyOrder, statusAnimationsByTemplateId, statusEffectsById])
 
   const resolveAbilityAnim = useCallback((abilityId?: string): AttackAnimationConfig => {
     if (!abilityId) return DEFAULT_ANIM
@@ -466,7 +642,10 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       setTargetImpact(true)
       setTargetVariant('hit')
 
-      const combatEvents = events.filter(ev => ev.type !== 'resource_change' && ev.type !== 'block')
+      const combatEvents = events
+        .filter(ev => ev.type !== 'resource_change' && ev.type !== 'block')
+        .filter(ev => DAMAGE_NUMBER_EVENT_TYPES.has(ev.type))
+      for (const ev of events) triggerStatusBurstForEvent(ev)
       for (const ev of combatEvents) {
         dmgKeyRef.current++
         const isOnBoss = ev.targetId === bossId
@@ -500,8 +679,30 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       setAttackerVariant('idle')
       setTargetDmg(null)
     },
-    [getPortraitPos, bossId, partyOrder, resolveAbilityAnim],
+    [getPortraitPos, bossId, partyOrder, triggerStatusBurstForEvent],
   )
+
+  const animateAmbientEvents = useCallback(async (events: CombatTurnEvent[]) => {
+    for (const ev of events) {
+      if (abortRef.current) return
+      triggerStatusBurstForEvent(ev)
+      if (DAMAGE_NUMBER_EVENT_TYPES.has(ev.type)) {
+        dmgKeyRef.current++
+        const isOnBoss = ev.targetId === bossId
+        if (isOnBoss) {
+          setBossDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+        } else {
+          setPartyDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+        }
+        setCombatantHp((prev) => ({ ...prev, [ev.targetId]: Math.max(0, ev.targetHpAfter) }))
+        await sleep(240)
+        setPartyDmg(null)
+        setBossDmg(null)
+      } else if (STATUS_BURST_EVENT_TYPES.has(ev.type)) {
+        await sleep(180)
+      }
+    }
+  }, [bossId, triggerStatusBurstForEvent])
 
   useEffect(() => {
     if (totalTurns === 0) {
@@ -515,24 +716,41 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         if (abortRef.current) return
         const turn = combat.turns[i]
         setCurrentTurn(turn.turnIndex ?? i)
-        const groups: CombatTurnEvent[][] = []
+        const groups: Array<{ kind: 'cast' | 'ambient'; key?: string; events: CombatTurnEvent[] }> = []
         for (const ev of turn.events as CombatTurnEvent[]) {
           const prev = groups[groups.length - 1]
-          if (ev.type === 'block' && prev && prev.length > 0) {
-            prev.push(ev)
-          } else if (prev && prev[0].sourceId === ev.sourceId && ev.abilityId && prev[0].abilityId === ev.abilityId) {
-            prev.push(ev)
+          const key =
+            ev.castId
+              ? `cast:${ev.castId}`
+              : ev.type === 'block' && prev?.kind === 'cast'
+                ? prev.key
+                : ev.abilityId
+                  ? `legacy:${ev.sourceId}:${ev.abilityId}`
+                  : undefined
+          if (!key) {
+            groups.push({ kind: 'ambient', events: [ev] })
+            continue
+          }
+          if (prev?.kind === 'cast' && prev.key === key) {
+            prev.events.push(ev)
           } else {
-            groups.push([ev])
+            groups.push({ kind: 'cast', key, events: [ev] })
           }
         }
         for (const grp of groups) {
           if (abortRef.current) return
-          if (grp.every(ev => ev.type === 'resource_change')) continue
-          const attackerSide = partyOrder.includes(grp[0].sourceId) ? 'party' : 'boss'
-          const anim = resolveAbilityAnim(grp[0].abilityId)
-          await animateAttack(attackerSide, grp, anim)
+          if (grp.kind === 'ambient') {
+            await animateAmbientEvents(grp.events)
+            continue
+          }
+          if (grp.events.every(ev => ev.type === 'resource_change')) continue
+          const sourceEvent = grp.events.find(ev => ev.type !== 'resource_change') ?? grp.events[0]
+          const attackerSide = partyOrder.includes(sourceEvent.sourceId) ? 'party' : 'boss'
+          const animAbilityId = grp.events.find(ev => !!ev.abilityId)?.abilityId
+          const anim = resolveAbilityAnim(animAbilityId)
+          await animateAttack(attackerSide, grp.events, anim)
         }
+        if (turn.activeStatusEffects) setStatusEffectsById(turn.activeStatusEffects)
         if (!abortRef.current) await sleep(300)
       }
       if (!abortRef.current) setFinished(true)
@@ -541,7 +759,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     return () => {
       abortRef.current = true
     }
-  }, [combat.turns, totalTurns, partyOrder, animateAttack, resolveAbilityAnim])
+  }, [combat.turns, totalTurns, partyOrder, animateAmbientEvents, animateAttack, resolveAbilityAnim])
 
   const handleSkip = () => {
     abortRef.current = true
@@ -559,6 +777,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     setActiveWeaponFrames([])
     setActiveImpactFrames([])
     setActiveBlockFrames([])
+    setActiveStatusBurstParticles([])
     setJustDiedIds([])
     const hp: Record<string, number> = {}
     for (const id of partyOrder) hp[id] = partyMaxHp[id] ?? 100
@@ -568,6 +787,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         hp[ev.targetId] = Math.max(0, ev.targetHpAfter)
       }
     }
+    const lastTurn = combat.turns?.[combat.turns.length - 1]
+    setStatusEffectsById(lastTurn?.activeStatusEffects ?? {})
     setCombatantHp(hp)
     setCurrentTurn(combat.turns?.length ? combat.turns.length - 1 : 0)
     setFinished(true)
@@ -684,6 +905,43 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                       <RaidPortrait url={getMemberPortrait(member)} size={portraitSize} />
                       {isFront && (
                         <>
+                          {loopStatusParticles.filter(p => p.side === 'party').map((p, idx) => (
+                            <StatusParticleEffect
+                              key={`party-loop-${idx}-${p.url}`}
+                              id={`party-loop-${idx}-${p.url}`}
+                              url={p.url}
+                              delayMs={p.delayMs}
+                              lifetimeMs={p.lifetimeMs}
+                              startSizePx={p.startSizePx}
+                              endSizePx={p.endSizePx}
+                              offsetX={p.offsetX}
+                              offsetY={p.offsetY}
+                              endOffsetX={p.endOffsetX}
+                              endOffsetY={p.endOffsetY}
+                              acceleration={p.acceleration}
+                              rotationStart={p.rotationStart}
+                              rotationEnd={p.rotationEnd}
+                              loop
+                            />
+                          ))}
+                          {activeStatusBurstParticles.filter(p => p.side === 'party').map(p => (
+                            <StatusParticleEffect
+                              key={p.key}
+                              id={p.key}
+                              url={p.url}
+                              delayMs={p.delayMs}
+                              lifetimeMs={p.lifetimeMs}
+                              startSizePx={p.startSizePx}
+                              endSizePx={p.endSizePx}
+                              offsetX={p.offsetX}
+                              offsetY={p.offsetY}
+                              endOffsetX={p.endOffsetX}
+                              endOffsetY={p.endOffsetY}
+                              acceleration={p.acceleration}
+                              rotationStart={p.rotationStart}
+                              rotationEnd={p.rotationEnd}
+                            />
+                          ))}
                           {activeWeaponFrames.filter(f => f.side === 'party').map(f => (
                             <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
                           ))}
@@ -724,6 +982,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                       const resCurrent = resDef.isGenerative ? 0 : resDef.max
                       return <RaidResourceBar current={resCurrent} max={resDef.max} name={resDef.name} colorHex={resDef.colorHex} />
                     })()}
+                    <StatusEffectIcons effects={statusEffectsById[id] ?? []} />
                     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                       {STAT_LABELS.map(({ key, label }) => (
                         <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
@@ -834,6 +1093,43 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
               >
                 <Box ref={bossPortraitRef} sx={{ position: 'relative' }}>
                   <RaidPortrait url={boss.iconUrl ?? undefined} size={PORTRAIT_SIZE} />
+                  {loopStatusParticles.filter(p => p.side === 'boss').map((p, idx) => (
+                    <StatusParticleEffect
+                      key={`boss-loop-${idx}-${p.url}`}
+                      id={`boss-loop-${idx}-${p.url}`}
+                      url={p.url}
+                      delayMs={p.delayMs}
+                      lifetimeMs={p.lifetimeMs}
+                      startSizePx={p.startSizePx}
+                      endSizePx={p.endSizePx}
+                      offsetX={p.offsetX}
+                      offsetY={p.offsetY}
+                      endOffsetX={p.endOffsetX}
+                      endOffsetY={p.endOffsetY}
+                      acceleration={p.acceleration}
+                      rotationStart={p.rotationStart}
+                      rotationEnd={p.rotationEnd}
+                      loop
+                    />
+                  ))}
+                  {activeStatusBurstParticles.filter(p => p.side === 'boss').map(p => (
+                    <StatusParticleEffect
+                      key={p.key}
+                      id={p.key}
+                      url={p.url}
+                      delayMs={p.delayMs}
+                      lifetimeMs={p.lifetimeMs}
+                      startSizePx={p.startSizePx}
+                      endSizePx={p.endSizePx}
+                      offsetX={p.offsetX}
+                      offsetY={p.offsetY}
+                      endOffsetX={p.endOffsetX}
+                      endOffsetY={p.endOffsetY}
+                      acceleration={p.acceleration}
+                      rotationStart={p.rotationStart}
+                      rotationEnd={p.rotationEnd}
+                    />
+                  ))}
                   {activeWeaponFrames.filter(f => f.side === 'boss').map(f => (
                     <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
                   ))}
@@ -871,6 +1167,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                   const resCurrent = bossResDef.isGenerative ? 0 : bossResDef.max
                   return <RaidResourceBar current={resCurrent} max={bossResDef.max} name={bossResDef.name} colorHex={bossResDef.colorHex} />
                 })()}
+                <StatusEffectIcons effects={bossStatusEffects} />
                 <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                   {STAT_LABELS.map(({ key, label }) => (
                     <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>

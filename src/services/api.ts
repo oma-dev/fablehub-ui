@@ -177,6 +177,30 @@ export interface AnimationFrames {
   block?: AnimationBlockFrame[]
 }
 
+/** Status animation particle shown around the holder card center in replay. */
+export interface StatusAnimationParticle {
+  url?: string
+  imageSource?: AnimationFrameImageSource
+  delayMs?: number
+  lifetimeMs?: number
+  sizePx?: number
+  startSizePx?: number
+  endSizePx?: number
+  offsetX?: number
+  offsetY?: number
+  endOffsetX?: number
+  endOffsetY?: number
+  acceleration?: number
+  rotationStart?: number
+  rotationEnd?: number
+  /** Loop continuously while status is active on target. */
+  loop?: boolean
+}
+
+export interface StatusAnimation {
+  particles?: StatusAnimationParticle[]
+}
+
 /** Reactive ability configuration (e.g. block chance). */
 export interface ReactiveConfig {
   baseChance: number
@@ -221,17 +245,37 @@ export interface DerivedStatModifier {
   percent?: number
 }
 
-export type EffectKind = 'damage' | 'heal' | 'apply_status' | 'execute' | 'lifesteal'
+export type EffectKind =
+  | 'damage'
+  | 'heal'
+  | 'apply_status'
+  | 'execute'
+  | 'lifesteal'
+  | 'stun'
+  | 'anti_heal'
+  | 'barrier'
+  | 'stat_modifiers'
+  | 'derived_stat_modifiers'
+  | 'dispel'
+
+export type EffectTarget = 'self' | 'enemy'
+export type DispelFilter = 'all' | 'buff' | 'debuff'
 
 export interface Effect {
   kind: EffectKind
+  target?: EffectTarget
   amount?: number
   percentage?: number
+  durationTurns?: number
   scalingTerms?: ScalingTerm[]
   scalingStat?: StatId
   scalingCoeff?: number
   lifestealPercent?: number
+  statusEffectId?: string
   statusEffect?: StatusEffectTemplate
+  statModifiers?: Partial<Record<MainStatId, number>>
+  derivedStatModifiers?: Partial<Record<DerivedStatId, number>>
+  dispelFilter?: DispelFilter
 }
 
 export type StatusEffectKind =
@@ -240,13 +284,21 @@ export type StatusEffectKind =
   | 'vulnerability' | 'anti_heal' | 'thorns' | 'barrier'
   | 'evasion' | 'haste' | 'auto_revive'
 
+export type StatusEffectCategory = 'buff' | 'debuff'
+
 export interface StatusEffectTemplate {
   id: string
-  kind: StatusEffectKind
   name: string
   description?: string
   iconUrl?: string
-  durationTurns: number
+  category?: StatusEffectCategory
+  maxStacks?: number
+  effects?: Effect[]
+  /** Replay animation for this status effect. */
+  animation?: StatusAnimation
+  // Legacy fields kept for compatibility with older packs.
+  kind?: StatusEffectKind
+  durationTurns?: number
   tickAmount?: number
   tickPercentage?: number
   escalation?: number
@@ -321,6 +373,7 @@ export interface IdleRpgPackV1 {
   }
   resources?: Resource[]
   abilities?: Ability[]
+  statusEffects?: StatusEffectTemplate[]
   classes: ClassBlock[]
   creatures: CreatureTemplate[]
   items: ItemTemplate[]
@@ -529,16 +582,19 @@ export interface CreateIdleRpgBody {
 
 export type CombatEventType =
   | 'damage' | 'heal' | 'dot_tick' | 'hot_tick'
-  | 'status_applied' | 'status_expired' | 'stun_skip'
+  | 'status_applied' | 'status_expired' | 'status_dispelled' | 'stun_skip'
   | 'execute' | 'resource_change' | 'block'
 
 export interface ActiveStatusEffect {
   id: string
+  templateId: string
   sourceAbilityId: string
-  kind: StatusEffectKind
   name: string
   description?: string
   iconUrl?: string
+  category: StatusEffectCategory
+  stacks: number
+  maxStacks: number
   remainingTurns: number
 }
 
@@ -548,9 +604,11 @@ export interface CombatTurnEvent {
   type: CombatEventType
   value: number
   targetHpAfter: number
+  castId?: string
   abilityId?: string
   abilityName?: string
   statusEffectId?: string
+  statusTemplateId?: string
   resourceAfter?: { current: number; max: number }
   statusEffectName?: string
   blocked?: boolean

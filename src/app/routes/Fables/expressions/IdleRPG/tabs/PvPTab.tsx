@@ -222,12 +222,17 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
             if (r1 || r2) abilityAnimations[ab.id] = r1 ?? r2
           }
         }
+        const statusAnimations: Record<string, any> = {}
+        for (const status of (pack.statusEffects ?? [])) {
+          if (status.animation) statusAnimations[status.id] = status.animation
+        }
         return (
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, overflow: 'auto' }}>
             <CombatReplay
               combat={combatResult.combat}
               leftCharacterId={character.id}
               abilityAnimations={abilityAnimations}
+              statusAnimations={statusAnimations}
               player={{
                 name: character.name,
                 level: character.level,

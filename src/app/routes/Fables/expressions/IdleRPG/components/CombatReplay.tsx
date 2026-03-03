@@ -7,7 +7,7 @@ import Paper from '@mui/material/Paper'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import PersonIcon from '@mui/icons-material/Person'
-import type { ActiveStatusEffect, AnimationFrames, CombatEventType, CombatResult, CombatTurnEvent } from '../../../../../../services/api'
+import type { ActiveStatusEffect, AnimationFrames, CombatEventType, CombatResult, CombatTurnEvent, StatusAnimation } from '../../../../../../services/api'
 import charBackground from '../../../../../../assets/backgrounds/charBackground.png'
 import { getAttackAnimationConfig, type AttackAnimationConfig, type AnimationBlockFrame } from './vfx/animationConfig'
 import BlockFrame from './vfx/BlockFrame'
@@ -15,6 +15,7 @@ import DamageNumber from './vfx/DamageNumber'
 import ImpactEffect from './vfx/ImpactEffect'
 import ImpactFrame from './vfx/ImpactFrame'
 import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from './vfx/Projectile'
+import StatusParticleEffect from './vfx/StatusParticleEffect'
 import WeaponFrame from './vfx/WeaponFrame'
 
 interface ResourceInfo {
@@ -52,6 +53,8 @@ interface Props {
   leftCharacterId?: string
   /** Per-ability animation overrides keyed by abilityId. When an ability fires, its frames are used instead of the combatant default. */
   abilityAnimations?: Record<string, AnimationFrames>
+  /** Per-status animation definitions keyed by status template id. */
+  statusAnimations?: Record<string, StatusAnimation>
 }
 
 const STAT_LABELS: { key: keyof Pick<CombatantInfo, 'ap' | 'arm'>; label: string }[] = [
@@ -208,10 +211,8 @@ function ResourceBar({ current, max, name, colorHex }: { current: number; max: n
 
 const STATUS_ICON_SIZE = 24
 const STATUS_EFFECT_COLORS: Record<string, string> = {
-  dot: '#ce93d8', hot: '#66bb6a', stun: '#ffa726', buff: '#64b5f6', debuff: '#ef5350',
-  slow: '#90a4ae', paralyze: '#ffcc80', freeze: '#80deea', sleep: '#b39ddb',
-  confusion: '#f48fb1', blind: '#bdbdbd', vulnerability: '#ff8a65', anti_heal: '#e57373',
-  thorns: '#a5d6a7', barrier: '#4fc3f7', evasion: '#b0bec5', haste: '#fff176', auto_revive: '#ffd54f',
+  buff: '#64b5f6',
+  debuff: '#ef5350',
 }
 
 function StatusEffectIcons({ effects }: { effects: ActiveStatusEffect[] }) {
@@ -219,20 +220,20 @@ function StatusEffectIcons({ effects }: { effects: ActiveStatusEffect[] }) {
   return (
     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap', mt: 0.5 }}>
       {effects.map((eff) => (
-        <Tooltip key={eff.id} title={`${eff.name}${eff.description ? `: ${eff.description}` : ''} (${eff.remainingTurns} turns)`}>
+        <Tooltip key={eff.id} title={`${eff.name}${eff.description ? `: ${eff.description}` : ''} (${eff.remainingTurns} turns, ${eff.stacks ?? 1}/${eff.maxStacks ?? 1} stacks)`}>
           {eff.iconUrl ? (
             <Box
               component="img"
               src={eff.iconUrl}
               alt={eff.name}
-              sx={{ width: STATUS_ICON_SIZE, height: STATUS_ICON_SIZE, borderRadius: '4px', border: `1px solid ${STATUS_EFFECT_COLORS[eff.kind] ?? '#666'}` }}
+              sx={{ width: STATUS_ICON_SIZE, height: STATUS_ICON_SIZE, borderRadius: '4px', border: `1px solid ${STATUS_EFFECT_COLORS[eff.category ?? 'debuff'] ?? '#666'}` }}
             />
           ) : (
             <Box sx={{
               width: STATUS_ICON_SIZE,
               height: STATUS_ICON_SIZE,
               borderRadius: '4px',
-              bgcolor: STATUS_EFFECT_COLORS[eff.kind] ?? '#666',
+              bgcolor: STATUS_EFFECT_COLORS[eff.category ?? 'debuff'] ?? '#666',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -335,6 +336,28 @@ interface ActiveBlockFrameEntry {
   rotationEnd?: number
 }
 
+interface ActiveStatusParticleEntry {
+  key: number
+  identity?: string
+  side: 'player' | 'creature'
+  url: string
+  delayMs: number
+  lifetimeMs: number
+  startSizePx?: number
+  endSizePx?: number
+  offsetX: number
+  offsetY: number
+  endOffsetX?: number
+  endOffsetY?: number
+  acceleration?: number
+  rotationStart?: number
+  rotationEnd?: number
+  loop: boolean
+}
+
+const DAMAGE_NUMBER_EVENT_TYPES = new Set<CombatEventType>(['damage', 'heal', 'dot_tick', 'hot_tick', 'execute'])
+const STATUS_BURST_EVENT_TYPES = new Set<CombatEventType>(['status_applied', 'dot_tick', 'hot_tick'])
+
 export default function CombatReplay({
   combat,
   player,
@@ -344,6 +367,7 @@ export default function CombatReplay({
   arenaBackgroundImageUrl,
   leftCharacterId,
   abilityAnimations,
+  statusAnimations,
 }: Props) {
   const [playerHp, setPlayerHp] = useState(player.maxHp)
   const [creatureHp, setCreatureHp] = useState(creature.maxHp)
@@ -363,6 +387,10 @@ export default function CombatReplay({
   const creatureCardRef = useRef<HTMLDivElement>(null) // kept for potential future use
 
   const playerId = leftCharacterId ?? combat.turns[0]?.events[0]?.sourceId ?? 'player'
+  const creatureId =
+    combat.turns[0]?.events?.find(e => e.sourceId !== playerId)?.sourceId
+    ?? combat.turns[0]?.events?.find(e => e.targetId !== playerId)?.targetId
+    ?? 'creature'
 
   const [playerVariant, setPlayerVariant] = useState<string>('idle')
   const [creatureVariant, setCreatureVariant] = useState<string>('idle')
@@ -374,6 +402,8 @@ export default function CombatReplay({
   const [activeProjectiles, setActiveProjectiles] = useState<ActiveProjectileEntry[]>([])
   const [activeImpactFrames, setActiveImpactFrames] = useState<ActiveImpactFrame[]>([])
   const [activeBlockFrames, setActiveBlockFrames] = useState<ActiveBlockFrameEntry[]>([])
+  const [activeStatusLoopParticles, setActiveStatusLoopParticles] = useState<ActiveStatusParticleEntry[]>([])
+  const [activeStatusBurstParticles, setActiveStatusBurstParticles] = useState<ActiveStatusParticleEntry[]>([])
 
   type DmgState = { value: number; type: CombatEventType; key: number; abilityName?: string } | null
   const [playerDmg, setPlayerDmg] = useState<DmgState>(null)
@@ -401,6 +431,144 @@ export default function CombatReplay({
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+  const resolveStatusParticleUrl = useCallback((
+    side: 'player' | 'creature',
+    imageSource?: 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact',
+    url?: string,
+  ): string => {
+    const source = imageSource ?? 'url'
+    if (source === 'url') return url?.trim() ?? ''
+    const weaponUrl = side === 'player' ? player.weaponUrl : creature.weaponUrl
+    return weaponUrl?.trim() ?? ''
+  }, [player.weaponUrl, creature.weaponUrl])
+
+  const buildStatusParticleEntry = useCallback((
+    side: 'player' | 'creature',
+    particle: {
+      url?: string
+      imageSource?: 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact'
+      delayMs?: number
+      lifetimeMs?: number
+      sizePx?: number
+      startSizePx?: number
+      endSizePx?: number
+      offsetX?: number
+      offsetY?: number
+      endOffsetX?: number
+      endOffsetY?: number
+      acceleration?: number
+      rotationStart?: number
+      rotationEnd?: number
+      loop?: boolean
+    },
+    loop: boolean,
+  ): Omit<ActiveStatusParticleEntry, 'key'> | null => {
+    const url = resolveStatusParticleUrl(side, particle.imageSource, particle.url)
+    if (!url) return null
+
+    const isRightSide = side === 'creature'
+    const offsetX = isRightSide ? -(particle.offsetX ?? 0) : (particle.offsetX ?? 0)
+    const offsetY = particle.offsetY ?? 0
+    const endOffsetX = isRightSide
+      ? -(particle.endOffsetX ?? particle.offsetX ?? 0)
+      : (particle.endOffsetX ?? particle.offsetX ?? 0)
+    const endOffsetY = particle.endOffsetY ?? particle.offsetY ?? 0
+    const rotationStart = isRightSide ? -(particle.rotationStart ?? 0) : (particle.rotationStart ?? 0)
+    const rotationEnd = isRightSide
+      ? -(particle.rotationEnd ?? particle.rotationStart ?? 0)
+      : (particle.rotationEnd ?? particle.rotationStart ?? 0)
+
+    return {
+      side,
+      url,
+      delayMs: Math.max(0, particle.delayMs ?? 0),
+      lifetimeMs: Math.max(100, particle.lifetimeMs ?? 1000),
+      startSizePx: particle.startSizePx ?? particle.sizePx,
+      endSizePx: particle.endSizePx ?? particle.sizePx ?? particle.startSizePx,
+      offsetX,
+      offsetY,
+      endOffsetX,
+      endOffsetY,
+      acceleration: particle.acceleration ?? 0,
+      rotationStart,
+      rotationEnd,
+      loop,
+    }
+  }, [resolveStatusParticleUrl])
+
+  const syncLoopStatusParticles = useCallback((nextPlayerEffects: ActiveStatusEffect[], nextCreatureEffects: ActiveStatusEffect[]) => {
+    const desired: Array<{ identity: string; entry: Omit<ActiveStatusParticleEntry, 'key' | 'identity'> }> = []
+    const appendForSide = (side: 'player' | 'creature', effects: ActiveStatusEffect[]) => {
+      effects.forEach((status) => {
+        const particles = statusAnimations?.[status.templateId]?.particles ?? []
+        particles.forEach((particle, idx) => {
+          if (!particle.loop) return
+          const entry = buildStatusParticleEntry(side, particle, true)
+          if (!entry) return
+          desired.push({
+            identity: `${side}:${status.id}:${idx}`,
+            entry,
+          })
+        })
+      })
+    }
+
+    appendForSide('player', nextPlayerEffects)
+    appendForSide('creature', nextCreatureEffects)
+
+    setActiveStatusLoopParticles((prev) => {
+      const prevByIdentity = new Map(prev.map((entry) => [entry.identity ?? '', entry]))
+      const next: ActiveStatusParticleEntry[] = []
+      for (const item of desired) {
+        const existing = prevByIdentity.get(item.identity)
+        if (existing) {
+          next.push({
+            ...existing,
+            ...item.entry,
+            key: existing.key,
+            identity: item.identity,
+            loop: true,
+          })
+          continue
+        }
+        next.push({
+          ...item.entry,
+          key: ++vfxKeyRef.current,
+          identity: item.identity,
+          loop: true,
+        })
+      }
+      return next
+    })
+  }, [buildStatusParticleEntry, statusAnimations])
+
+  const triggerStatusBurstForEvent = useCallback((event: CombatTurnEvent) => {
+    if (!STATUS_BURST_EVENT_TYPES.has(event.type)) return
+    const statusTemplateId =
+      event.statusTemplateId
+      ?? playerStatusEffects.find((status) => status.id === event.statusEffectId)?.templateId
+      ?? creatureStatusEffects.find((status) => status.id === event.statusEffectId)?.templateId
+    if (!statusTemplateId) return
+    const side: 'player' | 'creature' | null =
+      event.targetId === playerId ? 'player'
+      : event.targetId === creatureId ? 'creature'
+      : null
+    if (!side) return
+
+    const particles = statusAnimations?.[statusTemplateId]?.particles ?? []
+    for (const particle of particles) {
+      if (particle.loop) continue
+      const built = buildStatusParticleEntry(side, particle, false)
+      if (!built) continue
+      const key = ++vfxKeyRef.current
+      setActiveStatusBurstParticles(prev => [...prev, { ...built, key, loop: false }])
+      const removeAfterMs = built.delayMs + built.lifetimeMs + 150
+      setTimeout(() => {
+        setActiveStatusBurstParticles(prev => prev.filter(p => p.key !== key))
+      }, removeAfterMs)
+    }
+  }, [buildStatusParticleEntry, creatureId, creatureStatusEffects, playerId, playerStatusEffects, statusAnimations])
 
   const animateAttack = useCallback(async (
     attackerSide: 'player' | 'creature',
@@ -617,8 +785,11 @@ export default function CombatReplay({
     // Combat events (damage/heal/execute) — split into target-side (shown at impact) and self-side
     // (lifesteal heal shown 200ms later so it reads: "hit enemy → drain life → heal self")
     const combatEvents = events.filter(ev => ev.type !== 'resource_change' && ev.type !== 'block')
+      .filter(ev => DAMAGE_NUMBER_EVENT_TYPES.has(ev.type))
     const targetEvents = combatEvents.filter(ev => ev.targetId !== ev.sourceId || ev.type !== 'heal')
     const selfHealEvents = combatEvents.filter(ev => ev.targetId === ev.sourceId && ev.type === 'heal')
+
+    for (const ev of events) triggerStatusBurstForEvent(ev)
 
     setTargetImpact(true)
     setTargetVariant('hit')
@@ -663,7 +834,38 @@ export default function CombatReplay({
     setAttackerVariant('idle')
     setPlayerDmg(null)
     setCreatureDmg(null)
-  }, [playerId, player.weaponUrl, creature.weaponUrl, getPortraitPos])
+  }, [playerId, player.weaponUrl, creature.weaponUrl, getPortraitPos, triggerStatusBurstForEvent])
+
+  const animateAmbientEvents = useCallback(async (events: CombatTurnEvent[]) => {
+    for (const ev of events) {
+      if (abortRef.current) return
+
+      if (ev.type === 'resource_change' && ev.resourceAfter) {
+        const isPlayerSource = ev.sourceId === playerId
+        if (isPlayerSource) setPlayerResourceCurrent(ev.resourceAfter.current)
+        else setCreatureResourceCurrent(ev.resourceAfter.current)
+      }
+
+      triggerStatusBurstForEvent(ev)
+
+      if (DAMAGE_NUMBER_EVENT_TYPES.has(ev.type)) {
+        const isOnPlayer = ev.targetId === playerId
+        dmgKeyRef.current++
+        if (isOnPlayer) {
+          setPlayerDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+          setPlayerHp(Math.max(0, ev.targetHpAfter))
+        } else {
+          setCreatureDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+          setCreatureHp(Math.max(0, ev.targetHpAfter))
+        }
+        await sleep(240)
+        setPlayerDmg(null)
+        setCreatureDmg(null)
+      } else if (STATUS_BURST_EVENT_TYPES.has(ev.type)) {
+        await sleep(180)
+      }
+    }
+  }, [playerId, triggerStatusBurstForEvent])
 
   useEffect(() => {
     if (combat.turns.length === 0) {
@@ -679,38 +881,54 @@ export default function CombatReplay({
         const turn = combat.turns[i]
         setCurrentTurn(turn.turnIndex)
 
-        // Group consecutive events with the same sourceId+abilityId into one animation.
-        // Block events (emitted by defender) are appended to the preceding attacker group.
-        const groups: CombatTurnEvent[][] = []
+        // Prefer castId grouping (new schema). Fall back to legacy sourceId+abilityId grouping when castId is absent.
+        const groups: Array<{ kind: 'cast' | 'ambient'; key?: string; events: CombatTurnEvent[] }> = []
         for (const ev of turn.events) {
           const prev = groups[groups.length - 1]
-          if (ev.type === 'block' && prev && prev.length > 0) {
-            prev.push(ev)
-          } else if (prev && prev[0].sourceId === ev.sourceId && ev.abilityId && prev[0].abilityId === ev.abilityId) {
-            prev.push(ev)
+          const key =
+            ev.castId
+              ? `cast:${ev.castId}`
+              : ev.type === 'block' && prev?.kind === 'cast'
+                ? prev.key
+                : ev.abilityId
+                  ? `legacy:${ev.sourceId}:${ev.abilityId}`
+                  : undefined
+
+          if (!key) {
+            groups.push({ kind: 'ambient', events: [ev] })
+            continue
+          }
+
+          if (prev?.kind === 'cast' && prev.key === key) {
+            prev.events.push(ev)
           } else {
-            groups.push([ev])
+            groups.push({ kind: 'cast', key, events: [ev] })
           }
         }
         for (const group of groups) {
           if (abortRef.current) return
-          // Pure resource_change groups (regen events with no abilityId) are handled by turn snapshot
-          if (group.every(ev => ev.type === 'resource_change')) continue
-          const attackerSide = group[0].sourceId === playerId ? 'player' : 'creature'
-          const groupAbilityId = group[0].abilityId
+          if (group.kind === 'ambient') {
+            await animateAmbientEvents(group.events)
+            continue
+          }
+          if (group.events.every(ev => ev.type === 'resource_change')) continue
+          const sourceEvent = group.events.find(ev => ev.type !== 'resource_change') ?? group.events[0]
+          const attackerSide = sourceEvent.sourceId === playerId ? 'player' : 'creature'
+          const groupAbilityId = group.events.find(ev => !!ev.abilityId)?.abilityId
           const overrideFrames = groupAbilityId && abilityAnimations?.[groupAbilityId]
           const baseAnim = attackerSide === 'player' ? playerAnim : creatureAnim
           const anim = overrideFrames
             ? getAttackAnimationConfig(undefined, overrideFrames)
             : baseAnim
-          await animateAttack(attackerSide, group, anim)
+          await animateAttack(attackerSide, group.events, anim)
         }
-        // Update status effects and resources after each turn
-        const creatureId = combat.turns[0]?.events?.find(e => e.sourceId !== playerId)?.sourceId
-          ?? combat.turns[0]?.events?.find(e => e.targetId !== playerId)?.targetId ?? ''
+        // Update status effects and resources after each turn.
         if (turn.activeStatusEffects) {
-          setPlayerStatusEffects(turn.activeStatusEffects[playerId] ?? [])
-          setCreatureStatusEffects(turn.activeStatusEffects[creatureId] ?? [])
+          const nextPlayer = turn.activeStatusEffects[playerId] ?? []
+          const nextCreature = turn.activeStatusEffects[creatureId] ?? []
+          setPlayerStatusEffects(nextPlayer)
+          setCreatureStatusEffects(nextCreature)
+          syncLoopStatusParticles(nextPlayer, nextCreature)
         }
         if (turn.resources) {
           if (turn.resources[playerId]) setPlayerResourceCurrent(turn.resources[playerId].current)
@@ -736,6 +954,8 @@ export default function CombatReplay({
     setActiveProjectiles([])
     setActiveImpactFrames([])
     setActiveBlockFrames([])
+    setActiveStatusLoopParticles([])
+    setActiveStatusBurstParticles([])
     setPlayerDmg(null)
     setCreatureDmg(null)
 
@@ -830,6 +1050,43 @@ export default function CombatReplay({
           >
             <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
               <Portrait url={player.portraitUrl} weaponUrl={player.weaponUrl} />
+              {activeStatusLoopParticles.filter(p => p.side === 'player').map(p => (
+                <StatusParticleEffect
+                  key={p.key}
+                  id={p.key}
+                  url={p.url}
+                  delayMs={p.delayMs}
+                  lifetimeMs={p.lifetimeMs}
+                  startSizePx={p.startSizePx}
+                  endSizePx={p.endSizePx}
+                  offsetX={p.offsetX}
+                  offsetY={p.offsetY}
+                  endOffsetX={p.endOffsetX}
+                  endOffsetY={p.endOffsetY}
+                  acceleration={p.acceleration}
+                  rotationStart={p.rotationStart}
+                  rotationEnd={p.rotationEnd}
+                  loop
+                />
+              ))}
+              {activeStatusBurstParticles.filter(p => p.side === 'player').map(p => (
+                <StatusParticleEffect
+                  key={p.key}
+                  id={p.key}
+                  url={p.url}
+                  delayMs={p.delayMs}
+                  lifetimeMs={p.lifetimeMs}
+                  startSizePx={p.startSizePx}
+                  endSizePx={p.endSizePx}
+                  offsetX={p.offsetX}
+                  offsetY={p.offsetY}
+                  endOffsetX={p.endOffsetX}
+                  endOffsetY={p.endOffsetY}
+                  acceleration={p.acceleration}
+                  rotationStart={p.rotationStart}
+                  rotationEnd={p.rotationEnd}
+                />
+              ))}
               {activeWeaponFrames.filter(f => f.side === 'player').map(f => (
                 <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
               ))}
@@ -912,6 +1169,43 @@ export default function CombatReplay({
           >
             <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
               <Portrait url={creature.portraitUrl} weaponUrl={creature.weaponUrl} />
+              {activeStatusLoopParticles.filter(p => p.side === 'creature').map(p => (
+                <StatusParticleEffect
+                  key={p.key}
+                  id={p.key}
+                  url={p.url}
+                  delayMs={p.delayMs}
+                  lifetimeMs={p.lifetimeMs}
+                  startSizePx={p.startSizePx}
+                  endSizePx={p.endSizePx}
+                  offsetX={p.offsetX}
+                  offsetY={p.offsetY}
+                  endOffsetX={p.endOffsetX}
+                  endOffsetY={p.endOffsetY}
+                  acceleration={p.acceleration}
+                  rotationStart={p.rotationStart}
+                  rotationEnd={p.rotationEnd}
+                  loop
+                />
+              ))}
+              {activeStatusBurstParticles.filter(p => p.side === 'creature').map(p => (
+                <StatusParticleEffect
+                  key={p.key}
+                  id={p.key}
+                  url={p.url}
+                  delayMs={p.delayMs}
+                  lifetimeMs={p.lifetimeMs}
+                  startSizePx={p.startSizePx}
+                  endSizePx={p.endSizePx}
+                  offsetX={p.offsetX}
+                  offsetY={p.offsetY}
+                  endOffsetX={p.endOffsetX}
+                  endOffsetY={p.endOffsetY}
+                  acceleration={p.acceleration}
+                  rotationStart={p.rotationStart}
+                  rotationEnd={p.rotationEnd}
+                />
+              ))}
               {activeWeaponFrames.filter(f => f.side === 'creature').map(f => (
                 <WeaponFrame key={f.key} show url={f.url} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
               ))}

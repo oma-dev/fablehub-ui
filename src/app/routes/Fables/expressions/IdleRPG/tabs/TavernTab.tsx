@@ -324,12 +324,17 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
             if (resolved) abilityAnimations[ab.id] = resolved
           }
         }
+        const statusAnimations: Record<string, any> = {}
+        for (const status of (pack.statusEffects ?? [])) {
+          if (status.animation) statusAnimations[status.id] = status.animation
+        }
         return (
           <Box sx={{ flex: 1 }}>
             <CombatReplay
               combat={combatData.combat}
               leftCharacterId={character.id}
               abilityAnimations={abilityAnimations}
+              statusAnimations={statusAnimations}
               player={{
                 name: character.name,
                 level: character.level,

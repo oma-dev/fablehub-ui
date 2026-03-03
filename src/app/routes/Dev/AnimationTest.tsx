@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, forwardRef } from 'react'
+import { useCallback, useEffect, useRef, useState, forwardRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -30,7 +30,12 @@ import DamageNumber from '../../routes/Fables/expressions/IdleRPG/components/vfx
 import ImpactEffect from '../../routes/Fables/expressions/IdleRPG/components/vfx/ImpactEffect'
 import ImpactFrame from '../../routes/Fables/expressions/IdleRPG/components/vfx/ImpactFrame'
 import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from '../../routes/Fables/expressions/IdleRPG/components/vfx/Projectile'
+import StatusParticleEffect from '../../routes/Fables/expressions/IdleRPG/components/vfx/StatusParticleEffect'
 import WeaponFrame from '../../routes/Fables/expressions/IdleRPG/components/vfx/WeaponFrame'
+import StatusAnimationEditor, {
+  type StatusParticleForm,
+  createEmptyStatusParticle,
+} from '../../routes/Fables/expressions/IdleRPG/components/StatusAnimationEditor'
 import charBackground from '../../../assets/backgrounds/charBackground.png'
 
 const styleIds = [...STYLE_IDS]
@@ -261,6 +266,24 @@ interface ActiveBlockFrameEntry {
   mirrored?: boolean
 }
 
+interface ActiveStatusParticleEntry {
+  key: number
+  side: 'player' | 'creature'
+  url: string
+  delayMs: number
+  lifetimeMs: number
+  startSizePx?: number
+  endSizePx?: number
+  offsetX: number
+  offsetY: number
+  endOffsetX?: number
+  endOffsetY?: number
+  acceleration?: number
+  rotationStart?: number
+  rotationEnd?: number
+  loop: boolean
+}
+
 function getMotionVariants(_anim: AttackAnimationConfig, direction: 'left' | 'right') {
   const sign = direction === 'left' ? 1 : -1
   return {
@@ -283,6 +306,8 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   activeWeaponFrames?: ActiveWeaponFrameEntry[]
   activeImpactFrames?: ActiveImpactFrameEntry[]
   activeBlockFrames?: ActiveBlockFrameEntry[]
+  activeStatusLoopParticles?: ActiveStatusParticleEntry[]
+  activeStatusBurstParticles?: ActiveStatusParticleEntry[]
   cardRef?: React.Ref<HTMLDivElement>
   side: 'player' | 'creature'
   portraitUrl?: string
@@ -298,6 +323,8 @@ const CombatantCard = forwardRef<HTMLDivElement, {
   activeWeaponFrames,
   activeImpactFrames,
   activeBlockFrames,
+  activeStatusLoopParticles,
+  activeStatusBurstParticles,
   cardRef,
   side,
   portraitUrl,
@@ -343,6 +370,43 @@ const CombatantCard = forwardRef<HTMLDivElement, {
               <PersonIcon sx={{ fontSize: PERSON_ICON_SIZE, color: 'rgba(168,85,247,0.25)' }} />
             )}
           </Box>
+          {(activeStatusLoopParticles ?? []).map((p) => (
+            <StatusParticleEffect
+              key={p.key}
+              id={p.key}
+              url={p.url}
+              delayMs={p.delayMs}
+              lifetimeMs={p.lifetimeMs}
+              startSizePx={p.startSizePx}
+              endSizePx={p.endSizePx}
+              offsetX={p.offsetX}
+              offsetY={p.offsetY}
+              endOffsetX={p.endOffsetX}
+              endOffsetY={p.endOffsetY}
+              acceleration={p.acceleration}
+              rotationStart={p.rotationStart}
+              rotationEnd={p.rotationEnd}
+              loop
+            />
+          ))}
+          {(activeStatusBurstParticles ?? []).map((p) => (
+            <StatusParticleEffect
+              key={p.key}
+              id={p.key}
+              url={p.url}
+              delayMs={p.delayMs}
+              lifetimeMs={p.lifetimeMs}
+              startSizePx={p.startSizePx}
+              endSizePx={p.endSizePx}
+              offsetX={p.offsetX}
+              offsetY={p.offsetY}
+              endOffsetX={p.endOffsetX}
+              endOffsetY={p.endOffsetY}
+              acceleration={p.acceleration}
+              rotationStart={p.rotationStart}
+              rotationEnd={p.rotationEnd}
+            />
+          ))}
           {(activeWeaponFrames ?? []).map(f => (
             <WeaponFrame
               key={f.key}
@@ -668,6 +732,11 @@ export default function AnimationTest() {
   const [impactFrames, setImpactFrames] = useState<ImpactFrameForm[]>([defaultImpactFrame()])
   const [blockFrames, setBlockFrames] = useState<BlockFrameForm[]>([])
   const [simulateBlock, setSimulateBlock] = useState(false)
+  const [statusParticles, setStatusParticles] = useState<StatusParticleForm[]>([createEmptyStatusParticle()])
+  const [statusHolderSide, setStatusHolderSide] = useState<'player' | 'creature'>('creature')
+  const [statusApplied, setStatusApplied] = useState(false)
+  const [activeStatusLoopParticles, setActiveStatusLoopParticles] = useState<ActiveStatusParticleEntry[]>([])
+  const [activeStatusBurstParticles, setActiveStatusBurstParticles] = useState<ActiveStatusParticleEntry[]>([])
 
   // Active VFX state (runtime)
   const [playerActiveWeapon, setPlayerActiveWeapon] = useState<ActiveWeaponFrameEntry[]>([])
@@ -927,6 +996,97 @@ export default function AnimationTest() {
     if (source === 'weaponImpact') return weaponImpactUrl?.trim() || ''
     return customUrl?.trim() || ''
   }, [weaponUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl])
+
+  const parseStatusNumber = (value: string, fallback: number): number => {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : fallback
+  }
+
+  const resolveStatusParticleUrl = useCallback((particle: StatusParticleForm): string => {
+    if (particle.imageSource === 'weaponIcon') return weaponUrl?.trim() || ''
+    if (particle.imageSource === 'weaponAnimation') return weaponAnimationUrl?.trim() || weaponUrl?.trim() || ''
+    if (particle.imageSource === 'weaponProjectile') return weaponProjectileUrl?.trim() || weaponAnimationUrl?.trim() || weaponUrl?.trim() || ''
+    if (particle.imageSource === 'weaponImpact') return weaponImpactUrl?.trim() || weaponAnimationUrl?.trim() || weaponUrl?.trim() || ''
+    return particle.url?.trim() || ''
+  }, [weaponAnimationUrl, weaponImpactUrl, weaponProjectileUrl, weaponUrl])
+
+  const buildStatusParticleEntry = useCallback((
+    side: 'player' | 'creature',
+    particle: StatusParticleForm,
+    loop: boolean,
+  ): Omit<ActiveStatusParticleEntry, 'key'> | null => {
+    const url = resolveStatusParticleUrl(particle)
+    if (!url) return null
+    const isRightSide = side === 'creature'
+    const offsetXValue = parseStatusNumber(particle.offsetX, 0)
+    const offsetYValue = parseStatusNumber(particle.offsetY, 0)
+    const endOffsetXValue = parseStatusNumber(particle.endOffsetX, offsetXValue)
+    const endOffsetYValue = parseStatusNumber(particle.endOffsetY, offsetYValue)
+    const rotationStartValue = parseStatusNumber(particle.rotationStart, 0)
+    const rotationEndValue = parseStatusNumber(particle.rotationEnd, rotationStartValue)
+
+    return {
+      side,
+      url,
+      delayMs: Math.max(0, parseStatusNumber(particle.delayMs, 0)),
+      lifetimeMs: Math.max(100, parseStatusNumber(particle.lifetimeMs, 1000)),
+      startSizePx: parseStatusNumber(particle.startSizePx, 72),
+      endSizePx: parseStatusNumber(particle.endSizePx, parseStatusNumber(particle.startSizePx, 72)),
+      offsetX: isRightSide ? -offsetXValue : offsetXValue,
+      offsetY: offsetYValue,
+      endOffsetX: isRightSide ? -endOffsetXValue : endOffsetXValue,
+      endOffsetY: endOffsetYValue,
+      acceleration: parseStatusNumber(particle.acceleration, 0),
+      rotationStart: isRightSide ? -rotationStartValue : rotationStartValue,
+      rotationEnd: isRightSide ? -rotationEndValue : rotationEndValue,
+      loop,
+    }
+  }, [resolveStatusParticleUrl])
+
+  const triggerStatusBurst = useCallback((side: 'player' | 'creature') => {
+    for (const particle of statusParticles) {
+      if (particle.loop) continue
+      const built = buildStatusParticleEntry(side, particle, false)
+      if (!built) continue
+      const key = ++vfxKeyRef.current
+      setActiveStatusBurstParticles(prev => [...prev, { ...built, key }])
+      const removeAfterMs = built.delayMs + built.lifetimeMs + 150
+      setTimeout(() => {
+        setActiveStatusBurstParticles(prev => prev.filter(p => p.key !== key))
+      }, removeAfterMs)
+    }
+  }, [buildStatusParticleEntry, statusParticles])
+
+  const handleApplyStatus = useCallback(() => {
+    setStatusApplied(true)
+    triggerStatusBurst(statusHolderSide)
+  }, [statusHolderSide, triggerStatusBurst])
+
+  const handleStatusTick = useCallback(() => {
+    if (!statusApplied) return
+    triggerStatusBurst(statusHolderSide)
+  }, [statusApplied, statusHolderSide, triggerStatusBurst])
+
+  const handleClearStatus = useCallback(() => {
+    setStatusApplied(false)
+    setActiveStatusLoopParticles([])
+    setActiveStatusBurstParticles([])
+  }, [])
+
+  useEffect(() => {
+    if (!statusApplied) {
+      setActiveStatusLoopParticles([])
+      return
+    }
+    const next: ActiveStatusParticleEntry[] = []
+    for (const particle of statusParticles) {
+      if (!particle.loop) continue
+      const built = buildStatusParticleEntry(statusHolderSide, particle, true)
+      if (!built) continue
+      next.push({ ...built, key: ++vfxKeyRef.current })
+    }
+    setActiveStatusLoopParticles(next)
+  }, [buildStatusParticleEntry, statusApplied, statusHolderSide, statusParticles])
 
   const log = useCallback((text: string) => {
     setLogLines((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${text}`])
@@ -1330,6 +1490,32 @@ export default function AnimationTest() {
         </Box>
       </Paper>
 
+      {/* Status animation test */}
+      <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Typography variant="subtitle1" fontWeight={700}>Status Animation Test</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Configure status particles, then simulate apply/tick behavior. Loop particles stay while status is active; non-loop particles fire once per event.
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Status holder</InputLabel>
+            <Select
+              value={statusHolderSide}
+              label="Status holder"
+              onChange={(e) => setStatusHolderSide(e.target.value as 'player' | 'creature')}
+            >
+              <MenuItem value="player">Player</MenuItem>
+              <MenuItem value="creature">Creature</MenuItem>
+            </Select>
+          </FormControl>
+          <Chip size="small" color={statusApplied ? 'success' : 'default'} label={statusApplied ? 'Applied' : 'Not applied'} />
+          <Button variant="contained" onClick={handleApplyStatus}>Apply Status</Button>
+          <Button variant="outlined" onClick={handleStatusTick} disabled={!statusApplied}>Trigger Tick</Button>
+          <Button variant="outlined" color="error" onClick={handleClearStatus}>Clear Status</Button>
+        </Box>
+        <StatusAnimationEditor particles={statusParticles} onChange={setStatusParticles} />
+      </Paper>
+
       {/* Ability Properties */}
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Typography variant="subtitle1" fontWeight={700}>Ability Properties</Typography>
@@ -1464,6 +1650,8 @@ export default function AnimationTest() {
             activeWeaponFrames={playerActiveWeapon}
             activeImpactFrames={playerActiveImpact}
             activeBlockFrames={activeBlockFrames.filter(f => f.side === 'player')}
+            activeStatusLoopParticles={activeStatusLoopParticles.filter(p => p.side === 'player')}
+            activeStatusBurstParticles={activeStatusBurstParticles.filter(p => p.side === 'player')}
             portraitUrl={playerPortraitUrl || undefined}
           />
 
@@ -1498,6 +1686,8 @@ export default function AnimationTest() {
             activeWeaponFrames={creatureActiveWeapon}
             activeImpactFrames={creatureActiveImpact}
             activeBlockFrames={activeBlockFrames.filter(f => f.side === 'creature')}
+            activeStatusLoopParticles={activeStatusLoopParticles.filter(p => p.side === 'creature')}
+            activeStatusBurstParticles={activeStatusBurstParticles.filter(p => p.side === 'creature')}
             portraitUrl={creaturePortraitUrl || undefined}
           />
         </Box>
