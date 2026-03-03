@@ -1,11 +1,14 @@
 import { motion } from 'framer-motion'
 import { getAccelerationEase } from './motionEasing'
+import { useParticleSound } from './playParticleSound'
 
 const DEFAULT_SIZE = 96
 
 interface Props {
   id: string | number
   url: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   delayMs?: number
   lifetimeMs?: number
   startSizePx?: number
@@ -23,6 +26,7 @@ interface Props {
 export default function StatusParticleEffect({
   id,
   url,
+  soundUrl,
   delayMs = 0,
   lifetimeMs = 1000,
   startSizePx,
@@ -36,6 +40,8 @@ export default function StatusParticleEffect({
   rotationEnd,
   loop = false,
 }: Props) {
+  useParticleSound(true, soundUrl, id, delayMs)
+
   const clampedLifetimeMs = Math.max(100, lifetimeMs)
   const startSize = startSizePx ?? endSizePx ?? DEFAULT_SIZE
   const endSize = endSizePx ?? startSizePx ?? DEFAULT_SIZE

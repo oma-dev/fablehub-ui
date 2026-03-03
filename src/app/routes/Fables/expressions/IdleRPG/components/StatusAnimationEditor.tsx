@@ -11,6 +11,7 @@ import Select from '@mui/material/Select'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import type { AnimationFrameImageSource, StatusAnimation } from '../../../../../../services/api'
+import SoundUploadButton from './SoundUploadButton'
 
 const IMAGE_SOURCE_OPTIONS: Array<{ value: AnimationFrameImageSource; label: string }> = [
   { value: 'url', label: 'Custom URL' },
@@ -23,6 +24,7 @@ const IMAGE_SOURCE_OPTIONS: Array<{ value: AnimationFrameImageSource; label: str
 export type StatusParticleForm = {
   imageSource: AnimationFrameImageSource
   url: string
+  soundUrl: string
   delayMs: string
   lifetimeMs: string
   startSizePx: string
@@ -41,6 +43,7 @@ export function createEmptyStatusParticle(): StatusParticleForm {
   return {
     imageSource: 'url',
     url: '',
+    soundUrl: '',
     delayMs: '0',
     lifetimeMs: '1000',
     startSizePx: '72',
@@ -66,6 +69,7 @@ export function hydrateStatusAnimationParticles(animation?: StatusAnimation | nu
   const rows = (animation?.particles ?? []).map((particle) => ({
     imageSource: particle.imageSource ?? 'url',
     url: particle.url ?? '',
+    soundUrl: particle.soundUrl ?? '',
     delayMs: asNumberString(particle.delayMs, '0'),
     lifetimeMs: asNumberString(particle.lifetimeMs, '1000'),
     startSizePx: asNumberString(particle.startSizePx ?? particle.sizePx, '72'),
@@ -96,6 +100,7 @@ export function buildStatusAnimation(particles: StatusParticleForm[]): StatusAni
         loop: particle.loop,
       }
       if (particle.url.trim()) out.url = particle.url.trim()
+      if (particle.soundUrl.trim()) out.soundUrl = particle.soundUrl.trim()
       const delayMs = parseNumber(particle.delayMs)
       if (delayMs != null) out.delayMs = delayMs
       const lifetimeMs = parseNumber(particle.lifetimeMs)
@@ -166,6 +171,18 @@ export default function StatusAnimationEditor({ particles, onChange }: Props) {
               sx={{ minWidth: 220, flex: 1 }}
             />
           )}
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', minWidth: 260, flex: 1 }}>
+            <TextField
+              size="small"
+              label="Sound URL"
+              value={particle.soundUrl}
+              onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, soundUrl: e.target.value } : x))}
+              sx={{ minWidth: 220, flex: 1 }}
+            />
+            <SoundUploadButton
+              onUploaded={(url) => onChange(particles.map((x, i) => i === index ? { ...x, soundUrl: url } : x))}
+            />
+          </Box>
           <TextField size="small" label="Delay (ms)" type="number" value={particle.delayMs} onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, delayMs: e.target.value } : x))} sx={{ width: 110 }} />
           <TextField size="small" label="Lifetime (ms)" type="number" value={particle.lifetimeMs} onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, lifetimeMs: e.target.value } : x))} sx={{ width: 120 }} />
           <TextField size="small" label="Start size" type="number" value={particle.startSizePx} onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, startSizePx: e.target.value } : x))} sx={{ width: 110 }} />
@@ -188,4 +205,3 @@ export default function StatusAnimationEditor({ particles, onChange }: Props) {
     </Box>
   )
 }
-

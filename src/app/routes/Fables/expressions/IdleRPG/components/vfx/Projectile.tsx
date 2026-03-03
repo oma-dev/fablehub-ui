@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ProjectileType } from './animationConfig'
 import { getAccelerationEase } from './motionEasing'
+import { useParticleSound } from './playParticleSound'
 
 export interface ProjectilePos {
   x: number
@@ -12,6 +13,8 @@ interface Props {
   color: string
   direction: 'left-to-right' | 'right-to-left'
   id: string | number
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   weaponUrl?: string | null
   /** Mirror projectile image horizontally. */
   mirrored?: boolean
@@ -222,6 +225,7 @@ export default function Projectile({
   color,
   direction,
   id,
+  soundUrl,
   weaponUrl,
   mirrored = false,
   acceleration = 0,
@@ -235,6 +239,8 @@ export default function Projectile({
   from,
   to,
 }: Props) {
+  useParticleSound(show, soundUrl, id)
+
   const start = from ?? (direction === 'left-to-right' ? FALLBACK_FROM : FALLBACK_TO)
   const end = to ?? (direction === 'left-to-right' ? FALLBACK_TO : FALLBACK_FROM)
   const durationSec = durationMs != null ? durationMs / 1000 : PROJECTILE_SPEED

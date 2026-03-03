@@ -459,6 +459,9 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
             abilityAnimations={abilityAnimations}
             statusAnimations={statusAnimations}
             arenaBackgroundImageUrl={bossReplayBackground}
+            playerIntroSoundUrl={cls?.introSoundUrl}
+            creatureIntroSoundUrl={boss.introSoundUrl}
+            bossBattleMusicUrl={boss.bossBattleMusicUrl}
             player={{
               name: character.name,
               level: character.level,

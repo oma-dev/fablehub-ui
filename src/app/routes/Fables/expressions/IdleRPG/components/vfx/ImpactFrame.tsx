@@ -1,11 +1,14 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { getAccelerationEase } from './motionEasing'
+import { useParticleSound } from './playParticleSound'
 
 const DEFAULT_SIZE = 140
 
 interface Props {
   show: boolean
   url: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   /** How long fully visible before starting fade, in ms */
   showMs?: number
   /** Fade-out (vanish) duration in ms */
@@ -38,6 +41,7 @@ interface Props {
 export default function ImpactFrame({
   show,
   url,
+  soundUrl,
   showMs = 100,
   vanishMs = 500,
   sizePx,
@@ -53,6 +57,8 @@ export default function ImpactFrame({
   mirrored = false,
   id,
 }: Props) {
+  useParticleSound(show, soundUrl, id)
+
   const totalSec = showMs / 1000 + vanishMs / 1000
   let fadeStart = showMs / 1000 / totalSec
   // Keyframe times must be monotonically non-decreasing (Web Animations API requirement)

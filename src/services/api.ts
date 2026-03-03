@@ -58,6 +58,8 @@ export type AnimationFrameImageSource = 'url' | 'weaponIcon' | 'weaponAnimation'
 /** Optional weapon frame: pops at caster portrait center, fades in, then vanishes after lifetimeMs. */
 export interface AnimationWeaponFrame {
   url?: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple weapon frames). */
   delayMs?: number
@@ -90,6 +92,8 @@ export interface AnimationWeaponFrame {
 /** Optional projectile frame: flies from caster to target (straight or arc). */
 export interface AnimationProjectileFrame {
   url?: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple projectiles). */
   delayMs?: number
@@ -119,6 +123,8 @@ export interface AnimationProjectileFrame {
 /** Optional impact frame: pops at target center after projectile vanishes, then fades out. */
 export interface AnimationImpactFrame {
   url?: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple impact frames). */
   delayMs?: number
@@ -153,6 +159,8 @@ export interface AnimationImpactFrame {
 /** Optional block frame: pops at defender portrait center when a reactive block triggers. */
 export interface AnimationBlockFrame {
   url?: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   imageSource?: AnimationFrameImageSource
   delayMs?: number
   showMs?: number
@@ -180,6 +188,8 @@ export interface AnimationFrames {
 /** Status animation particle shown around the holder card center in replay. */
 export interface StatusAnimationParticle {
   url?: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   imageSource?: AnimationFrameImageSource
   delayMs?: number
   lifetimeMs?: number
@@ -389,6 +399,8 @@ export interface ClassBlock {
   name: string
   description?: string
   iconUrl?: string
+  /** Optional intro sound played when this class enters combat replay. */
+  introSoundUrl?: string
   /** When true, only one character per realm may pick this class. */
   isHeroClass?: boolean
   scaling?: { damageMainStat?: string; secondaryBenefits?: Record<string, string[]> }
@@ -420,8 +432,12 @@ export interface CreatureTemplate {
   weaponDamage?: number
   protectiveArmor?: number
   iconUrl?: string
+  /** Optional intro sound played when this creature enters combat replay. */
+  introSoundUrl?: string
   /** Optional combat replay background image URL (typically used by bosses). */
   backgroundImageUrl?: string
+  /** Optional looping boss battle music URL used during boss combat replay. */
+  bossBattleMusicUrl?: string
   tags?: string[]
   abilityIds?: string[]
   resourceId?: string

@@ -1,10 +1,13 @@
 import { motion, AnimatePresence } from 'framer-motion'
+import { useParticleSound } from './playParticleSound'
 
 const DEFAULT_SIZE = 140
 
 interface Props {
   show: boolean
   url: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   side: 'player' | 'creature'
   showMs?: number
   vanishMs?: number
@@ -28,6 +31,7 @@ interface Props {
 export default function BlockFrame({
   show,
   url,
+  soundUrl,
   showMs = 100,
   vanishMs = 500,
   sizePx,
@@ -40,6 +44,8 @@ export default function BlockFrame({
   mirrored = false,
   id,
 }: Props) {
+  useParticleSound(show, soundUrl, id)
+
   const totalSec = showMs / 1000 + vanishMs / 1000
   let fadeStart = showMs / 1000 / totalSec
   if (fadeStart < 0.08) fadeStart = 0.08

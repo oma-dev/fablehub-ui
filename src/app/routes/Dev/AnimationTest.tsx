@@ -36,6 +36,7 @@ import StatusAnimationEditor, {
   type StatusParticleForm,
   createEmptyStatusParticle,
 } from '../../routes/Fables/expressions/IdleRPG/components/StatusAnimationEditor'
+import SoundUploadButton from '../../routes/Fables/expressions/IdleRPG/components/SoundUploadButton'
 import charBackground from '../../../assets/backgrounds/charBackground.png'
 
 const styleIds = [...STYLE_IDS]
@@ -67,6 +68,7 @@ interface WeaponFrameForm {
   enabled: boolean
   imageSource: AnimationFrameImageSource
   url: string
+  soundUrl: string
   delayMs: number
   fadeInMs: number
   lifetimeMs: number
@@ -84,6 +86,7 @@ interface ProjectileFrameForm {
   enabled: boolean
   imageSource: AnimationFrameImageSource
   url: string
+  soundUrl: string
   delayMs: number
   /** Lifetime / flight duration in ms */
   lifetimeMs: number
@@ -100,6 +103,7 @@ interface ImpactFrameForm {
   enabled: boolean
   imageSource: AnimationFrameImageSource
   url: string
+  soundUrl: string
   delayMs: number
   showMs: number
   vanishMs: number
@@ -120,6 +124,7 @@ const defaultWeaponFrame = (): WeaponFrameForm => ({
   enabled: false,
   imageSource: 'url',
   url: 'https://bg3.wiki/w/images/0/0f/Quarterstaff_Unfaded.png',
+  soundUrl: '',
   delayMs: 0,
   fadeInMs: 200,
   lifetimeMs: 0,   // 0 = stay until sequence ends
@@ -137,6 +142,7 @@ const defaultProjectileFrame = (): ProjectileFrameForm => ({
   enabled: false,
   imageSource: 'url',
   url: 'https://bg3.wiki/w/images/2/2e/Fireball_Spell_Icon.png',
+  soundUrl: '',
   delayMs: 0,
   lifetimeMs: 400,
   trajectory: 'arc',
@@ -152,6 +158,7 @@ const defaultImpactFrame = (): ImpactFrameForm => ({
   enabled: false,
   imageSource: 'url',
   url: 'https://bg3.wiki/w/images/4/4e/Smoke_Powder_Unfaded.png',
+  soundUrl: '',
   delayMs: 0,
   showMs: 90,
   vanishMs: 510,
@@ -171,6 +178,7 @@ interface BlockFrameForm {
   enabled: boolean
   imageSource: AnimationFrameImageSource
   url: string
+  soundUrl: string
   delayMs: number
   startBeforeImpactMs: number
   showMs: number
@@ -187,6 +195,7 @@ const defaultBlockFrame = (): BlockFrameForm => ({
   enabled: false,
   imageSource: 'url',
   url: '',
+  soundUrl: '',
   delayMs: 0,
   startBeforeImpactMs: 0,
   showMs: 320,
@@ -204,6 +213,7 @@ const defaultBlockFrame = (): BlockFrameForm => ({
 interface ActiveWeaponFrameEntry {
   key: number
   url: string
+  soundUrl?: string
   fadeInMs: number
   lifetimeMs?: number
   sizePx?: number
@@ -222,6 +232,7 @@ interface ActiveProjectileEntry {
   key: number
   direction: 'left-to-right' | 'right-to-left'
   imageUrl: string | null
+  soundUrl?: string
   from: ProjectilePos
   to: ProjectilePos
   trajectory: 'straight' | 'arc'
@@ -238,6 +249,7 @@ interface ActiveProjectileEntry {
 interface ActiveImpactFrameEntry {
   key: number
   url: string
+  soundUrl?: string
   showMs: number
   vanishMs: number
   startSizePx?: number
@@ -255,6 +267,7 @@ interface ActiveBlockFrameEntry {
   key: number
   side: 'player' | 'creature'
   url: string
+  soundUrl?: string
   showMs: number
   vanishMs: number
   startSizePx?: number
@@ -270,6 +283,7 @@ interface ActiveStatusParticleEntry {
   key: number
   side: 'player' | 'creature'
   url: string
+  soundUrl?: string
   delayMs: number
   lifetimeMs: number
   startSizePx?: number
@@ -375,6 +389,7 @@ const CombatantCard = forwardRef<HTMLDivElement, {
               key={p.key}
               id={p.key}
               url={p.url}
+              soundUrl={p.soundUrl}
               delayMs={p.delayMs}
               lifetimeMs={p.lifetimeMs}
               startSizePx={p.startSizePx}
@@ -394,6 +409,7 @@ const CombatantCard = forwardRef<HTMLDivElement, {
               key={p.key}
               id={p.key}
               url={p.url}
+              soundUrl={p.soundUrl}
               delayMs={p.delayMs}
               lifetimeMs={p.lifetimeMs}
               startSizePx={p.startSizePx}
@@ -412,6 +428,7 @@ const CombatantCard = forwardRef<HTMLDivElement, {
               key={f.key}
               show
               url={f.url}
+              soundUrl={f.soundUrl}
               fadeInMs={f.fadeInMs}
               lifetimeMs={f.lifetimeMs}
               sizePx={f.sizePx}
@@ -434,6 +451,7 @@ const CombatantCard = forwardRef<HTMLDivElement, {
                 key={f.key}
                 show
                 url={f.url}
+                soundUrl={f.soundUrl}
                 showMs={f.showMs}
                 vanishMs={f.vanishMs}
                 startSizePx={f.startSizePx}
@@ -457,7 +475,7 @@ const CombatantCard = forwardRef<HTMLDivElement, {
         </Box>
         <Typography variant="subtitle1" fontWeight={700} sx={{ fontSize: NAME_FONT_SIZE }}>{label}</Typography>
         {(activeBlockFrames ?? []).map(f => (
-          <BlockFrame key={f.key} show url={f.url} side={side} showMs={f.showMs} vanishMs={f.vanishMs} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={f.mirrored} id={f.key} />
+          <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} side={side} showMs={f.showMs} vanishMs={f.vanishMs} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={f.mirrored} id={f.key} />
         ))}
       </Paper>
     </motion.div>
@@ -520,6 +538,10 @@ function WeaponFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         {frame.imageSource === 'url' && (
           <TextField size="small" label="PNG URL" value={frame.url} onChange={(e) => set('url', e.target.value)} placeholder="https://..." sx={{ minWidth: 240, flex: 1 }} disabled={!frame.enabled} />
         )}
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', minWidth: 260, flex: 1 }}>
+          <TextField size="small" label="Sound URL" value={frame.soundUrl} onChange={(e) => set('soundUrl', e.target.value)} placeholder="https://..." sx={{ minWidth: 220, flex: 1 }} disabled={!frame.enabled} />
+          <SoundUploadButton disabled={!frame.enabled} onUploaded={(url) => set('soundUrl', url)} />
+        </Box>
         {resolveUrl(frame.imageSource, frame.url) && (
           <img src={resolveUrl(frame.imageSource, frame.url)} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }} />
         )}
@@ -569,6 +591,10 @@ function ProjectileFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         {frame.imageSource === 'url' && (
           <TextField size="small" label="PNG URL" value={frame.url} onChange={(e) => set('url', e.target.value)} placeholder="https://..." sx={{ minWidth: 240, flex: 1 }} disabled={!frame.enabled} />
         )}
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', minWidth: 260, flex: 1 }}>
+          <TextField size="small" label="Sound URL" value={frame.soundUrl} onChange={(e) => set('soundUrl', e.target.value)} placeholder="https://..." sx={{ minWidth: 220, flex: 1 }} disabled={!frame.enabled} />
+          <SoundUploadButton disabled={!frame.enabled} onUploaded={(url) => set('soundUrl', url)} />
+        </Box>
         {resolveUrl(frame.imageSource, frame.url) && (
           <img src={resolveUrl(frame.imageSource, frame.url)} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }} />
         )}
@@ -632,6 +658,10 @@ function ImpactFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         {frame.imageSource === 'url' && (
           <TextField size="small" label="PNG URL" value={frame.url} onChange={(e) => set('url', e.target.value)} placeholder="https://..." sx={{ minWidth: 240, flex: 1 }} disabled={!frame.enabled} />
         )}
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', minWidth: 260, flex: 1 }}>
+          <TextField size="small" label="Sound URL" value={frame.soundUrl} onChange={(e) => set('soundUrl', e.target.value)} placeholder="https://..." sx={{ minWidth: 220, flex: 1 }} disabled={!frame.enabled} />
+          <SoundUploadButton disabled={!frame.enabled} onUploaded={(url) => set('soundUrl', url)} />
+        </Box>
         {resolveUrl(frame.imageSource, frame.url) && (
           <img src={resolveUrl(frame.imageSource, frame.url)} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }} />
         )}
@@ -688,6 +718,10 @@ function BlockFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
         {frame.imageSource === 'url' && (
           <TextField size="small" label="PNG URL" value={frame.url} onChange={(e) => set('url', e.target.value)} placeholder="https://..." sx={{ minWidth: 240, flex: 1 }} disabled={!frame.enabled} />
         )}
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', minWidth: 260, flex: 1 }}>
+          <TextField size="small" label="Sound URL" value={frame.soundUrl} onChange={(e) => set('soundUrl', e.target.value)} placeholder="https://..." sx={{ minWidth: 220, flex: 1 }} disabled={!frame.enabled} />
+          <SoundUploadButton disabled={!frame.enabled} onUploaded={(url) => set('soundUrl', url)} />
+        </Box>
         {resolveUrl(frame.imageSource, frame.url) && (
           <img src={resolveUrl(frame.imageSource, frame.url)} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }} />
         )}
@@ -793,6 +827,7 @@ export default function AnimationTest() {
       const w = weaponFrames.filter(f => f.enabled).map(f => ({
         ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
         ...(f.url.trim() ? { url: f.url.trim() } : {}),
+        ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
         ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
         ...(f.fadeInMs !== 200 ? { fadeInMs: f.fadeInMs } : {}),
         ...(f.lifetimeMs > 0 ? { lifetimeMs: f.lifetimeMs } : {}),
@@ -808,6 +843,7 @@ export default function AnimationTest() {
       const p = projectileFrames.filter(f => f.enabled).map(f => ({
         ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
         ...(f.url.trim() ? { url: f.url.trim() } : {}),
+        ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
         ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
         trajectory: f.trajectory,
         ...(f.lifetimeMs > 0 ? { lifetimeMs: f.lifetimeMs } : {}),
@@ -821,6 +857,7 @@ export default function AnimationTest() {
       const im = impactFrames.filter(f => f.enabled).map(f => ({
         ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
         ...(f.url.trim() ? { url: f.url.trim() } : {}),
+        ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
         ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
         ...(f.showMs > 0 ? { showMs: f.showMs } : {}),
         ...(f.vanishMs > 0 ? { vanishMs: f.vanishMs } : {}),
@@ -837,6 +874,7 @@ export default function AnimationTest() {
       const b = blockFrames.filter(f => f.enabled).map(f => ({
         ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
         ...(f.url.trim() ? { url: f.url.trim() } : {}),
+        ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
         ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
         ...(f.startBeforeImpactMs > 0 ? { startBeforeImpactMs: f.startBeforeImpactMs } : {}),
         ...(f.showMs > 0 ? { showMs: f.showMs } : {}),
@@ -925,6 +963,7 @@ export default function AnimationTest() {
       if (af) {
         setWeaponFrames((af.weapon ?? []).map((f: any) => ({
           enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
+          soundUrl: f.soundUrl ?? '',
           delayMs: f.delayMs ?? 0, fadeInMs: f.fadeInMs ?? 200, lifetimeMs: f.lifetimeMs ?? 0,
           startSizePx: f.startSizePx ?? f.sizePx ?? 80, endSizePx: f.endSizePx ?? f.sizePx ?? 120,
           offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
@@ -935,6 +974,7 @@ export default function AnimationTest() {
         })))
         setProjectileFrames((af.projectile ?? []).map((f: any) => ({
           enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
+          soundUrl: f.soundUrl ?? '',
           delayMs: f.delayMs ?? 0, lifetimeMs: f.lifetimeMs ?? f.speedMs ?? 400,
           trajectory: f.trajectory ?? 'arc',
           startSizePx: f.startSizePx ?? f.sizePx ?? 120, endSizePx: f.endSizePx ?? f.sizePx ?? 300,
@@ -945,6 +985,7 @@ export default function AnimationTest() {
         })))
         setImpactFrames((af.impact ?? []).map((f: any) => ({
           enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
+          soundUrl: f.soundUrl ?? '',
           delayMs: f.delayMs ?? 0, showMs: f.showMs ?? 90, vanishMs: f.vanishMs ?? 510,
           lifetimeMs: f.lifetimeMs ?? 600,
           startSizePx: f.startSizePx ?? f.sizePx ?? 60, endSizePx: f.endSizePx ?? f.sizePx ?? 140,
@@ -956,6 +997,7 @@ export default function AnimationTest() {
         })))
         setBlockFrames((af.block ?? []).map((f: any) => ({
           enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
+          soundUrl: f.soundUrl ?? '',
           delayMs: f.delayMs ?? 0, startBeforeImpactMs: f.startBeforeImpactMs ?? 0,
           showMs: f.showMs ?? 320, vanishMs: f.vanishMs ?? 480, lifetimeMs: f.lifetimeMs ?? 800,
           startSizePx: f.startSizePx ?? f.sizePx ?? 100, endSizePx: f.endSizePx ?? f.sizePx ?? 140,
@@ -1028,6 +1070,7 @@ export default function AnimationTest() {
     return {
       side,
       url,
+      soundUrl: particle.soundUrl?.trim() || undefined,
       delayMs: Math.max(0, parseStatusNumber(particle.delayMs, 0)),
       lifetimeMs: Math.max(100, parseStatusNumber(particle.lifetimeMs, 1000)),
       startSizePx: parseStatusNumber(particle.startSizePx, 72),
@@ -1126,6 +1169,7 @@ export default function AnimationTest() {
         const entry: ActiveWeaponFrameEntry = {
           key: ++vfxKeyRef.current,
           url,
+          soundUrl: f.soundUrl?.trim() || undefined,
           fadeInMs: f.fadeInMs,
           lifetimeMs: f.lifetimeMs > 0 ? f.lifetimeMs : undefined,
           sizePx: undefined,
@@ -1168,6 +1212,7 @@ export default function AnimationTest() {
           key,
           direction: dir,
           imageUrl: url || null,
+          soundUrl: f.soundUrl?.trim() || undefined,
           from: { x: srcPos.x + (isRightSideAttacker ? -f.offsetX : f.offsetX), y: srcPos.y + f.offsetY },
           to: tgtPos,
           trajectory: f.trajectory,
@@ -1197,6 +1242,7 @@ export default function AnimationTest() {
         const tgtPos = getPortraitPos(tgtRef)
         const entry: ActiveProjectileEntry = {
           key, direction: dir, imageUrl: null,
+          soundUrl: undefined,
           from: getPortraitPos(srcRef), to: tgtPos,
           trajectory: traj as 'straight' | 'arc', acceleration: 0, rotationStart: 0, rotationEnd: 0, mirrored: isRightSideAttacker, color: anim.impactColor, show: true,
         }
@@ -1223,6 +1269,7 @@ export default function AnimationTest() {
             key: ++vfxKeyRef.current,
             side: defenderSide,
             url,
+            soundUrl: f.soundUrl?.trim() || undefined,
             showMs: f.showMs,
             vanishMs: f.vanishMs,
             startSizePx: f.startSizePx,
@@ -1254,6 +1301,7 @@ export default function AnimationTest() {
           const entry: ActiveImpactFrameEntry = {
             key: ++vfxKeyRef.current,
             url,
+            soundUrl: f.soundUrl?.trim() || undefined,
             showMs: f.showMs,
             vanishMs: f.vanishMs,
             startSizePx: f.startSizePx,
@@ -1620,6 +1668,7 @@ export default function AnimationTest() {
                 color={p.color}
                 direction={p.direction}
                 id={p.key}
+                soundUrl={p.soundUrl}
                 weaponUrl={p.imageUrl}
                 trajectory={p.trajectory}
                 durationMs={p.durationMs}

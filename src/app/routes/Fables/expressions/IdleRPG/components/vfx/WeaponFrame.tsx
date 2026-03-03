@@ -1,5 +1,6 @@
 import { motion, AnimatePresence, type TargetAndTransition } from 'framer-motion'
 import { getAccelerationEase } from './motionEasing'
+import { useParticleSound } from './playParticleSound'
 
 const DEFAULT_SIZE = 120
 const DEFAULT_FADE_IN_MS = 200
@@ -7,6 +8,8 @@ const DEFAULT_FADE_IN_MS = 200
 interface Props {
   show: boolean
   url: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   /** Fade-in duration in ms. Default 200. */
   fadeInMs?: number
   /**
@@ -42,6 +45,7 @@ interface Props {
 
 export default function WeaponFrame({
   show, url,
+  soundUrl,
   fadeInMs = DEFAULT_FADE_IN_MS,
   lifetimeMs,
   sizePx, startSizePx, endSizePx,
@@ -53,6 +57,8 @@ export default function WeaponFrame({
   mirrored = false,
   id,
 }: Props) {
+  useParticleSound(show, soundUrl, id)
+
   const startSize = startSizePx ?? sizePx ?? DEFAULT_SIZE
   const endSize = endSizePx ?? sizePx ?? DEFAULT_SIZE
   const baseSize = Math.max(startSize, endSize, 1)

@@ -9,6 +9,8 @@ export type AnimationFrameImageSource = 'url' | 'weaponIcon' | 'weaponAnimation'
 /** Optional weapon frame (pops at caster, fades in, then vanishes after lifetimeMs). */
 export interface AnimationWeaponFrame {
   url?: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple weapon frames). */
   delayMs?: number
@@ -44,6 +46,8 @@ export interface AnimationWeaponFrame {
 /** Optional projectile frame (flies caster → target). */
 export interface AnimationProjectileFrame {
   url?: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple projectiles). */
   delayMs?: number
@@ -73,6 +77,8 @@ export interface AnimationProjectileFrame {
 /** Optional impact frame (pops at target, fades out). */
 export interface AnimationImpactFrame {
   url?: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple impact frames). */
   delayMs?: number
@@ -110,6 +116,8 @@ export interface AnimationImpactFrame {
 /** Optional block frame: pops at defender portrait center when a reactive block triggers. */
 export interface AnimationBlockFrame {
   url?: string
+  /** Optional sound URL played when this particle starts. */
+  soundUrl?: string
   imageSource?: AnimationFrameImageSource
   delayMs?: number
   showMs?: number
