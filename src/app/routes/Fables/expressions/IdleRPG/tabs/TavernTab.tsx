@@ -325,8 +325,10 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
           }
         }
         const statusAnimations: Record<string, any> = {}
+        const statusTransforms: Record<string, any> = {}
         for (const status of (pack.statusEffects ?? [])) {
           if (status.animation) statusAnimations[status.id] = status.animation
+          if (status.transform) statusTransforms[status.id] = status.transform
         }
         return (
           <Box sx={{ flex: 1 }}>
@@ -335,6 +337,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
               leftCharacterId={character.id}
               abilityAnimations={abilityAnimations}
               statusAnimations={statusAnimations}
+              statusTransforms={statusTransforms}
               playerIntroSoundUrl={cls?.introSoundUrl}
               playerIntroSoundVolumePercent={cls?.introSoundVolumePercent}
               creatureIntroSoundUrl={creatureDef?.introSoundUrl}

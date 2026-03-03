@@ -4,7 +4,18 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
-import type { ActiveStatusEffect, CombatEventType, CombatResult, CombatTurnEvent, IdleRpgGroup, IdleRpgPackV1, RaidReplayPayload, StatusAnimationParticle } from '@features/idle-rpg/api'
+import type {
+  ActiveStatusEffect,
+  CombatEventType,
+  CombatResult,
+  CombatTurnEvent,
+  IdleRpgGroup,
+  IdleRpgPackV1,
+  RaidReplayPayload,
+  StatusAnimation,
+  StatusAnimationParticle,
+  StatusTransformConfig,
+} from '@features/idle-rpg/api'
 import type { IdleRpgGroupMember } from '@features/idle-rpg/api'
 import {
   ReplayHpBar,
@@ -47,8 +58,22 @@ const RESULT_FONT_SIZE = `${1.5 * SCALE}rem`
 const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
 const CARD_LUNGE_DURATION_MS = 260
 const CARD_RETURN_DURATION_MS = 240
+const TRANSFORM_SWAP_HOLD_MS = 2000
 const DAMAGE_NUMBER_EVENT_TYPES = new Set<CombatEventType>(['damage', 'heal', 'dot_tick', 'hot_tick', 'execute'])
 const STATUS_BURST_EVENT_TYPES = new Set<CombatEventType>(['status_applied', 'dot_tick', 'hot_tick'])
+
+function getPreferredTransformTemplateId(
+  effects: ActiveStatusEffect[],
+  statusTransformsByTemplateId: Map<string, StatusTransformConfig>,
+): string | null {
+  for (let index = effects.length - 1; index >= 0; index -= 1) {
+    const templateId = effects[index]?.templateId
+    if (!templateId) continue
+    const portraitUrl = statusTransformsByTemplateId.get(templateId)?.portraitUrl?.trim()
+    if (portraitUrl) return templateId
+  }
+  return null
+}
 
 type CardMotionEase = 'linear' | [number, number, number, number]
 type CardMotionTransition = { type: 'tween'; duration: number; ease: CardMotionEase }
@@ -242,7 +267,11 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const [activeBlockFrames, setActiveBlockFrames] = useState<ActiveBF[]>([])
   const [activeStatusBurstParticles, setActiveStatusBurstParticles] = useState<ActiveStatusParticleEntry[]>([])
   const [statusEffectsById, setStatusEffectsById] = useState<Record<string, ActiveStatusEffect[]>>({})
+  const [frontPartyTransformTemplateId, setFrontPartyTransformTemplateId] = useState<string | null>(null)
+  const [bossTransformTemplateId, setBossTransformTemplateId] = useState<string | null>(null)
   const bossCardRef = useRef<HTMLDivElement>(null)
+  const partyTransformTimerRef = useRef<number | null>(null)
+  const bossTransformTimerRef = useRef<number | null>(null)
   /** IDs of party members who just died; kept in the list until fade-out completes so we can animate. */
   const [justDiedIds, setJustDiedIds] = useState<string[]>([])
 
@@ -264,9 +293,17 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const frontPartyStatusEffects = frontPartyId ? (statusEffectsById[frontPartyId] ?? []) : []
   const bossStatusEffects = bossId ? (statusEffectsById[bossId] ?? []) : []
   const statusAnimationsByTemplateId = useMemo(() => {
-    const map = new Map<string, { particles?: StatusAnimationParticle[] }>()
+    const map = new Map<string, StatusAnimation>()
     for (const status of (pack.statusEffects ?? [])) {
       map.set(status.id, status.animation ?? {})
+    }
+    return map
+  }, [pack.statusEffects])
+  const statusTransformsByTemplateId = useMemo(() => {
+    const map = new Map<string, StatusTransformConfig>()
+    for (const status of (pack.statusEffects ?? [])) {
+      if (!status.transform?.portraitUrl?.trim()) continue
+      map.set(status.id, status.transform)
     }
     return map
   }, [pack.statusEffects])
@@ -293,6 +330,43 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+  const clearTransformTimer = useCallback((side: 'party' | 'boss') => {
+    const timerRef = side === 'party' ? partyTransformTimerRef : bossTransformTimerRef
+    if (timerRef.current != null) {
+      window.clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }, [])
+
+  const scheduleTransformActivation = useCallback((
+    side: 'party' | 'boss',
+    templateId: string,
+    delayMs: number,
+    soundUrl?: string,
+    soundVolumePercent?: number,
+  ) => {
+    clearTransformTimer(side)
+    const activate = () => {
+      if (side === 'party') setFrontPartyTransformTemplateId(templateId)
+      else setBossTransformTemplateId(templateId)
+      const trimmedSoundUrl = soundUrl?.trim()
+      if (trimmedSoundUrl) {
+        playOneShotAudio(trimmedSoundUrl, soundVolumePercent ?? 100)
+      }
+    }
+    if (delayMs <= 0) {
+      activate()
+      return
+    }
+    const timerId = window.setTimeout(() => {
+      activate()
+      if (side === 'party') partyTransformTimerRef.current = null
+      else bossTransformTimerRef.current = null
+    }, delayMs)
+    if (side === 'party') partyTransformTimerRef.current = timerId
+    else bossTransformTimerRef.current = timerId
+  }, [clearTransformTimer])
 
   const setCardMotion = useCallback((
     side: 'party' | 'boss',
@@ -403,25 +477,24 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     return entries
   }, [bossId, bossStatusEffects, buildStatusParticleEntry, frontPartyId, frontPartyStatusEffects, statusAnimationsByTemplateId])
 
-  const triggerStatusBurstForEvent = useCallback((event: CombatTurnEvent) => {
-    if (!STATUS_BURST_EVENT_TYPES.has(event.type)) return
+  const triggerStatusBurstForEvent = useCallback((event: CombatTurnEvent): number => {
+    if (!STATUS_BURST_EVENT_TYPES.has(event.type)) return 0
     const statusTemplateId =
       event.statusTemplateId
       ?? Object.values(statusEffectsById).flat().find((status) => status.id === event.statusEffectId)?.templateId
-    if (!statusTemplateId) return
+    if (!statusTemplateId) return 0
 
     const side: 'party' | 'boss' | null =
       event.targetId === bossId ? 'boss'
       : partyOrder.includes(event.targetId) ? 'party'
       : null
-    if (!side) return
+    if (!side) return 0
+    let transformPauseMs = 0
 
     const holderId = side === 'party' ? event.targetId : bossId ?? null
-    const particles = statusAnimationsByTemplateId.get(statusTemplateId)?.particles ?? []
-    for (const particle of particles) {
-      if (particle.loop) continue
+    const pushBurstParticle = (particle: StatusAnimationParticle) => {
       const built = buildStatusParticleEntry(side, holderId, particle, false)
-      if (!built) continue
+      if (!built) return
       const key = ++vfxKeyRef.current
       setActiveStatusBurstParticles(prev => [...prev, { ...built, key }])
       const removeAfterMs = built.delayMs + built.lifetimeMs + 150
@@ -429,7 +502,79 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         setActiveStatusBurstParticles(prev => prev.filter(p => p.key !== key))
       }, removeAfterMs)
     }
-  }, [bossId, buildStatusParticleEntry, partyOrder, statusAnimationsByTemplateId, statusEffectsById])
+
+    if (event.type === 'status_applied') {
+      const transformConfig = statusTransformsByTemplateId.get(statusTemplateId)
+      const transformPortraitUrl = transformConfig?.portraitUrl?.trim()
+      if (transformPortraitUrl) {
+        const swapDelayMs = Math.max(0, transformConfig?.swapPortraitDelayMs ?? 0)
+        const activeTemplateId = side === 'party' ? frontPartyTransformTemplateId : bossTransformTemplateId
+        const shouldTriggerTransformSequence = activeTemplateId !== statusTemplateId
+        scheduleTransformActivation(
+          side,
+          statusTemplateId,
+          swapDelayMs,
+          shouldTriggerTransformSequence ? transformConfig?.soundUrl : undefined,
+          transformConfig?.soundVolumePercent,
+        )
+        if (shouldTriggerTransformSequence) {
+          transformPauseMs = swapDelayMs + TRANSFORM_SWAP_HOLD_MS
+        }
+      }
+      const preTransformParticles = statusAnimationsByTemplateId.get(statusTemplateId)?.preTransformParticles ?? []
+      for (const particle of preTransformParticles) {
+        pushBurstParticle(particle)
+      }
+    }
+
+    const particles = statusAnimationsByTemplateId.get(statusTemplateId)?.particles ?? []
+    for (const particle of particles) {
+      if (particle.loop) continue
+      pushBurstParticle(particle)
+    }
+    return transformPauseMs
+  }, [
+    bossId,
+    bossTransformTemplateId,
+    buildStatusParticleEntry,
+    frontPartyTransformTemplateId,
+    partyOrder,
+    statusAnimationsByTemplateId,
+    statusEffectsById,
+    scheduleTransformActivation,
+    statusTransformsByTemplateId,
+  ])
+
+  useEffect(() => {
+    const nextPartyTransform = getPreferredTransformTemplateId(frontPartyStatusEffects, statusTransformsByTemplateId)
+    if (!nextPartyTransform) {
+      clearTransformTimer('party')
+      setFrontPartyTransformTemplateId(null)
+    } else if (
+      !frontPartyStatusEffects.some((status) => status.templateId === frontPartyTransformTemplateId)
+      && partyTransformTimerRef.current == null
+    ) {
+      setFrontPartyTransformTemplateId(nextPartyTransform)
+    }
+
+    const nextBossTransform = getPreferredTransformTemplateId(bossStatusEffects, statusTransformsByTemplateId)
+    if (!nextBossTransform) {
+      clearTransformTimer('boss')
+      setBossTransformTemplateId(null)
+    } else if (
+      !bossStatusEffects.some((status) => status.templateId === bossTransformTemplateId)
+      && bossTransformTimerRef.current == null
+    ) {
+      setBossTransformTemplateId(nextBossTransform)
+    }
+  }, [
+    frontPartyStatusEffects,
+    bossStatusEffects,
+    frontPartyTransformTemplateId,
+    bossTransformTemplateId,
+    statusTransformsByTemplateId,
+    clearTransformTimer,
+  ])
 
   const resolveAbilityAnim = useCallback((abilityId?: string): AttackAnimationConfig => {
     if (!abilityId) return DEFAULT_ANIM
@@ -633,7 +778,13 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       const combatEvents = events
         .filter(ev => ev.type !== 'resource_change' && ev.type !== 'block')
         .filter(ev => DAMAGE_NUMBER_EVENT_TYPES.has(ev.type))
-      for (const ev of events) triggerStatusBurstForEvent(ev)
+      let transformPauseUntilMs = 0
+      for (const ev of events) {
+        const transformPauseMs = triggerStatusBurstForEvent(ev)
+        if (transformPauseMs > 0) {
+          transformPauseUntilMs = Math.max(transformPauseUntilMs, Date.now() + transformPauseMs)
+        }
+      }
       for (const ev of combatEvents) {
         dmgKeyRef.current++
         const isOnBoss = ev.targetId === bossId
@@ -672,6 +823,13 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
 
       setAttackerVariant('idle')
       setTargetDmg(null)
+
+      const remainingTransformPauseMs = transformPauseUntilMs > 0
+        ? Math.max(0, transformPauseUntilMs - Date.now())
+        : 0
+      if (remainingTransformPauseMs > 0) {
+        await sleep(remainingTransformPauseMs)
+      }
     },
     [
       getPortraitPos,
@@ -686,7 +844,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const animateAmbientEvents = useCallback(async (events: CombatTurnEvent[]) => {
     for (const ev of events) {
       if (abortRef.current) return
-      triggerStatusBurstForEvent(ev)
+      const transformPauseMs = triggerStatusBurstForEvent(ev)
       if (DAMAGE_NUMBER_EVENT_TYPES.has(ev.type)) {
         dmgKeyRef.current++
         const isOnBoss = ev.targetId === bossId
@@ -702,6 +860,10 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       } else if (STATUS_BURST_EVENT_TYPES.has(ev.type)) {
         await sleep(180)
       }
+
+      if (transformPauseMs > 0) {
+        await sleep(transformPauseMs)
+      }
     }
   }, [bossId, triggerStatusBurstForEvent])
 
@@ -715,8 +877,26 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         continue
       }
       if (group.events.every((event) => event.type === 'resource_change')) continue
-      const sourceEvent = group.events.find((event) => event.type !== 'resource_change') ?? group.events[0]
-      const attackerSide = partyOrder.includes(sourceEvent.sourceId) ? 'party' : 'boss'
+      const nonResourceEvents = group.events.filter((event) => event.type !== 'resource_change')
+      const nonResourceNonBlockEvents = nonResourceEvents.filter((event) => event.type !== 'block')
+      const isBlockedCastGroup =
+        nonResourceEvents.length > 0
+        && nonResourceEvents.every((event) => event.type === 'block' && event.blocked)
+
+      let attackerSide: 'party' | 'boss' = 'party'
+      if (isBlockedCastGroup) {
+        const blockTargetId = nonResourceEvents[0]?.targetId
+        if (blockTargetId === bossId) attackerSide = 'party'
+        else if (partyOrder.includes(blockTargetId)) attackerSide = 'boss'
+        else attackerSide = partyOrder.includes(nonResourceEvents[0]?.sourceId ?? '') ? 'party' : 'boss'
+      } else {
+        const attackerEvent =
+          nonResourceNonBlockEvents[0]
+          ?? group.events.find((event) => event.type === 'resource_change')
+          ?? nonResourceEvents[0]
+          ?? group.events[0]
+        attackerSide = partyOrder.includes(attackerEvent.sourceId) ? 'party' : 'boss'
+      }
       const abilityId = group.events.find((event) => !!event.abilityId)?.abilityId
       const animationConfig = resolveAbilityAnim(abilityId)
       await animateAttack(attackerSide, group.events, animationConfig)
@@ -782,8 +962,15 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     if (introUrl) playOneShotAudio(introUrl, frontClass?.introSoundVolumePercent ?? 100)
   }, [finished, frontPartyId, group?.members, pack.classes])
 
+  useEffect(() => () => {
+    clearTransformTimer('party')
+    clearTransformTimer('boss')
+  }, [clearTransformTimer])
+
   const handleSkip = () => {
     stopPlayback()
+    clearTransformTimer('party')
+    clearTransformTimer('boss')
     setPartyVariant('idle')
     setBossVariant('idle')
     setPartyCardOffsetX(0)
@@ -819,6 +1006,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   }
 
   const handleDone = () => {
+    clearTransformTimer('party')
+    clearTransformTimer('boss')
     if (bossBgmRef.current) {
       bossBgmRef.current.pause()
       bossBgmRef.current.src = ''
@@ -826,6 +1015,13 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     }
     onDone()
   }
+
+  const frontPartyTransformPortraitUrl = frontPartyTransformTemplateId
+    ? statusTransformsByTemplateId.get(frontPartyTransformTemplateId)?.portraitUrl?.trim()
+    : ''
+  const bossTransformPortraitUrl = bossTransformTemplateId
+    ? statusTransformsByTemplateId.get(bossTransformTemplateId)?.portraitUrl?.trim()
+    : ''
 
   return (
     <Box
@@ -934,7 +1130,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                   <>
                     <Box ref={isFront ? partyPortraitRef : undefined} sx={{ position: 'relative' }}>
                       <ReplayPortrait
-                        url={getMemberPortrait(member)}
+                        url={isFront ? (frontPartyTransformPortraitUrl || getMemberPortrait(member)) : getMemberPortrait(member)}
                         sizePx={portraitSize}
                         personIconSizePx={PERSON_ICON_SIZE}
                         borderRadius={PORTRAIT_BORDER_RADIUS}
@@ -1147,7 +1343,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                 >
                 <Box ref={bossPortraitRef} sx={{ position: 'relative' }}>
                   <ReplayPortrait
-                    url={boss.iconUrl ?? undefined}
+                    url={bossTransformPortraitUrl || boss.iconUrl || undefined}
                     sizePx={PORTRAIT_SIZE}
                     personIconSizePx={PERSON_ICON_SIZE}
                     borderRadius={PORTRAIT_BORDER_RADIUS}

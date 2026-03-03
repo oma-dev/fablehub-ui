@@ -4,7 +4,15 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
-import type { ActiveStatusEffect, AnimationFrames, CombatEventType, CombatResult, CombatTurnEvent, StatusAnimation } from '@features/idle-rpg/api'
+import type {
+  ActiveStatusEffect,
+  AnimationFrames,
+  CombatEventType,
+  CombatResult,
+  CombatTurnEvent,
+  StatusAnimation,
+  StatusTransformConfig,
+} from '@features/idle-rpg/api'
 import {
   ReplayHpBar,
   ReplayPortrait,
@@ -59,6 +67,8 @@ interface Props {
   abilityAnimations?: Record<string, AnimationFrames>
   /** Per-status animation definitions keyed by status template id. */
   statusAnimations?: Record<string, StatusAnimation>
+  /** Per-status transform definitions keyed by status template id. */
+  statusTransforms?: Record<string, StatusTransformConfig>
   /** Optional intro sound for left-side combatant (typically class intro). */
   playerIntroSoundUrl?: string | null
   /** Optional intro sound volume percent for left-side combatant. */
@@ -101,6 +111,7 @@ const RESULT_FONT_SIZE = `${1.5 * SCALE}rem`
 const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
 const CARD_LUNGE_DURATION_MS = 260
 const CARD_RETURN_DURATION_MS = 240
+const TRANSFORM_SWAP_HOLD_MS = 2000
 
 type CardMotionEase = 'linear' | [number, number, number, number]
 type CardMotionTransition = { type: 'tween'; duration: number; ease: CardMotionEase }
@@ -254,6 +265,19 @@ interface ActiveStatusParticleEntry {
 const DAMAGE_NUMBER_EVENT_TYPES = new Set<CombatEventType>(['damage', 'heal', 'dot_tick', 'hot_tick', 'execute'])
 const STATUS_BURST_EVENT_TYPES = new Set<CombatEventType>(['status_applied', 'dot_tick', 'hot_tick'])
 
+function getPreferredTransformTemplateId(
+  effects: ActiveStatusEffect[],
+  statusTransforms?: Record<string, StatusTransformConfig>,
+): string | null {
+  for (let index = effects.length - 1; index >= 0; index -= 1) {
+    const templateId = effects[index]?.templateId
+    if (!templateId) continue
+    const portraitUrl = statusTransforms?.[templateId]?.portraitUrl?.trim()
+    if (portraitUrl) return templateId
+  }
+  return null
+}
+
 function clampSoundVolume(volumePercent?: number | null): number {
   if (volumePercent == null || Number.isNaN(volumePercent)) return 1
   return Math.min(1, Math.max(0, volumePercent / 100))
@@ -292,6 +316,7 @@ export default function CombatReplay({
   leftCharacterId,
   abilityAnimations,
   statusAnimations,
+  statusTransforms,
   playerIntroSoundUrl,
   playerIntroSoundVolumePercent,
   creatureIntroSoundUrl,
@@ -342,10 +367,14 @@ export default function CombatReplay({
   const [creatureDmg, setCreatureDmg] = useState<DmgState>(null)
   const [playerStatusEffects, setPlayerStatusEffects] = useState<ActiveStatusEffect[]>([])
   const [creatureStatusEffects, setCreatureStatusEffects] = useState<ActiveStatusEffect[]>([])
+  const [playerTransformTemplateId, setPlayerTransformTemplateId] = useState<string | null>(null)
+  const [creatureTransformTemplateId, setCreatureTransformTemplateId] = useState<string | null>(null)
   const dmgKeyRef = useRef(0)
   const vfxKeyRef = useRef(0)
   const introPlayedRef = useRef(false)
   const bossBgmRef = useRef<HTMLAudioElement | null>(null)
+  const playerTransformTimerRef = useRef<number | null>(null)
+  const creatureTransformTimerRef = useRef<number | null>(null)
 
   const playerAnim = getAttackAnimationConfig(player.styleId, player.animationFrames)
   const creatureAnim = getAttackAnimationConfig(creature.styleId, creature.animationFrames)
@@ -365,6 +394,43 @@ export default function CombatReplay({
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+  const clearTransformTimer = useCallback((side: 'player' | 'creature') => {
+    const timerRef = side === 'player' ? playerTransformTimerRef : creatureTransformTimerRef
+    if (timerRef.current != null) {
+      window.clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }, [])
+
+  const scheduleTransformActivation = useCallback((
+    side: 'player' | 'creature',
+    templateId: string,
+    delayMs: number,
+    soundUrl?: string,
+    soundVolumePercent?: number,
+  ) => {
+    clearTransformTimer(side)
+    const activate = () => {
+      if (side === 'player') setPlayerTransformTemplateId(templateId)
+      else setCreatureTransformTemplateId(templateId)
+      const trimmedSoundUrl = soundUrl?.trim()
+      if (trimmedSoundUrl) {
+        playOneShotAudio(trimmedSoundUrl, soundVolumePercent ?? 100)
+      }
+    }
+    if (delayMs <= 0) {
+      activate()
+      return
+    }
+    const timerId = window.setTimeout(() => {
+      activate()
+      if (side === 'player') playerTransformTimerRef.current = null
+      else creatureTransformTimerRef.current = null
+    }, delayMs)
+    if (side === 'player') playerTransformTimerRef.current = timerId
+    else creatureTransformTimerRef.current = timerId
+  }, [clearTransformTimer])
 
   const setCardMotion = useCallback((
     side: 'player' | 'creature',
@@ -518,24 +584,41 @@ export default function CombatReplay({
     })
   }, [buildStatusParticleEntry, statusAnimations])
 
-  const triggerStatusBurstForEvent = useCallback((event: CombatTurnEvent) => {
-    if (!STATUS_BURST_EVENT_TYPES.has(event.type)) return
+  const triggerStatusBurstForEvent = useCallback((event: CombatTurnEvent): number => {
+    if (!STATUS_BURST_EVENT_TYPES.has(event.type)) return 0
     const statusTemplateId =
       event.statusTemplateId
       ?? playerStatusEffects.find((status) => status.id === event.statusEffectId)?.templateId
       ?? creatureStatusEffects.find((status) => status.id === event.statusEffectId)?.templateId
-    if (!statusTemplateId) return
+    if (!statusTemplateId) return 0
     const side: 'player' | 'creature' | null =
       event.targetId === playerId ? 'player'
       : event.targetId === creatureId ? 'creature'
       : null
-    if (!side) return
+    if (!side) return 0
+    let transformPauseMs = 0
 
-    const particles = statusAnimations?.[statusTemplateId]?.particles ?? []
-    for (const particle of particles) {
-      if (particle.loop) continue
+    const pushBurstParticle = (particle: {
+      url?: string
+      soundUrl?: string
+      soundVolumePercent?: number
+      imageSource?: 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact'
+      delayMs?: number
+      lifetimeMs?: number
+      sizePx?: number
+      startSizePx?: number
+      endSizePx?: number
+      offsetX?: number
+      offsetY?: number
+      endOffsetX?: number
+      endOffsetY?: number
+      acceleration?: number
+      rotationStart?: number
+      rotationEnd?: number
+      loop?: boolean
+    }) => {
       const built = buildStatusParticleEntry(side, particle, false)
-      if (!built) continue
+      if (!built) return
       const key = ++vfxKeyRef.current
       setActiveStatusBurstParticles(prev => [...prev, { ...built, key, loop: false }])
       const removeAfterMs = built.delayMs + built.lifetimeMs + 150
@@ -543,7 +626,49 @@ export default function CombatReplay({
         setActiveStatusBurstParticles(prev => prev.filter(p => p.key !== key))
       }, removeAfterMs)
     }
-  }, [buildStatusParticleEntry, creatureId, creatureStatusEffects, playerId, playerStatusEffects, statusAnimations])
+
+    if (event.type === 'status_applied') {
+      const transformConfig = statusTransforms?.[statusTemplateId]
+      const transformPortraitUrl = transformConfig?.portraitUrl?.trim()
+      if (transformPortraitUrl) {
+        const swapDelayMs = Math.max(0, transformConfig?.swapPortraitDelayMs ?? 0)
+        const activeTemplateId = side === 'player' ? playerTransformTemplateId : creatureTransformTemplateId
+        const shouldTriggerTransformSequence = activeTemplateId !== statusTemplateId
+        scheduleTransformActivation(
+          side,
+          statusTemplateId,
+          swapDelayMs,
+          shouldTriggerTransformSequence ? transformConfig?.soundUrl : undefined,
+          transformConfig?.soundVolumePercent,
+        )
+        if (shouldTriggerTransformSequence) {
+          transformPauseMs = swapDelayMs + TRANSFORM_SWAP_HOLD_MS
+        }
+      }
+      const preTransformParticles = statusAnimations?.[statusTemplateId]?.preTransformParticles ?? []
+      for (const particle of preTransformParticles) {
+        pushBurstParticle(particle)
+      }
+    }
+
+    const particles = statusAnimations?.[statusTemplateId]?.particles ?? []
+    for (const particle of particles) {
+      if (particle.loop) continue
+      pushBurstParticle(particle)
+    }
+    return transformPauseMs
+  }, [
+    buildStatusParticleEntry,
+    creatureId,
+    creatureTransformTemplateId,
+    creatureStatusEffects,
+    playerId,
+    playerTransformTemplateId,
+    playerStatusEffects,
+    scheduleTransformActivation,
+    statusAnimations,
+    statusTransforms,
+  ])
 
   const animateAttack = useCallback(async (
     attackerSide: 'player' | 'creature',
@@ -800,7 +925,13 @@ export default function CombatReplay({
     const targetEvents = combatEvents.filter(ev => ev.targetId !== ev.sourceId || ev.type !== 'heal')
     const selfHealEvents = combatEvents.filter(ev => ev.targetId === ev.sourceId && ev.type === 'heal')
 
-    for (const ev of events) triggerStatusBurstForEvent(ev)
+    let transformPauseUntilMs = 0
+    for (const ev of events) {
+      const transformPauseMs = triggerStatusBurstForEvent(ev)
+      if (transformPauseMs > 0) {
+        transformPauseUntilMs = Math.max(transformPauseUntilMs, Date.now() + transformPauseMs)
+      }
+    }
 
     setTargetImpact(true)
     if (targetCardAnimation === 'hit') setTargetVariant('hit')
@@ -852,6 +983,13 @@ export default function CombatReplay({
     setAttackerVariant('idle')
     setPlayerDmg(null)
     setCreatureDmg(null)
+
+    const remainingTransformPauseMs = transformPauseUntilMs > 0
+      ? Math.max(0, transformPauseUntilMs - Date.now())
+      : 0
+    if (remainingTransformPauseMs > 0) {
+      await sleep(remainingTransformPauseMs)
+    }
   }, [
     playerId,
     player.weaponUrl,
@@ -872,7 +1010,7 @@ export default function CombatReplay({
         else setCreatureResourceCurrent(ev.resourceAfter.current)
       }
 
-      triggerStatusBurstForEvent(ev)
+      const transformPauseMs = triggerStatusBurstForEvent(ev)
 
       if (DAMAGE_NUMBER_EVENT_TYPES.has(ev.type)) {
         const isOnPlayer = ev.targetId === playerId
@@ -890,6 +1028,10 @@ export default function CombatReplay({
       } else if (STATUS_BURST_EVENT_TYPES.has(ev.type)) {
         await sleep(180)
       }
+
+      if (transformPauseMs > 0) {
+        await sleep(transformPauseMs)
+      }
     }
   }, [playerId, triggerStatusBurstForEvent])
 
@@ -903,8 +1045,26 @@ export default function CombatReplay({
         continue
       }
       if (group.events.every((event) => event.type === 'resource_change')) continue
-      const sourceEvent = group.events.find((event) => event.type !== 'resource_change') ?? group.events[0]
-      const attackerSide = sourceEvent.sourceId === playerId ? 'player' : 'creature'
+      const nonResourceEvents = group.events.filter((event) => event.type !== 'resource_change')
+      const nonResourceNonBlockEvents = nonResourceEvents.filter((event) => event.type !== 'block')
+      const isBlockedCastGroup =
+        nonResourceEvents.length > 0
+        && nonResourceEvents.every((event) => event.type === 'block' && event.blocked)
+
+      let attackerSide: 'player' | 'creature' = 'player'
+      if (isBlockedCastGroup) {
+        const blockTargetId = nonResourceEvents[0]?.targetId
+        if (blockTargetId === playerId) attackerSide = 'creature'
+        else if (blockTargetId === creatureId) attackerSide = 'player'
+        else attackerSide = (nonResourceEvents[0]?.sourceId === playerId ? 'player' : 'creature')
+      } else {
+        const attackerEvent =
+          nonResourceNonBlockEvents[0]
+          ?? group.events.find((event) => event.type === 'resource_change')
+          ?? nonResourceEvents[0]
+          ?? group.events[0]
+        attackerSide = attackerEvent.sourceId === playerId ? 'player' : 'creature'
+      }
       const groupAbilityId = group.events.find((event) => !!event.abilityId)?.abilityId
       const overrideFrames = groupAbilityId && abilityAnimations?.[groupAbilityId]
       const baseAnimation = attackerSide === 'player' ? playerAnim : creatureAnim
@@ -920,6 +1080,28 @@ export default function CombatReplay({
       setPlayerStatusEffects(nextPlayer)
       setCreatureStatusEffects(nextCreature)
       syncLoopStatusParticles(nextPlayer, nextCreature)
+
+      const nextPlayerTransform = getPreferredTransformTemplateId(nextPlayer, statusTransforms)
+      if (!nextPlayerTransform) {
+        clearTransformTimer('player')
+        setPlayerTransformTemplateId(null)
+      } else if (
+        !nextPlayer.some((status) => status.templateId === playerTransformTemplateId)
+        && playerTransformTimerRef.current == null
+      ) {
+        setPlayerTransformTemplateId(nextPlayerTransform)
+      }
+
+      const nextCreatureTransform = getPreferredTransformTemplateId(nextCreature, statusTransforms)
+      if (!nextCreatureTransform) {
+        clearTransformTimer('creature')
+        setCreatureTransformTemplateId(null)
+      } else if (
+        !nextCreature.some((status) => status.templateId === creatureTransformTemplateId)
+        && creatureTransformTimerRef.current == null
+      ) {
+        setCreatureTransformTemplateId(nextCreatureTransform)
+      }
     }
     if (turn.resources) {
       if (turn.resources[playerId]) setPlayerResourceCurrent(turn.resources[playerId].current)
@@ -931,8 +1113,12 @@ export default function CombatReplay({
     animateAttack,
     creatureAnim,
     creatureId,
+    clearTransformTimer,
     playerAnim,
     playerId,
+    playerTransformTemplateId,
+    creatureTransformTemplateId,
+    statusTransforms,
     syncLoopStatusParticles,
   ])
 
@@ -982,8 +1168,15 @@ export default function CombatReplay({
     }
   }, [bossBattleMusicUrl, bossBattleMusicVolumePercent])
 
+  useEffect(() => () => {
+    clearTransformTimer('player')
+    clearTransformTimer('creature')
+  }, [clearTransformTimer])
+
   const handleSkip = () => {
     stopPlayback()
+    clearTransformTimer('player')
+    clearTransformTimer('creature')
     setPlayerVariant('idle')
     setCreatureVariant('idle')
     setPlayerCardOffsetX(0)
@@ -1017,10 +1210,19 @@ export default function CombatReplay({
       if (lastTurn.resources[playerId]) setPlayerResourceCurrent(lastTurn.resources[playerId].current)
       if (lastTurn.resources[creatureId]) setCreatureResourceCurrent(lastTurn.resources[creatureId].current)
     }
+    const finalPlayerStatuses = lastTurn?.activeStatusEffects?.[playerId] ?? []
+    const finalCreatureStatuses = lastTurn?.activeStatusEffects?.[creatureId] ?? []
+    setPlayerStatusEffects(finalPlayerStatuses)
+    setCreatureStatusEffects(finalCreatureStatuses)
+    setPlayerTransformTemplateId(getPreferredTransformTemplateId(finalPlayerStatuses, statusTransforms))
+    setCreatureTransformTemplateId(getPreferredTransformTemplateId(finalCreatureStatuses, statusTransforms))
+    syncLoopStatusParticles(finalPlayerStatuses, finalCreatureStatuses)
     finishAtTurn(lastTurn?.turnIndex ?? 0)
   }
 
   const handleContinue = () => {
+    clearTransformTimer('player')
+    clearTransformTimer('creature')
     if (bossBgmRef.current) {
       bossBgmRef.current.pause()
       bossBgmRef.current.src = ''
@@ -1028,6 +1230,15 @@ export default function CombatReplay({
     }
     onFinish()
   }
+
+  const playerTransformPortraitUrl = playerTransformTemplateId
+    ? statusTransforms?.[playerTransformTemplateId]?.portraitUrl?.trim()
+    : ''
+  const creatureTransformPortraitUrl = creatureTransformTemplateId
+    ? statusTransforms?.[creatureTransformTemplateId]?.portraitUrl?.trim()
+    : ''
+  const resolvedPlayerPortraitUrl = playerTransformPortraitUrl || player.portraitUrl
+  const resolvedCreaturePortraitUrl = creatureTransformPortraitUrl || creature.portraitUrl
 
   return (
     <Box
@@ -1105,7 +1316,7 @@ export default function CombatReplay({
             >
               <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
               <ReplayPortrait
-                url={player.portraitUrl}
+                url={resolvedPlayerPortraitUrl}
                 weaponUrl={player.weaponUrl}
                 sizePx={PORTRAIT_SIZE}
                 personIconSizePx={PERSON_ICON_SIZE}
@@ -1251,7 +1462,7 @@ export default function CombatReplay({
             >
               <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
               <ReplayPortrait
-                url={creature.portraitUrl}
+                url={resolvedCreaturePortraitUrl}
                 weaponUrl={creature.weaponUrl}
                 sizePx={PORTRAIT_SIZE}
                 personIconSizePx={PERSON_ICON_SIZE}

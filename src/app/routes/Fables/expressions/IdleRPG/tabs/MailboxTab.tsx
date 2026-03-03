@@ -71,6 +71,7 @@ export default function MailboxTab({
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeReplay, setActiveReplay] = useState<MailReplayPayload | null>(null)
+  const [activeReplayMailId, setActiveReplayMailId] = useState<string | null>(null)
   const [openingMailId, setOpeningMailId] = useState<string | null>(null)
   const [actionMailId, setActionMailId] = useState<string | null>(null)
   const replayOpenInFlightRef = useRef<Set<string>>(new Set())
@@ -81,6 +82,13 @@ export default function MailboxTab({
     const map: Record<string, any> = {}
     for (const status of (pack.statusEffects ?? [])) {
       if (status.animation) map[status.id] = status.animation
+    }
+    return map
+  }, [pack.statusEffects])
+  const statusTransforms = useMemo(() => {
+    const map: Record<string, any> = {}
+    for (const status of (pack.statusEffects ?? [])) {
+      if (status.transform) map[status.id] = status.transform
     }
     return map
   }, [pack.statusEffects])
@@ -134,6 +142,7 @@ export default function MailboxTab({
         return
       }
       setActiveReplay(replayResponse.replay)
+      setActiveReplayMailId(mailId)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to open replay')
     } finally {
@@ -205,11 +214,13 @@ export default function MailboxTab({
         if (leftResolved || rightResolved) abilityAnimations[ability.id] = leftResolved ?? rightResolved
       }
       return (
-        <CombatReplay
-          combat={replay.combat}
-          leftCharacterId={left.id}
+          <CombatReplay
+            key={`mail-replay-${activeReplayMailId ?? replay.kind}`}
+            combat={replay.combat}
+            leftCharacterId={left.id}
           abilityAnimations={abilityAnimations}
           statusAnimations={statusAnimations}
+          statusTransforms={statusTransforms}
           playerIntroSoundUrl={leftClass?.introSoundUrl}
           playerIntroSoundVolumePercent={leftClass?.introSoundVolumePercent}
           creatureIntroSoundUrl={rightClass?.introSoundUrl}
@@ -237,7 +248,10 @@ export default function MailboxTab({
             resource: resolveCharacterResource(pack, right.classId),
           }}
           victory={replay.combat.winnerId === left.id}
-          onFinish={() => setActiveReplay(null)}
+          onFinish={() => {
+            setActiveReplay(null)
+            setActiveReplayMailId(null)
+          }}
         />
       )
     }
@@ -256,10 +270,12 @@ export default function MailboxTab({
     }
     return (
       <CombatReplay
+        key={`mail-replay-${activeReplayMailId ?? replay.kind}`}
         combat={replay.combat}
         leftCharacterId={player.id}
         abilityAnimations={abilityAnimations}
         statusAnimations={statusAnimations}
+        statusTransforms={statusTransforms}
         arenaBackgroundImageUrl={replay.bossBackgroundImageUrl}
         playerIntroSoundUrl={playerClass?.introSoundUrl}
         playerIntroSoundVolumePercent={playerClass?.introSoundVolumePercent}
@@ -288,7 +304,10 @@ export default function MailboxTab({
           resource: resolveCreatureResource(pack, bossTemplate?.resourceId),
         }}
         victory={replay.victory}
-        onFinish={() => setActiveReplay(null)}
+        onFinish={() => {
+          setActiveReplay(null)
+          setActiveReplayMailId(null)
+        }}
       />
     )
   }
@@ -297,7 +316,16 @@ export default function MailboxTab({
     if (activeReplay.kind === 'raid') {
       return (
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <RaidReplayView replay={activeReplay} group={null} pack={pack} onDone={() => setActiveReplay(null)} />
+          <RaidReplayView
+            key={`mail-replay-${activeReplayMailId ?? activeReplay.kind}`}
+            replay={activeReplay}
+            group={null}
+            pack={pack}
+            onDone={() => {
+              setActiveReplay(null)
+              setActiveReplayMailId(null)
+            }}
+          />
         </Box>
       )
     }

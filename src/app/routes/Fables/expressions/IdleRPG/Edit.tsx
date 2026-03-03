@@ -132,6 +132,13 @@ type StatusEffectForm = {
   maxStacks: string
   effects: EffectFormRow[]
   animationParticles: StatusParticleForm[]
+  transformPortraitUrl: string
+  transformAccentHex: string
+  transformSwapPortraitDelayMs: string
+  transformSoundUrl: string
+  transformSoundVolumePercent: string
+  transformGrantedAbilityIds: string
+  transformPreParticles: StatusParticleForm[]
 }
 type ClassForm = {
   id: string; name: string; description: string; iconUrl: string; introSoundUrl: string; introSoundVolumePercent: string; isHeroClass: boolean
@@ -175,6 +182,13 @@ const emptyStatusEffect = (): StatusEffectForm => ({
   maxStacks: '1',
   effects: [createEmptyEffectRow()],
   animationParticles: [createEmptyStatusParticle()],
+  transformPortraitUrl: '',
+  transformAccentHex: '',
+  transformSwapPortraitDelayMs: '0',
+  transformSoundUrl: '',
+  transformSoundVolumePercent: '100',
+  transformGrantedAbilityIds: '',
+  transformPreParticles: [],
 })
 const emptyClass = (): ClassForm => ({
   id: '', name: '', description: '', iconUrl: '', introSoundUrl: '', introSoundVolumePercent: '100', isHeroClass: false,
@@ -348,6 +362,13 @@ function hydrateStatusEffects(pack: IdleRpgPackV1, fallbackMainStatId: string): 
     maxStacks: String(s.maxStacks ?? 1),
     effects: hydrateEffectRows(s.effects as any[], fallbackMainStatId),
     animationParticles: hydrateStatusAnimationParticles(s.animation),
+    transformPortraitUrl: s.transform?.portraitUrl ?? '',
+    transformAccentHex: s.transform?.accentHex ?? '',
+    transformSwapPortraitDelayMs: String(s.transform?.swapPortraitDelayMs ?? 0),
+    transformSoundUrl: s.transform?.soundUrl ?? '',
+    transformSoundVolumePercent: String(s.transform?.soundVolumePercent ?? 100),
+    transformGrantedAbilityIds: (s.transform?.grantedAbilityIds ?? []).join(', '),
+    transformPreParticles: hydrateStatusAnimationParticles(s.animation, 'preTransformParticles', false),
   }))
 }
 
@@ -796,7 +817,12 @@ export default function IdleRpgEdit() {
       .filter((s) => s.id.trim() && s.name.trim())
       .map((s) => {
         const effects = buildEffectPayload(s.effects).filter((e) => e.kind !== 'apply_status')
-        const animation = buildStatusAnimation(s.animationParticles)
+        const animation = buildStatusAnimation(s.animationParticles, s.transformPreParticles)
+        const transformPortraitUrl = s.transformPortraitUrl.trim()
+        const transformAccentHex = s.transformAccentHex.trim()
+        const transformSwapPortraitDelayMs = Number(s.transformSwapPortraitDelayMs)
+        const transformSoundUrl = s.transformSoundUrl.trim()
+        const transformGrantedAbilityIds = parseTags(s.transformGrantedAbilityIds)
         return {
           id: s.id.trim(),
           name: s.name.trim(),
@@ -805,6 +831,18 @@ export default function IdleRpgEdit() {
           category: s.category,
           maxStacks: Math.max(1, Number(s.maxStacks) || 1),
           effects,
+          ...(transformPortraitUrl ? {
+            transform: {
+              portraitUrl: transformPortraitUrl,
+              ...(transformAccentHex ? { accentHex: transformAccentHex } : {}),
+              ...(!Number.isNaN(transformSwapPortraitDelayMs) ? { swapPortraitDelayMs: Math.max(0, transformSwapPortraitDelayMs) } : {}),
+              ...(transformSoundUrl ? {
+                soundUrl: transformSoundUrl,
+                soundVolumePercent: parseSoundVolumePercent(s.transformSoundVolumePercent),
+              } : {}),
+              ...(transformGrantedAbilityIds.length > 0 ? { grantedAbilityIds: transformGrantedAbilityIds } : {}),
+            },
+          } : {}),
           ...(animation ? { animation } : {}),
         }
       })
@@ -1227,6 +1265,54 @@ export default function IdleRpgEdit() {
                     <TextField size="small" label="Icon URL" value={s.iconUrl} onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ flex: 1, minWidth: 160 }} />
                     <IconButton size="small" color="error" onClick={() => setStatusEffects((p) => p.filter((_, j) => j !== i))}>−</IconButton>
                     <TextField size="small" label="Description" value={s.description} onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} sx={{ width: '100%' }} />
+                    <TextField
+                      size="small"
+                      label="Transform Portrait URL (optional)"
+                      value={s.transformPortraitUrl}
+                      onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformPortraitUrl: e.target.value } : x))}
+                      sx={{ minWidth: 280, flex: 1 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Transform Accent Hex"
+                      value={s.transformAccentHex}
+                      onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformAccentHex: e.target.value } : x))}
+                      sx={{ width: 170 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Swap Delay (ms)"
+                      type="number"
+                      value={s.transformSwapPortraitDelayMs}
+                      onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformSwapPortraitDelayMs: e.target.value } : x))}
+                      sx={{ width: 140 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Transform Sound URL"
+                      value={s.transformSoundUrl}
+                      onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformSoundUrl: e.target.value } : x))}
+                      sx={{ minWidth: 240, flex: 1 }}
+                    />
+                    <SoundUploadButton
+                      onUploaded={(url) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformSoundUrl: url } : x))}
+                    />
+                    <TextField
+                      size="small"
+                      label="Transform Sound %"
+                      type="number"
+                      value={s.transformSoundVolumePercent}
+                      onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformSoundVolumePercent: e.target.value } : x))}
+                      sx={{ width: 160 }}
+                      inputProps={{ min: 0, max: 100, step: 1 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Granted Ability IDs (comma)"
+                      value={s.transformGrantedAbilityIds}
+                      onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformGrantedAbilityIds: e.target.value } : x))}
+                      sx={{ width: '100%' }}
+                    />
                     <EffectsEditor
                       effects={s.effects}
                       onChange={(next) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, effects: next } : x))}
@@ -1235,8 +1321,14 @@ export default function IdleRpgEdit() {
                       allowApplyStatus={false}
                     />
                     <StatusAnimationEditor
+                      title="Status Particles (loop + tick)"
                       particles={s.animationParticles}
                       onChange={(next) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, animationParticles: next } : x))}
+                    />
+                    <StatusAnimationEditor
+                      title="Transform Pre-Particles (one-shot on apply)"
+                      particles={s.transformPreParticles}
+                      onChange={(next) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformPreParticles: next } : x))}
                     />
                   </Box>
                 </Paper>

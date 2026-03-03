@@ -233,6 +233,23 @@ export interface StatusAnimationParticle {
 
 export interface StatusAnimation {
   particles?: StatusAnimationParticle[]
+  /** Optional one-shot particles that only fire when transform status is applied. */
+  preTransformParticles?: StatusAnimationParticle[]
+}
+
+export interface StatusTransformConfig {
+  /** Portrait URL used while this transform status is active. */
+  portraitUrl: string
+  /** Optional accent color reserved for future transform visuals. */
+  accentHex?: string
+  /** Delay in ms before portrait is swapped after status application. */
+  swapPortraitDelayMs?: number
+  /** Optional one-shot sound played when transform swap happens. */
+  soundUrl?: string
+  /** Optional transform sound volume percent (0-100). Defaults to 100 when omitted. */
+  soundVolumePercent?: number
+  /** Ability ids granted while the transform status is active. */
+  grantedAbilityIds?: string[]
 }
 
 /** Reactive ability configuration (e.g. block chance). */
@@ -330,6 +347,8 @@ export interface StatusEffectTemplate {
   effects?: Effect[]
   /** Replay animation for this status effect. */
   animation?: StatusAnimation
+  /** Optional transform metadata for this status. Used by replay to swap portrait while active. */
+  transform?: StatusTransformConfig
   // Legacy fields kept for compatibility with older packs.
   kind?: StatusEffectKind
   durationTurns?: number

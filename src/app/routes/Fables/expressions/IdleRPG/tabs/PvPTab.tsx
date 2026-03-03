@@ -223,8 +223,10 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
           }
         }
         const statusAnimations: Record<string, any> = {}
+        const statusTransforms: Record<string, any> = {}
         for (const status of (pack.statusEffects ?? [])) {
           if (status.animation) statusAnimations[status.id] = status.animation
+          if (status.transform) statusTransforms[status.id] = status.transform
         }
         return (
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, overflow: 'auto' }}>
@@ -233,6 +235,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
               leftCharacterId={character.id}
               abilityAnimations={abilityAnimations}
               statusAnimations={statusAnimations}
+              statusTransforms={statusTransforms}
               playerIntroSoundUrl={cls?.introSoundUrl}
               playerIntroSoundVolumePercent={cls?.introSoundVolumePercent}
               creatureIntroSoundUrl={targetCls?.introSoundUrl}

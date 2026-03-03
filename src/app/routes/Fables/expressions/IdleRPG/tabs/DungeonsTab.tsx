@@ -129,8 +129,10 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
     }
   }
   const statusAnimations: Record<string, any> = {}
+  const statusTransforms: Record<string, any> = {}
   for (const status of (pack.statusEffects ?? [])) {
     if (status.animation) statusAnimations[status.id] = status.animation
+    if (status.transform) statusTransforms[status.id] = status.transform
   }
   const boss = currentDungeon?.boss
   const bossReplayBackground = boss?.backgroundImageUrl?.trim() ? boss.backgroundImageUrl.trim() : undefined
@@ -458,6 +460,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
             leftCharacterId={character.id}
             abilityAnimations={abilityAnimations}
             statusAnimations={statusAnimations}
+            statusTransforms={statusTransforms}
             arenaBackgroundImageUrl={bossReplayBackground}
             playerIntroSoundUrl={cls?.introSoundUrl}
             playerIntroSoundVolumePercent={cls?.introSoundVolumePercent}

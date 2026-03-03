@@ -10,7 +10,7 @@ import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import type { AnimationFrameImageSource, StatusAnimation } from '@features/idle-rpg/api'
+import type { AnimationFrameImageSource, StatusAnimation, StatusAnimationParticle } from '@features/idle-rpg/api'
 import SoundUploadButton from './SoundUploadButton'
 
 const IMAGE_SOURCE_OPTIONS: Array<{ value: AnimationFrameImageSource; label: string }> = [
@@ -67,8 +67,17 @@ function asNumberString(value: unknown, fallback = '0'): string {
   return fallback
 }
 
-export function hydrateStatusAnimationParticles(animation?: StatusAnimation | null): StatusParticleForm[] {
-  const rows = (animation?.particles ?? []).map((particle) => ({
+export type StatusAnimationSection = 'particles' | 'preTransformParticles'
+
+export function hydrateStatusAnimationParticles(
+  animation?: StatusAnimation | null,
+  section: StatusAnimationSection = 'particles',
+  fallbackToEmptyRow = true,
+): StatusParticleForm[] {
+  const sourceParticles = section === 'preTransformParticles'
+    ? (animation?.preTransformParticles ?? [])
+    : (animation?.particles ?? [])
+  const rows = sourceParticles.map((particle) => ({
     imageSource: particle.imageSource ?? 'url',
     url: particle.url ?? '',
     soundUrl: particle.soundUrl ?? '',
@@ -86,7 +95,8 @@ export function hydrateStatusAnimationParticles(animation?: StatusAnimation | nu
     rotationEnd: asNumberString(particle.rotationEnd ?? particle.rotationStart, '0'),
     loop: particle.loop ?? false,
   }))
-  return rows.length > 0 ? rows : [createEmptyStatusParticle()]
+  if (rows.length > 0) return rows
+  return fallbackToEmptyRow ? [createEmptyStatusParticle()] : []
 }
 
 function parseNumber(input: string): number | undefined {
@@ -101,10 +111,10 @@ function parseSoundVolumePercent(input: string): number {
   return Math.min(100, Math.max(0, n))
 }
 
-export function buildStatusAnimation(particles: StatusParticleForm[]): StatusAnimation | undefined {
-  const built = particles
+export function buildStatusParticleList(particles: StatusParticleForm[]): StatusAnimationParticle[] {
+  return particles
     .map((particle) => {
-      const out: any = {
+      const out: StatusAnimationParticle = {
         imageSource: particle.imageSource,
         loop: particle.loop,
       }
@@ -144,20 +154,32 @@ export function buildStatusAnimation(particles: StatusParticleForm[]): StatusAni
       return out
     })
     .filter((particle) => Boolean(particle.url || particle.imageSource !== 'url'))
+}
 
-  if (built.length === 0) return undefined
-  return { particles: built }
+export function buildStatusAnimation(
+  particles: StatusParticleForm[],
+  preTransformParticles: StatusParticleForm[] = [],
+): StatusAnimation | undefined {
+  const built = buildStatusParticleList(particles)
+  const builtPreTransform = buildStatusParticleList(preTransformParticles)
+
+  if (built.length === 0 && builtPreTransform.length === 0) return undefined
+  const animation: StatusAnimation = {}
+  if (built.length > 0) animation.particles = built
+  if (builtPreTransform.length > 0) animation.preTransformParticles = builtPreTransform
+  return animation
 }
 
 type Props = {
   particles: StatusParticleForm[]
   onChange: (next: StatusParticleForm[]) => void
+  title?: string
 }
 
-export default function StatusAnimationEditor({ particles, onChange }: Props) {
+export default function StatusAnimationEditor({ particles, onChange, title }: Props) {
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Typography variant="caption" color="text.secondary">Status Animation Particles</Typography>
+      <Typography variant="caption" color="text.secondary">{title ?? 'Status Animation Particles'}</Typography>
       {particles.map((particle, index) => (
         <Paper key={index} variant="outlined" sx={{ p: 1.5, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
           <FormControl size="small" sx={{ minWidth: 140 }}>
