@@ -25,7 +25,7 @@ interface Props {
   onCharacterUpdate: (c: CharacterState) => void
 }
 
-function describeEffect(effect: Effect, pack: IdleRpgPackV1): string {
+function describeEffect(effect: Effect): string {
   switch (effect.kind) {
     case 'damage':
       return `Deals ${effect.amount ?? '?'} damage`
@@ -198,7 +198,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
           <Tooltip
             title={
               primaryAbility?.effects?.[0]
-                ? `${primaryAbility.name} — ${describeEffect(primaryAbility.effects[0], pack)}`
+                ? `${primaryAbility.name} — ${describeEffect(primaryAbility.effects[0])}`
                 : 'Primary Attack'
             }
             arrow
@@ -340,7 +340,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
           <Typography sx={gradientTitle}>Unlocked Abilities</Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             {unlockedNotEquipped.map((ability) => {
-              const effectText = ability.effects?.[0] ? describeEffect(ability.effects[0], pack) : ''
+              const effectText = ability.effects?.[0] ? describeEffect(ability.effects[0]) : ''
               return (
                 <Tooltip key={ability.id} title={slotsAvailable ? 'Click to equip' : 'No empty slots'} arrow>
                   <Paper
@@ -474,7 +474,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                       {effect && (
                         <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
-                          {describeEffect(effect, pack)}
+                          {describeEffect(effect)}
                         </Typography>
                       )}
                       {ability.cooldownTurns > 0 && (

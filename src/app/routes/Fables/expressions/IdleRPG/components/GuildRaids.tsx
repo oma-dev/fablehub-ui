@@ -25,7 +25,7 @@ interface Props {
   onUpdate?: () => void
 }
 
-export default function GuildRaids({ fableId, realmId, groupId, group, character, pack, onUpdate }: Props) {
+export default function GuildRaids({ fableId, realmId, groupId, group, character, pack: _pack, onUpdate }: Props) {
   const [raidCall, setRaidCall] = useState<RaidCallResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [readying, setReadying] = useState(false)

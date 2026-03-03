@@ -31,7 +31,7 @@ interface Props {
   onCharacterUpdate: (c: CharacterState) => void
 }
 
-export default function RaidsTab({ fableId, realmId, character, pack, groupId, onCharacterUpdate }: Props) {
+export default function RaidsTab({ fableId, realmId, character, pack, groupId, onCharacterUpdate: _onCharacterUpdate }: Props) {
   const [raids, setRaids] = useState<RaidWithBoss[]>([])
   const [pendingReplay, setPendingReplay] = useState<RaidReplayPayload | null>(null)
   const [watchingReplay, setWatchingReplay] = useState<RaidReplayPayload | null>(null)

@@ -5,7 +5,7 @@ import Homepage from './routes/Homepage'
 import Login from './routes/Auth/Login'
 import Register from './routes/Auth/Register'
 import Fables from './routes/Fables/List'
-import Fable from './routes/Fables/Detail'
+import FableDetail from './routes/Fables/Detail'
 import FableCreate from './routes/Fables/Create'
 import FableIdleRPG from './routes/Fables/expressions/IdleRPG/Play'
 import IdleRpgCreate from './routes/Fables/expressions/IdleRPG/Create'
@@ -23,7 +23,7 @@ function App() {
             <Route path="register" element={<Register />} />
             <Route path="fables" element={<Fables />} />
             <Route path="fables/create" element={<FableCreate />} />
-            <Route path="fables/:fableId" element={<Fable />} />
+            <Route path="fables/:fableId" element={<FableDetail />} />
             <Route path="fables/:fableId/idle-rpg/create" element={<IdleRpgCreate />} />
             <Route path="fables/:fableId/idle-rpg/:realmId/edit" element={<IdleRpgEdit />} />
             <Route path="fables/:fableId/idle-rpg" element={<FableIdleRPG />} />

@@ -180,6 +180,7 @@ export interface AnimationFrames {
 /** Reactive ability configuration (e.g. block chance). */
 export interface ReactiveConfig {
   baseChance: number
+  scalingTerms?: ScalingTerm[]
   scalingStat?: StatId
   scalingCoeff?: number
 }
@@ -188,7 +189,37 @@ export interface ReactiveConfig {
 // Effect system (mirrors backend ability-catalog.types.ts)
 // ---------------------------------------------------------------------------
 
-export type StatId = 'STR' | 'DEX' | 'INT' | 'LCK' | 'HP' | 'ARM'
+export type MainStatId = string
+/** @deprecated Legacy alias. */
+export type StatId = MainStatId
+
+export type DerivedStatId =
+  | 'max_resource_amount'
+  | 'resource_regeneration'
+  | 'max_hp'
+  | 'hp_regeneration'
+  | 'block_chance'
+  | 'dodge_chance'
+  | 'damage_resistance'
+  | 'critical_hit_chance'
+  | 'critical_hit_damage'
+  | 'cooldown_reduction'
+
+export type ScalingSource =
+  | { kind: 'main_stat'; statId: MainStatId }
+  | { kind: 'equipped_weapon_damage' }
+  | { kind: 'equipped_protective_armor' }
+
+export interface ScalingTerm {
+  percent: number
+  source: ScalingSource
+}
+
+export interface DerivedStatModifier {
+  statId: DerivedStatId
+  flat?: number
+  percent?: number
+}
 
 export type EffectKind = 'damage' | 'heal' | 'apply_status' | 'execute' | 'lifesteal'
 
@@ -196,6 +227,7 @@ export interface Effect {
   kind: EffectKind
   amount?: number
   percentage?: number
+  scalingTerms?: ScalingTerm[]
   scalingStat?: StatId
   scalingCoeff?: number
   lifestealPercent?: number
@@ -218,7 +250,7 @@ export interface StatusEffectTemplate {
   tickAmount?: number
   tickPercentage?: number
   escalation?: number
-  statModifiers?: Partial<Record<StatId, number>>
+  statModifiers?: Partial<Record<string, number>>
   chance?: number
   damageReduction?: number
   healReduction?: number
@@ -261,6 +293,8 @@ export interface Ability {
   iconUrl?: string
   /** Optional animation frames (weapon / projectile / impact / block PNGs). */
   animationFrames?: AnimationFrames
+  /** Passive/item-like modifiers granted by this ability. */
+  derivedStatModifiers?: DerivedStatModifier[]
   /** Ability points required to unlock this ability. */
   unlockCost?: number
   /** When abilityType is 'reactive': controls trigger chance and stat scaling. */
@@ -270,6 +304,8 @@ export interface Ability {
 /** Realm pack shape (backend IdleRpgPackV1). */
 export interface IdleRpgPackV1 {
   version: 1
+  mainStats?: MainStatDefinition[]
+  derivedStats?: Partial<Record<DerivedStatId, DerivedStatDefinition>>
   rules: {
     maxLevel: number
     xpTable: Record<string, number>
@@ -277,6 +313,8 @@ export interface IdleRpgPackV1 {
     statPointsPerLevel?: number
     abilityPointsPerLevel?: number
     abilitySlotsByLevel?: Record<number, number>
+    baseMaxHp?: number
+    baseMaxHpPerLevel?: number
   }
   economy: {
     currencies: { id: string; name: string; iconUrl?: string }[]
@@ -300,14 +338,20 @@ export interface ClassBlock {
   iconUrl?: string
   /** When true, only one character per realm may pick this class. */
   isHeroClass?: boolean
-  scaling: { damageMainStat: string; secondaryBenefits?: Record<string, string[]> }
+  scaling?: { damageMainStat?: string; secondaryBenefits?: Record<string, string[]> }
   /** ID of the primary attack Ability from pack.abilities (abilityType 'primary'). */
   primaryAttackId: string
   slots: Record<string, { required: boolean; allowEmpty: boolean; allowedTagsAny: string[] }>
   resourceId?: string
   passives?: string[]
   abilities?: { regular?: string[]; ultimate?: string | null }
-  starting?: { stats?: Record<string, number>; startingItemIds?: string[]; startingBalances?: Record<string, number> }
+  starting?: {
+    mainStats?: Record<string, number>
+    derivedStatModifiers?: DerivedStatModifier[]
+    stats?: Record<string, number>
+    startingItemIds?: string[]
+    startingBalances?: Record<string, number>
+  }
 }
 
 export interface CreatureTemplate {
@@ -315,9 +359,13 @@ export interface CreatureTemplate {
   name: string
   role: 'quest' | 'boss'
   level: number
-  hp: number
-  ap: number
-  arm: number
+  hp?: number
+  ap?: number
+  arm?: number
+  mainStats?: Record<string, number>
+  derivedStatModifiers?: DerivedStatModifier[]
+  weaponDamage?: number
+  protectiveArmor?: number
   iconUrl?: string
   /** Optional combat replay background image URL (typically used by bosses). */
   backgroundImageUrl?: string
@@ -334,6 +382,10 @@ export interface ItemTemplate {
   rarity: number
   slot: string
   tags: string[]
+  mainStatBonuses?: Record<string, number>
+  derivedStatModifiers?: DerivedStatModifier[]
+  weaponDamage?: number
+  protectiveArmor?: number
   stats: Record<string, number>
   /** Icon for inventory, shop, item slot. */
   iconUrl?: string
@@ -344,6 +396,20 @@ export interface ItemTemplate {
   /** Optional custom impact image URL for this weapon. */
   impactUrl?: string
   price?: { currencyId: string; amount: number }
+}
+
+export interface MainStatDefinition {
+  id: MainStatId
+  name: string
+  description?: string
+}
+
+export interface DerivedStatDefinition {
+  base?: number
+  perLevel?: number
+  scaling?: ScalingTerm[]
+  floor?: number
+  cap?: number
 }
 
 export const RARITY_NAMES: Record<number, string> = {

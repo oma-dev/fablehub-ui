@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -25,7 +25,6 @@ import CastleIcon from '@mui/icons-material/Castle'
 import MilitaryTechIcon from '@mui/icons-material/MilitaryTech'
 import PersonIcon from '@mui/icons-material/Person'
 import FavoriteIcon from '@mui/icons-material/Favorite'
-import BoltIcon from '@mui/icons-material/Bolt'
 import ShieldIcon from '@mui/icons-material/Shield'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
@@ -54,6 +53,7 @@ import PvPTab from './tabs/PvPTab'
 import DungeonsTab from './tabs/DungeonsTab'
 import RaidsTab from './tabs/RaidsTab'
 import AbilitiesTab from './tabs/AbilitiesTab'
+import { computePlayerCombatStats } from './utils/combatStats'
 import charBackground from '../../../../../assets/backgrounds/charBackground.png'
 
 /* ------------------------------------------------------------------ */
@@ -62,29 +62,9 @@ import charBackground from '../../../../../assets/backgrounds/charBackground.png
 
 function SidebarCharacterCard({ character, pack }: { character: CharacterState; pack: IdleRpgPackV1 }) {
   const cls = pack.classes.find((c) => c.id === character.classId)
-  const mainStat = cls?.scaling?.damageMainStat ?? 'STR'
-
-  const totalStats = useMemo(() => {
-    const base: Record<string, number> = {}
-    if (cls?.starting?.stats) {
-      for (const [k, v] of Object.entries(cls.starting.stats)) base[k] = (base[k] ?? 0) + (v ?? 0)
-    }
-    const itemMap = new Map(pack.items.map((it) => [it.id, it]))
-    for (const itemId of Object.values(character.equipment)) {
-      if (!itemId) continue
-      const item = itemMap.get(itemId)
-      if (!item?.stats) continue
-      for (const [k, v] of Object.entries(item.stats)) base[k] = (base[k] ?? 0) + (v ?? 0)
-    }
-    for (const [k, v] of Object.entries(character.allocatedStats ?? {})) {
-      base[k] = (base[k] ?? 0) + (v ?? 0)
-    }
-    return base
-  }, [character, pack, cls])
-
-  const baseHp = 50 + character.level * 10 + (totalStats.HP ?? 0)
-  const baseAp = Math.max(1, character.level * 2 + (totalStats[mainStat] ?? 0))
-  const baseArm = Math.max(0, totalStats.ARM ?? 0)
+  const combatStats = useMemo(() => computePlayerCombatStats(character, pack), [character, pack])
+  const baseHp = combatStats.maxHp
+  const baseArm = combatStats.arm
 
   const xpTable = pack.rules.xpTable ?? {}
   const maxLevel = pack.rules.maxLevel ?? 10
@@ -245,19 +225,8 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
       {/* Combat stats row */}
       <Box sx={{ display: 'flex', gap: 1.5, width: '100%', maxWidth: 340, justifyContent: 'center' }}>
         <StatBadge icon={<FavoriteIcon sx={{ fontSize: 16 }} />} label="HP" value={baseHp} color="#ef4444" tooltip="Hit Points" />
-        <StatBadge icon={<BoltIcon sx={{ fontSize: 16 }} />} label="AP" value={baseAp} color="#f59e0b" tooltip="Attack Power" />
         <StatBadge icon={<ShieldIcon sx={{ fontSize: 16 }} />} label="ARM" value={baseArm} color="#6366f1" tooltip="Armor" />
       </Box>
-
-      {/* Primary stat indicator */}
-      <Typography variant="caption" color="text.disabled" sx={{ fontSize: 11 }}>
-        Main stat: <Box component="span" sx={{ color: '#fbbf24', fontWeight: 700 }}>{mainStat}</Box>
-        {' · '}
-        {(['STR', 'DEX', 'INT', 'LCK'] as const)
-          .filter((s) => (totalStats[s] ?? 0) > 0)
-          .map((s) => `${s} ${totalStats[s]}`)
-          .join(' · ')}
-      </Typography>
 
       {/* Equipment summary */}
       <Box sx={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
@@ -593,7 +562,7 @@ export default function FableIdleRPG() {
                       {isHero && (
                         <Chip
                           icon={<StarIcon sx={{ color: '#ffc145 !important', fontSize: 16 }} />}
-                          label={isTaken ? 'Hero Class — Taken' : 'Hero Class'}
+                          label={isTaken ? 'Hero Class â€” Taken' : 'Hero Class'}
                           size="small"
                           sx={{
                             mt: 1,

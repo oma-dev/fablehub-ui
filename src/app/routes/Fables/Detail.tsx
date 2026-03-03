@@ -9,7 +9,7 @@ import Typography from '@mui/material/Typography'
 import { getFable } from '../../../services/api'
 import type { Fable } from '../../../services/api'
 
-const Fable = () => {
+const FableDetail = () => {
   const { fableId } = useParams<{ fableId: string }>()
   const [fable, setFable] = useState<Fable | null>(null)
   const [loading, setLoading] = useState(true)
@@ -157,4 +157,4 @@ const Fable = () => {
   )
 }
 
-export default Fable
+export default FableDetail

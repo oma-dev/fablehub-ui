@@ -468,9 +468,9 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
             creature={{
               name: boss.name,
               level: boss.level,
-              maxHp: boss.hp,
-              ap: boss.ap,
-              arm: boss.arm,
+              maxHp: boss.hp ?? 0,
+              ap: boss.ap ?? 0,
+              arm: boss.arm ?? 0,
               portraitUrl: boss.iconUrl ?? undefined,
               resource: resolveCreatureResource(pack, boss.resourceId),
             }}

@@ -31,7 +31,6 @@ export type ExampleClassForm = {
   description: string
   iconUrl: string
   isHeroClass?: boolean
-  damageMainStat: string
   primaryAttackAbilityId: string
   attackTags: string
   attackRequired: boolean
@@ -143,7 +142,6 @@ const classes: ExampleClassForm[] = [
     name: 'Warlord',
     description: 'Uses flail and shield. Heavy control.',
     iconUrl: '',
-    damageMainStat: 'STR',
     primaryAttackAbilityId: 'warlord_slam',
     attackTags: 'weapon:flail',
     attackRequired: true,
@@ -160,7 +158,6 @@ const classes: ExampleClassForm[] = [
     name: 'Sorcerer',
     description: 'Uses 2h staff or wand and shield.',
     iconUrl: '',
-    damageMainStat: 'INT',
     primaryAttackAbilityId: 'sorcerer_bolt',
     attackTags: 'weapon:2h_staff,weapon:wand',
     attackRequired: true,
@@ -177,7 +174,6 @@ const classes: ExampleClassForm[] = [
     name: 'Warrior',
     description: 'Uses 2h sword or sword and shield.',
     iconUrl: '',
-    damageMainStat: 'STR',
     primaryAttackAbilityId: 'warrior_slash',
     attackTags: 'weapon:2h_sword,weapon:sword',
     attackRequired: true,
@@ -194,7 +190,6 @@ const classes: ExampleClassForm[] = [
     name: 'Hunter',
     description: 'Uses 2h bow or 1h knife.',
     iconUrl: '',
-    damageMainStat: 'DEX',
     primaryAttackAbilityId: 'hunter_shot',
     attackTags: 'weapon:2h_bow,weapon:knife',
     attackRequired: true,
@@ -211,7 +206,6 @@ const classes: ExampleClassForm[] = [
     name: 'Knifeman',
     description: 'Uses dual knives.',
     iconUrl: '',
-    damageMainStat: 'DEX',
     primaryAttackAbilityId: 'knifeman_stab',
     attackTags: 'weapon:dual_knives',
     attackRequired: true,

@@ -25,9 +25,13 @@ import type {
   Ability,
   ClassBlock,
   CreatureTemplate,
+  DerivedStatModifier,
+  DerivedStatDefinition,
+  DerivedStatId,
   Dungeon,
   IdleRpgPackV1,
   ItemTemplate,
+  MainStatDefinition,
   LootTable,
   MerchantListing,
   Raid,
@@ -62,11 +66,44 @@ function serializeStats(stats: Partial<Record<string, number>> | undefined): str
   return Object.entries(stats).filter(([, v]) => v != null && v !== 0).map(([k, v]) => `${k}:${v}`).join(', ')
 }
 
-const STAT_IDS = ['STR', 'DEX', 'INT', 'LCK', 'HP', 'ARM'] as const
+const DEFAULT_MAIN_STATS: MainStatDefinition[] = [
+  { id: 'STR', name: 'Strength' },
+  { id: 'DEX', name: 'Dexterity' },
+  { id: 'INT', name: 'Intelligence' },
+  { id: 'LCK', name: 'Luck' },
+]
+const DERIVED_STATS: Array<{ id: DerivedStatId; label: string }> = [
+  { id: 'max_resource_amount', label: 'Maximum Resource Amount' },
+  { id: 'resource_regeneration', label: 'Resource Regeneration / Turn' },
+  { id: 'max_hp', label: 'Max HP Bonus' },
+  { id: 'hp_regeneration', label: 'HP Regeneration / Turn' },
+  { id: 'block_chance', label: 'Block Chance (%)' },
+  { id: 'dodge_chance', label: 'Dodge Chance (%)' },
+  { id: 'damage_resistance', label: 'Damage Resistance (%)' },
+  { id: 'critical_hit_chance', label: 'Critical Hit Chance (%)' },
+  { id: 'critical_hit_damage', label: 'Critical Hit Damage (%)' },
+  { id: 'cooldown_reduction', label: 'Cooldown Reduction (%)' },
+]
 const SLOTS = ['attack_source', 'defense_layer'] as const
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
 const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate', 'reactive']
 const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal'] as const
+
+type DerivedScaleForm = {
+  sourceKind: 'main_stat' | 'equipped_weapon_damage' | 'equipped_protective_armor'
+  sourceStatId: string
+  percent: string
+}
+type DerivedModifierForm = { statId: DerivedStatId; flat: string; percent: string }
+type MainStatValueForm = { statId: string; value: string }
+type MainStatForm = { id: string; name: string; description: string }
+type DerivedStatForm = { id: DerivedStatId; base: string; perLevel: string; floor: string; cap: string; scaling: DerivedScaleForm[] }
+
+const emptyDerivedScale = (): DerivedScaleForm => ({ sourceKind: 'main_stat', sourceStatId: 'STR', percent: '' })
+const emptyDerivedStat = (id: DerivedStatId): DerivedStatForm => ({ id, base: '', perLevel: '', floor: '', cap: '', scaling: [] })
+const emptyMainStat = (): MainStatForm => ({ id: '', name: '', description: '' })
+const emptyDerivedModifier = (): DerivedModifierForm => ({ statId: 'max_hp', flat: '', percent: '' })
+const emptyMainStatValue = (fallbackMainStatId = 'STR'): MainStatValueForm => ({ statId: fallbackMainStatId, value: '' })
 
 // --- Form state types (same as Create) ---
 type XpEntry = { level: string; xp: string }
@@ -75,18 +112,29 @@ type AbilityForm = {
   id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string
   cooldownTurns: string; resourceCostId: string; resourceCostAmount: string; unlockCost: string; minLevel: string
   effectKind: string; effectAmount: string; effectPercentage: string; effectLifestealPct: string
+  effectScalingTerms: DerivedScaleForm[]
+  derivedStatModifiers: DerivedModifierForm[]
   animFrames: AbilityAnimFrames
   reactiveBaseChance: string; reactiveScalingStat: string; reactiveScalingCoeff: string
 }
 type ClassForm = {
   id: string; name: string; description: string; iconUrl: string; isHeroClass: boolean
-  damageMainStat: string; primaryAttackAbilityId: string
+  primaryAttackAbilityId: string
   attackTags: string; attackRequired: boolean; attackAllowEmpty: boolean
   defenseTags: string; defenseRequired: boolean; defenseAllowEmpty: boolean
   regularAbilityIds: string; ultimateAbilityId: string; resourceId: string
+  startingMainStats: MainStatValueForm[]; startingDerivedStatModifiers: DerivedModifierForm[]
 }
-type CreatureForm = { id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string; iconUrl: string; backgroundImageUrl: string; tags: string; abilityIds: string; resourceId: string; resourceMax: string }
-type ItemForm = { id: string; name: string; rarity: string; slot: string; tags: string; stats: string; iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string }
+type CreatureForm = {
+  id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string
+  iconUrl: string; backgroundImageUrl: string; tags: string; abilityIds: string; resourceId: string; resourceMax: string
+  mainStats: MainStatValueForm[]; weaponDamage: string; protectiveArmor: string; derivedStatModifiers: DerivedModifierForm[]
+}
+type ItemForm = {
+  id: string; name: string; rarity: string; slot: string; tags: string; stats: string
+  mainStatBonuses: MainStatValueForm[]; weaponDamage: string; protectiveArmor: string; derivedStatModifiers: DerivedModifierForm[]
+  iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string
+}
 type QuestForm = { id: string; name: string; creatureId: string; durationSec: string; iconUrl: string; rewardXp: string; rewardCurrency: string; lootTableId: string }
 type DungeonForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string }
 type RaidForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string; currencyId: string; costAmount: string }
@@ -98,24 +146,162 @@ const emptyAbility = (): AbilityForm => ({
   id: '', name: '', abilityType: 'regular', description: '', iconUrl: '',
   cooldownTurns: '0', resourceCostId: '', resourceCostAmount: '0', unlockCost: '1', minLevel: '1',
   effectKind: 'damage', effectAmount: '0', effectPercentage: '0', effectLifestealPct: '0',
+  effectScalingTerms: [],
+  derivedStatModifiers: [],
   animFrames: emptyAnimFrames(),
   reactiveBaseChance: '0.2', reactiveScalingStat: '', reactiveScalingCoeff: '0',
 })
 const emptyClass = (): ClassForm => ({
   id: '', name: '', description: '', iconUrl: '', isHeroClass: false,
-  damageMainStat: 'STR', primaryAttackAbilityId: '',
+  primaryAttackAbilityId: '',
   attackTags: '', attackRequired: true, attackAllowEmpty: false,
   defenseTags: '', defenseRequired: false, defenseAllowEmpty: true,
   regularAbilityIds: '', ultimateAbilityId: '', resourceId: '',
+  startingMainStats: [], startingDerivedStatModifiers: [],
 })
-const emptyCreature = (): CreatureForm => ({ id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0', iconUrl: '', backgroundImageUrl: '', tags: '', abilityIds: '', resourceId: '', resourceMax: '' })
-const emptyItem = (): ItemForm => ({ id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '', iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '' })
+const emptyCreature = (): CreatureForm => ({
+  id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0',
+  iconUrl: '', backgroundImageUrl: '', tags: '', abilityIds: '', resourceId: '', resourceMax: '',
+  mainStats: [], weaponDamage: '', protectiveArmor: '', derivedStatModifiers: [],
+})
+const emptyItem = (): ItemForm => ({
+  id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '',
+  mainStatBonuses: [], weaponDamage: '', protectiveArmor: '', derivedStatModifiers: [],
+  iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '',
+})
 const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', durationSec: '60', iconUrl: '', rewardXp: '10', rewardCurrency: '', lootTableId: '' })
 const emptyDungeon = (): DungeonForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '' })
 const emptyRaid = (): RaidForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '', currencyId: '', costAmount: '0' })
 const emptyLootEntry = (): LootEntryForm => ({ itemId: '', weight: '1', classId: '' })
 
 // --- Hydrate form state from pack ---
+
+function hydrateMainStats(pack: IdleRpgPackV1): MainStatForm[] {
+  const rows = (pack.mainStats ?? []).map((s) => ({
+    id: s.id ?? '',
+    name: s.name ?? '',
+    description: s.description ?? '',
+  }))
+  if (rows.length > 0) return rows
+  return DEFAULT_MAIN_STATS.map((s) => ({ id: s.id, name: s.name, description: s.description ?? '' }))
+}
+
+function hydrateDerivedStats(pack: IdleRpgPackV1, mainStats: MainStatForm[]): DerivedStatForm[] {
+  const fallbackMainStatId = mainStats.find((s) => s.id.trim())?.id?.trim() || 'STR'
+  return DERIVED_STATS.map(({ id }) => {
+    const src = pack.derivedStats?.[id] as DerivedStatDefinition | undefined
+    const scaling = (src?.scaling ?? []).map((t) => ({
+      sourceKind: t.source.kind,
+      sourceStatId: t.source.kind === 'main_stat' ? t.source.statId : fallbackMainStatId,
+      percent: String(t.percent ?? 0),
+    }))
+    return {
+      id,
+      base: src?.base != null ? String(src.base) : '',
+      perLevel: src?.perLevel != null ? String(src.perLevel) : '',
+      floor: src?.floor != null ? String(src.floor) : '',
+      cap: src?.cap != null ? String(src.cap) : '',
+      scaling,
+    }
+  })
+}
+
+function buildDerivedStats(rows: DerivedStatForm[]): Partial<Record<DerivedStatId, DerivedStatDefinition>> {
+  const out: Partial<Record<DerivedStatId, DerivedStatDefinition>> = {}
+  for (const row of rows) {
+    const def: DerivedStatDefinition = {}
+    if (row.base.trim() !== '' && !Number.isNaN(Number(row.base))) def.base = Number(row.base)
+    if (row.perLevel.trim() !== '' && !Number.isNaN(Number(row.perLevel))) def.perLevel = Number(row.perLevel)
+    if (row.floor.trim() !== '' && !Number.isNaN(Number(row.floor))) def.floor = Number(row.floor)
+    if (row.cap.trim() !== '' && !Number.isNaN(Number(row.cap))) def.cap = Number(row.cap)
+    const scaling = row.scaling
+      .filter((s) => s.percent.trim() !== '' && !Number.isNaN(Number(s.percent)))
+      .map((s) => ({
+        percent: Number(s.percent),
+        source: s.sourceKind === 'main_stat'
+          ? { kind: 'main_stat' as const, statId: s.sourceStatId.trim() || 'STR' }
+          : s.sourceKind === 'equipped_weapon_damage'
+            ? { kind: 'equipped_weapon_damage' as const }
+            : { kind: 'equipped_protective_armor' as const },
+      }))
+    if (scaling.length > 0) def.scaling = scaling
+    if (
+      def.base !== undefined ||
+      def.perLevel !== undefined ||
+      def.floor !== undefined ||
+      def.cap !== undefined ||
+      def.scaling !== undefined
+    ) {
+      out[row.id] = def
+    }
+  }
+  return out
+}
+
+function hydrateScalingRows(
+  rows: Array<{ percent?: number; source: { kind: 'main_stat'; statId: string } | { kind: 'equipped_weapon_damage' } | { kind: 'equipped_protective_armor' } }> | undefined,
+  fallbackMainStatId: string,
+): DerivedScaleForm[] {
+  return (rows ?? []).map((term) => ({
+    sourceKind: term.source.kind,
+    sourceStatId: term.source.kind === 'main_stat' ? term.source.statId : fallbackMainStatId,
+    percent: String(term.percent ?? 0),
+  }))
+}
+
+function buildScalingRows(rows: DerivedScaleForm[]): Array<{ percent: number; source: { kind: 'main_stat'; statId: string } | { kind: 'equipped_weapon_damage' } | { kind: 'equipped_protective_armor' } }> {
+  return rows
+    .filter((s) => s.percent.trim() !== '' && !Number.isNaN(Number(s.percent)))
+    .map((s) => ({
+      percent: Number(s.percent),
+      source: s.sourceKind === 'main_stat'
+        ? { kind: 'main_stat' as const, statId: s.sourceStatId.trim() || 'STR' }
+        : s.sourceKind === 'equipped_weapon_damage'
+          ? { kind: 'equipped_weapon_damage' as const }
+          : { kind: 'equipped_protective_armor' as const },
+    }))
+}
+
+function hydrateDerivedModifiers(mods: DerivedStatModifier[] | undefined): DerivedModifierForm[] {
+  return (mods ?? []).map((m) => ({
+    statId: m.statId,
+    flat: m.flat != null ? String(m.flat) : '',
+    percent: m.percent != null ? String(m.percent) : '',
+  }))
+}
+
+function buildDerivedModifiers(rows: DerivedModifierForm[]): DerivedStatModifier[] {
+  return rows
+    .map((row) => {
+      const out: DerivedStatModifier = { statId: row.statId }
+      if (row.flat.trim() !== '' && !Number.isNaN(Number(row.flat))) out.flat = Number(row.flat)
+      if (row.percent.trim() !== '' && !Number.isNaN(Number(row.percent))) out.percent = Number(row.percent)
+      return out
+    })
+    .filter((m) => m.flat != null || m.percent != null)
+}
+
+function hydrateMainStatValues(
+  values: Record<string, number> | undefined,
+  allowedMainStatIds: string[],
+  fallbackMainStatId: string,
+): MainStatValueForm[] {
+  return Object.entries(values ?? {})
+    .filter(([k, v]) => allowedMainStatIds.includes(k) && !Number.isNaN(Number(v)) && Number(v) !== 0)
+    .map(([statId, value]) => ({ statId, value: String(value) }))
+    .map((row) => ({ ...row, statId: row.statId || fallbackMainStatId }))
+}
+
+function buildMainStatValueMap(rows: MainStatValueForm[], allowedMainStatIds: string[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const row of rows) {
+    const statId = row.statId.trim()
+    if (!statId || !allowedMainStatIds.includes(statId)) continue
+    if (row.value.trim() === '' || Number.isNaN(Number(row.value))) continue
+    out[statId] = Number(row.value)
+  }
+  return out
+}
 
 function hydrateResources(pack: IdleRpgPackV1): ResourceForm[] {
   return (pack.resources ?? []).map((r: any) => ({
@@ -130,7 +316,7 @@ function hydrateResources(pack: IdleRpgPackV1): ResourceForm[] {
   }))
 }
 
-function hydrateAbilities(pack: IdleRpgPackV1): AbilityForm[] {
+function hydrateAbilities(pack: IdleRpgPackV1, fallbackMainStatId: string): AbilityForm[] {
   return (pack.abilities ?? []).map((a) => ({
     id: a.id,
     name: a.name,
@@ -146,6 +332,8 @@ function hydrateAbilities(pack: IdleRpgPackV1): AbilityForm[] {
     effectAmount: String((a as any).effects?.[0]?.amount ?? 0),
     effectPercentage: String((a as any).effects?.[0]?.percentage ?? 0),
     effectLifestealPct: String((a as any).effects?.[0]?.lifestealPercent ?? 0),
+    effectScalingTerms: hydrateScalingRows((a as any).effects?.[0]?.scalingTerms, fallbackMainStatId),
+    derivedStatModifiers: hydrateDerivedModifiers((a as any).derivedStatModifiers),
     animFrames: hydrateAnimFrames(a.animationFrames),
     reactiveBaseChance: String((a as any).reactiveConfig?.baseChance ?? 0.2),
     reactiveScalingStat: (a as any).reactiveConfig?.scalingStat ?? '',
@@ -153,7 +341,7 @@ function hydrateAbilities(pack: IdleRpgPackV1): AbilityForm[] {
   }))
 }
 
-function hydrateClasses(pack: IdleRpgPackV1): ClassForm[] {
+function hydrateClasses(pack: IdleRpgPackV1, allowedMainStatIds: string[], fallbackMainStatId: string): ClassForm[] {
   return pack.classes.map((c) => {
     return {
       id: c.id,
@@ -161,7 +349,6 @@ function hydrateClasses(pack: IdleRpgPackV1): ClassForm[] {
       description: c.description ?? '',
       iconUrl: c.iconUrl ?? '',
       isHeroClass: c.isHeroClass ?? false,
-      damageMainStat: c.scaling.damageMainStat ?? 'STR',
       primaryAttackAbilityId: c.primaryAttackId ?? '',
       attackTags: c.slots?.attack_source?.allowedTagsAny?.join(', ') ?? '',
       attackRequired: c.slots?.attack_source?.required ?? true,
@@ -172,11 +359,13 @@ function hydrateClasses(pack: IdleRpgPackV1): ClassForm[] {
       regularAbilityIds: c.abilities?.regular?.join(', ') ?? '',
       ultimateAbilityId: c.abilities?.ultimate ?? '',
       resourceId: (c as any).resourceId ?? '',
+      startingMainStats: hydrateMainStatValues((c as any).starting?.mainStats ?? (c as any).starting?.stats, allowedMainStatIds, fallbackMainStatId),
+      startingDerivedStatModifiers: hydrateDerivedModifiers((c as any).starting?.derivedStatModifiers),
     }
   })
 }
 
-function hydrateCreatures(pack: IdleRpgPackV1): CreatureForm[] {
+function hydrateCreatures(pack: IdleRpgPackV1, allowedMainStatIds: string[], fallbackMainStatId: string): CreatureForm[] {
   return pack.creatures.map((c) => ({
     id: c.id,
     name: c.name,
@@ -191,10 +380,14 @@ function hydrateCreatures(pack: IdleRpgPackV1): CreatureForm[] {
     abilityIds: (c as any).abilityIds?.join(', ') ?? '',
     resourceId: (c as any).resourceId ?? '',
     resourceMax: (c as any).resourceMax != null ? String((c as any).resourceMax) : '',
+    mainStats: hydrateMainStatValues((c as any).mainStats, allowedMainStatIds, fallbackMainStatId),
+    weaponDamage: (c as any).weaponDamage != null ? String((c as any).weaponDamage) : '',
+    protectiveArmor: (c as any).protectiveArmor != null ? String((c as any).protectiveArmor) : '',
+    derivedStatModifiers: hydrateDerivedModifiers((c as any).derivedStatModifiers),
   }))
 }
 
-function hydrateItems(pack: IdleRpgPackV1): ItemForm[] {
+function hydrateItems(pack: IdleRpgPackV1, allowedMainStatIds: string[], fallbackMainStatId: string): ItemForm[] {
   return pack.items.map((i) => ({
     id: i.id,
     name: i.name,
@@ -202,6 +395,10 @@ function hydrateItems(pack: IdleRpgPackV1): ItemForm[] {
     slot: i.slot,
     tags: i.tags?.join(', ') ?? '',
     stats: serializeStats(i.stats),
+    mainStatBonuses: hydrateMainStatValues((i as any).mainStatBonuses, allowedMainStatIds, fallbackMainStatId),
+    weaponDamage: (i as any).weaponDamage != null ? String((i as any).weaponDamage) : '',
+    protectiveArmor: (i as any).protectiveArmor != null ? String((i as any).protectiveArmor) : '',
+    derivedStatModifiers: hydrateDerivedModifiers((i as any).derivedStatModifiers),
     iconUrl: i.iconUrl ?? '',
     animationUrl: i.animationUrl ?? '',
     projectileUrl: i.projectileUrl ?? '',
@@ -271,6 +468,8 @@ export default function IdleRpgEdit() {
   const [playerCap, setPlayerCap] = useState(10)
   const [maxLevel, setMaxLevel] = useState(10)
   const [combatPresetId, setCombatPresetId] = useState('combat_v1_simple')
+  const [mainStats, setMainStats] = useState<MainStatForm[]>(DEFAULT_MAIN_STATS.map((s) => ({ id: s.id, name: s.name, description: s.description ?? '' })))
+  const [derivedStats, setDerivedStats] = useState<DerivedStatForm[]>(DERIVED_STATS.map((d) => emptyDerivedStat(d.id)))
   const [xpEntries, setXpEntries] = useState<XpEntry[]>([])
   const [statPointsPerLevel, setStatPointsPerLevel] = useState(3)
   const [abilityPointsPerLevel, setAbilityPointsPerLevel] = useState('1')
@@ -315,12 +514,17 @@ export default function IdleRpgEdit() {
       setAbilityPointsPerLevel(String((pack.rules as any).abilityPointsPerLevel ?? 1))
       const absMap = (pack.rules as any).abilitySlotsByLevel as Record<number, number> | undefined
       setAbilitySlotsByLevel(absMap ? Object.entries(absMap).map(([k, v]) => `${k}:${v}`).join(',') : '')
+      const hydratedMainStats = hydrateMainStats(pack)
+      const defaultMainStatId = hydratedMainStats.find((s) => s.id.trim())?.id?.trim() || 'STR'
+      const allowedMainStatIds = hydratedMainStats.map((s) => s.id.trim()).filter(Boolean)
+      setMainStats(hydratedMainStats)
+      setDerivedStats(hydrateDerivedStats(pack, hydratedMainStats))
       setCurrencies(pack.economy.currencies.map((c) => ({ id: c.id, name: c.name, iconUrl: c.iconUrl })))
       setResources(hydrateResources(pack))
-      setAbilities(hydrateAbilities(pack))
-      setClasses(hydrateClasses(pack).length > 0 ? hydrateClasses(pack) : [emptyClass()])
-      setCreatures(hydrateCreatures(pack))
-      setItems(hydrateItems(pack))
+      setAbilities(hydrateAbilities(pack, defaultMainStatId))
+      setClasses(hydrateClasses(pack, allowedMainStatIds, defaultMainStatId).length > 0 ? hydrateClasses(pack, allowedMainStatIds, defaultMainStatId) : [emptyClass()])
+      setCreatures(hydrateCreatures(pack, allowedMainStatIds, defaultMainStatId))
+      setItems(hydrateItems(pack, allowedMainStatIds, defaultMainStatId))
       setQuests(hydrateQuests(pack))
       setDungeons(hydrateDungeons(pack))
       setRaids(hydrateRaids(pack))
@@ -331,8 +535,26 @@ export default function IdleRpgEdit() {
     }).finally(() => setLoading(false))
   }, [fableId, realmId, authLoading])
 
+  const mainStatIds = mainStats.map((s) => s.id.trim()).filter(Boolean)
+  const fallbackMainStatId = mainStatIds[0] ?? 'STR'
+
   // --- Build pack from form (same as Create) ---
   function buildPack(): IdleRpgPackV1 {
+    const validMainStats: MainStatDefinition[] = mainStats
+      .map((s) => ({
+        id: s.id.trim(),
+        name: s.name.trim() || s.id.trim(),
+        description: s.description.trim(),
+      }))
+      .filter((s) => s.id)
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        ...(s.description ? { description: s.description } : {}),
+      }))
+    const mainStatIdList = validMainStats.map((s) => s.id)
+    const derivedStatsMap = buildDerivedStats(derivedStats)
+
     const xpTable: Record<string, number> = { '1': 0 }
     xpEntries.forEach((e) => {
       const l = e.level.trim()
@@ -354,6 +576,8 @@ export default function IdleRpgEdit() {
     const abilityList: Ability[] = abilities
       .filter((a) => a.id.trim() && a.name.trim())
       .map((a) => {
+        const effectScalingTerms = buildScalingRows(a.effectScalingTerms)
+        const derivedStatModifiers = buildDerivedModifiers(a.derivedStatModifiers)
         const def: Ability = {
           id: a.id.trim(),
           name: a.name.trim(),
@@ -370,15 +594,17 @@ export default function IdleRpgEdit() {
             kind: a.effectKind as any,
             ...(Number(a.effectAmount) > 0 ? { amount: Number(a.effectAmount) } : {}),
             ...(Number(a.effectPercentage) > 0 ? { percentage: Number(a.effectPercentage) } : {}),
+            ...(effectScalingTerms.length > 0 ? { scalingTerms: effectScalingTerms } : {}),
             ...(a.effectKind === 'lifesteal' && Number(a.effectLifestealPct) > 0 ? { lifestealPercent: Number(a.effectLifestealPct) } : {}),
           }] } : {}),
+          ...(derivedStatModifiers.length > 0 ? { derivedStatModifiers } : {}),
         }
         const animationFrames = buildAnimationFrames(a.animFrames)
         if (animationFrames) def.animationFrames = animationFrames
         if (a.abilityType === 'reactive') {
           def.reactiveConfig = {
             baseChance: Number(a.reactiveBaseChance) || 0.2,
-            ...(a.reactiveScalingStat ? { scalingStat: a.reactiveScalingStat as any } : {}),
+            ...(a.reactiveScalingStat && mainStatIdList.includes(a.reactiveScalingStat) ? { scalingStat: a.reactiveScalingStat as any } : {}),
             ...(Number(a.reactiveScalingCoeff) > 0 ? { scalingCoeff: Number(a.reactiveScalingCoeff) } : {}),
           }
         }
@@ -388,13 +614,14 @@ export default function IdleRpgEdit() {
     const classBlocks: ClassBlock[] = classes
       .filter((c) => c.id.trim() && c.name.trim())
       .map((c) => {
+        const filteredMainStats = buildMainStatValueMap(c.startingMainStats, mainStatIdList)
+        const startingDerivedStatModifiers = buildDerivedModifiers(c.startingDerivedStatModifiers)
         return {
           id: c.id.trim(),
           name: c.name.trim(),
           ...(c.description.trim() ? { description: c.description.trim() } : {}),
           ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
           ...(c.isHeroClass ? { isHeroClass: true } : {}),
-          scaling: { damageMainStat: c.damageMainStat },
           primaryAttackId: c.primaryAttackAbilityId.trim() || '',
           slots: {
             attack_source: {
@@ -417,44 +644,68 @@ export default function IdleRpgEdit() {
               }
             : {}),
           ...(c.resourceId.trim() ? { resourceId: c.resourceId.trim() } : {}),
+          ...(Object.keys(filteredMainStats).length > 0 || startingDerivedStatModifiers.length > 0
+            ? {
+                starting: {
+                  ...(Object.keys(filteredMainStats).length > 0 ? { mainStats: filteredMainStats } : {}),
+                  ...(startingDerivedStatModifiers.length > 0 ? { derivedStatModifiers: startingDerivedStatModifiers } : {}),
+                },
+              }
+            : {}),
         }
       })
 
     const creatureList: CreatureTemplate[] = creatures
       .filter((c) => c.id.trim() && c.name.trim())
-      .map((c) => ({
-        id: c.id.trim(),
-        name: c.name.trim(),
-        role: c.role,
-        level: Number(c.level) || 1,
-        hp: Number(c.hp) || 1,
-        ap: Number(c.ap) || 0,
-        arm: Number(c.arm) || 0,
-        ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
-        ...(c.backgroundImageUrl.trim() ? { backgroundImageUrl: c.backgroundImageUrl.trim() } : {}),
-        ...(c.tags.trim() ? { tags: parseTags(c.tags) } : {}),
-        ...(c.abilityIds.trim() ? { abilityIds: parseTags(c.abilityIds) } : {}),
-        ...(c.resourceId.trim() ? { resourceId: c.resourceId.trim() } : {}),
-        ...(c.resourceMax.trim() && Number(c.resourceMax) > 0 ? { resourceMax: Number(c.resourceMax) } : {}),
-      }))
+      .map((c) => {
+        const filteredMainStats = buildMainStatValueMap(c.mainStats, mainStatIdList)
+        const creatureDerivedStatModifiers = buildDerivedModifiers(c.derivedStatModifiers)
+        return {
+          id: c.id.trim(),
+          name: c.name.trim(),
+          role: c.role,
+          level: Number(c.level) || 1,
+          hp: Number(c.hp) || 1,
+          ap: Number(c.ap) || 0,
+          arm: Number(c.arm) || 0,
+          ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
+          ...(c.backgroundImageUrl.trim() ? { backgroundImageUrl: c.backgroundImageUrl.trim() } : {}),
+          ...(c.tags.trim() ? { tags: parseTags(c.tags) } : {}),
+          ...(c.abilityIds.trim() ? { abilityIds: parseTags(c.abilityIds) } : {}),
+          ...(c.resourceId.trim() ? { resourceId: c.resourceId.trim() } : {}),
+          ...(c.resourceMax.trim() && Number(c.resourceMax) > 0 ? { resourceMax: Number(c.resourceMax) } : {}),
+          ...(Object.keys(filteredMainStats).length > 0 ? { mainStats: filteredMainStats } : {}),
+          ...(c.weaponDamage.trim() !== '' && !Number.isNaN(Number(c.weaponDamage)) ? { weaponDamage: Number(c.weaponDamage) } : {}),
+          ...(c.protectiveArmor.trim() !== '' && !Number.isNaN(Number(c.protectiveArmor)) ? { protectiveArmor: Number(c.protectiveArmor) } : {}),
+          ...(creatureDerivedStatModifiers.length > 0 ? { derivedStatModifiers: creatureDerivedStatModifiers } : {}),
+        }
+      })
 
     const itemList: ItemTemplate[] = items
       .filter((i) => i.id.trim() && i.name.trim())
-      .map((i) => ({
-        id: i.id.trim(),
-        name: i.name.trim(),
-        rarity: RARITY_NAME_TO_NUMBER[i.rarity] ?? 1,
-        slot: i.slot,
-        tags: parseTags(i.tags),
-        stats: parseKeyValueNumber(i.stats),
-        ...(i.iconUrl.trim() ? { iconUrl: i.iconUrl.trim() } : {}),
-        ...(i.animationUrl.trim() ? { animationUrl: i.animationUrl.trim() } : {}),
-        ...(i.projectileUrl.trim() ? { projectileUrl: i.projectileUrl.trim() } : {}),
-        ...(i.impactUrl.trim() ? { impactUrl: i.impactUrl.trim() } : {}),
-        ...(i.priceCurrencyId.trim() && i.priceAmount.trim()
-          ? { price: { currencyId: i.priceCurrencyId.trim(), amount: Number(i.priceAmount) || 0 } }
-          : {}),
-      }))
+      .map((i) => {
+        const filteredMainStatBonuses = buildMainStatValueMap(i.mainStatBonuses, mainStatIdList)
+        const itemDerivedStatModifiers = buildDerivedModifiers(i.derivedStatModifiers)
+        return {
+          id: i.id.trim(),
+          name: i.name.trim(),
+          rarity: RARITY_NAME_TO_NUMBER[i.rarity] ?? 1,
+          slot: i.slot,
+          tags: parseTags(i.tags),
+          stats: parseKeyValueNumber(i.stats),
+          ...(Object.keys(filteredMainStatBonuses).length > 0 ? { mainStatBonuses: filteredMainStatBonuses } : {}),
+          ...(i.weaponDamage.trim() !== '' && !Number.isNaN(Number(i.weaponDamage)) ? { weaponDamage: Number(i.weaponDamage) } : {}),
+          ...(i.protectiveArmor.trim() !== '' && !Number.isNaN(Number(i.protectiveArmor)) ? { protectiveArmor: Number(i.protectiveArmor) } : {}),
+          ...(itemDerivedStatModifiers.length > 0 ? { derivedStatModifiers: itemDerivedStatModifiers } : {}),
+          ...(i.iconUrl.trim() ? { iconUrl: i.iconUrl.trim() } : {}),
+          ...(i.animationUrl.trim() ? { animationUrl: i.animationUrl.trim() } : {}),
+          ...(i.projectileUrl.trim() ? { projectileUrl: i.projectileUrl.trim() } : {}),
+          ...(i.impactUrl.trim() ? { impactUrl: i.impactUrl.trim() } : {}),
+          ...(i.priceCurrencyId.trim() && i.priceAmount.trim()
+            ? { price: { currencyId: i.priceCurrencyId.trim(), amount: Number(i.priceAmount) || 0 } }
+            : {}),
+        }
+      })
 
     const questList: Quest[] = quests
       .filter((q) => q.id.trim() && q.name.trim() && q.creatureId.trim())
@@ -525,6 +776,8 @@ export default function IdleRpgEdit() {
 
     return {
       version: 1,
+      ...(validMainStats.length > 0 ? { mainStats: validMainStats } : {}),
+      ...(Object.keys(derivedStatsMap).length > 0 ? { derivedStats: derivedStatsMap } : {}),
       rules: {
         maxLevel, xpTable, combatPresetId, statPointsPerLevel,
         ...(Number(abilityPointsPerLevel) > 0 ? { abilityPointsPerLevel: Number(abilityPointsPerLevel) } : {}),
@@ -564,12 +817,17 @@ export default function IdleRpgEdit() {
         setAbilityPointsPerLevel(String((pack.rules as any).abilityPointsPerLevel ?? 1))
         const absMap = (pack.rules as any).abilitySlotsByLevel as Record<number, number> | undefined
         setAbilitySlotsByLevel(absMap ? Object.entries(absMap).map(([k, v]) => `${k}:${v}`).join(',') : '')
+        const hydratedMainStats = hydrateMainStats(pack)
+        const defaultMainStatId = hydratedMainStats.find((s) => s.id.trim())?.id?.trim() || 'STR'
+        const allowedMainStatIds = hydratedMainStats.map((s) => s.id.trim()).filter(Boolean)
+        setMainStats(hydratedMainStats)
+        setDerivedStats(hydrateDerivedStats(pack, hydratedMainStats))
         setCurrencies(pack.economy.currencies.map((c) => ({ id: c.id, name: c.name, iconUrl: c.iconUrl })))
         setResources(hydrateResources(pack))
-        setAbilities(hydrateAbilities(pack))
-        setClasses(hydrateClasses(pack).length > 0 ? hydrateClasses(pack) : [emptyClass()])
-        setCreatures(hydrateCreatures(pack))
-        setItems(hydrateItems(pack))
+        setAbilities(hydrateAbilities(pack, defaultMainStatId))
+        setClasses(hydrateClasses(pack, allowedMainStatIds, defaultMainStatId).length > 0 ? hydrateClasses(pack, allowedMainStatIds, defaultMainStatId) : [emptyClass()])
+        setCreatures(hydrateCreatures(pack, allowedMainStatIds, defaultMainStatId))
+        setItems(hydrateItems(pack, allowedMainStatIds, defaultMainStatId))
         setQuests(hydrateQuests(pack))
         setDungeons(hydrateDungeons(pack))
         setRaids(hydrateRaids(pack))
@@ -697,6 +955,85 @@ export default function IdleRpgEdit() {
           </Accordion>
 
           <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Main Stats</Typography></AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                These are the only stats players can allocate on level up.
+              </Typography>
+              {mainStats.map((s, i) => (
+                <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
+                  <TextField size="small" label="ID" value={s.id} onChange={(e) => setMainStats((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} sx={{ width: 100 }} />
+                  <TextField size="small" label="Name" value={s.name} onChange={(e) => setMainStats((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 160 }} />
+                  <TextField size="small" label="Description" value={s.description} onChange={(e) => setMainStats((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} sx={{ flex: 1 }} />
+                  <IconButton size="small" color="error" onClick={() => setMainStats((p) => p.filter((_, j) => j !== i))} disabled={mainStats.length <= 1}>âˆ’</IconButton>
+                </Box>
+              ))}
+              <Button type="button" size="small" variant="outlined" onClick={() => setMainStats((p) => [...p, emptyMainStat()])}>+ Add main stat</Button>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Derived Stat Scaling</Typography></AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Configure formulas and caps/floors for each derived stat. You can add multiple scaling sources per stat.
+              </Typography>
+              {derivedStats.map((d, i) => {
+                const meta = DERIVED_STATS.find((x) => x.id === d.id)
+                return (
+                  <Paper key={d.id} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                    <Typography fontWeight={700} sx={{ mb: 1 }}>{meta?.label ?? d.id}</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                      <TextField size="small" label="Base" type="number" value={d.base} onChange={(e) => setDerivedStats((p) => p.map((x, j) => j === i ? { ...x, base: e.target.value } : x))} sx={{ width: 120 }} />
+                      <TextField size="small" label="Per Level" type="number" value={d.perLevel} onChange={(e) => setDerivedStats((p) => p.map((x, j) => j === i ? { ...x, perLevel: e.target.value } : x))} sx={{ width: 120 }} />
+                      <TextField size="small" label="Floor" type="number" value={d.floor} onChange={(e) => setDerivedStats((p) => p.map((x, j) => j === i ? { ...x, floor: e.target.value } : x))} sx={{ width: 120 }} />
+                      <TextField size="small" label="Cap" type="number" value={d.cap} onChange={(e) => setDerivedStats((p) => p.map((x, j) => j === i ? { ...x, cap: e.target.value } : x))} sx={{ width: 120 }} />
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">Scaling terms</Typography>
+                    {d.scaling.map((t, ti) => (
+                      <Box key={ti} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mt: 1 }}>
+                        <FormControl size="small" sx={{ minWidth: 190 }}>
+                          <InputLabel>Source</InputLabel>
+                          <Select
+                            value={t.sourceKind}
+                            label="Source"
+                            onChange={(e) => setDerivedStats((p) => p.map((x, j) => j === i ? {
+                              ...x,
+                              scaling: x.scaling.map((sx, sj) => sj === ti ? { ...sx, sourceKind: e.target.value as DerivedScaleForm['sourceKind'] } : sx),
+                            } : x))}
+                          >
+                            <MenuItem value="main_stat">Main stat</MenuItem>
+                            <MenuItem value="equipped_weapon_damage">Equipped weapon damage</MenuItem>
+                            <MenuItem value="equipped_protective_armor">Equipped protective armor</MenuItem>
+                          </Select>
+                        </FormControl>
+                        {t.sourceKind === 'main_stat' && (
+                          <FormControl size="small" sx={{ minWidth: 140 }}>
+                            <InputLabel>Main stat</InputLabel>
+                            <Select
+                              value={t.sourceStatId}
+                              label="Main stat"
+                              onChange={(e) => setDerivedStats((p) => p.map((x, j) => j === i ? {
+                                ...x,
+                                scaling: x.scaling.map((sx, sj) => sj === ti ? { ...sx, sourceStatId: e.target.value } : sx),
+                              } : x))}
+                            >
+                              {mainStatIds.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                            </Select>
+                          </FormControl>
+                        )}
+                        <TextField size="small" label="Percent" type="number" value={t.percent} onChange={(e) => setDerivedStats((p) => p.map((x, j) => j === i ? { ...x, scaling: x.scaling.map((sx, sj) => sj === ti ? { ...sx, percent: e.target.value } : sx) } : x))} sx={{ width: 120 }} helperText="e.g. 85 for 85%" />
+                        <IconButton size="small" color="error" onClick={() => setDerivedStats((p) => p.map((x, j) => j === i ? { ...x, scaling: x.scaling.filter((_, sj) => sj !== ti) } : x))}>âˆ’</IconButton>
+                      </Box>
+                    ))}
+                    <Button type="button" size="small" variant="outlined" sx={{ mt: 1 }} onClick={() => setDerivedStats((p) => p.map((x, j) => j === i ? { ...x, scaling: [...x.scaling, { ...emptyDerivedScale(), sourceStatId: fallbackMainStatId }] } : x))}>+ Add scaling term</Button>
+                  </Paper>
+                )
+              })}
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion defaultExpanded>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Currencies (at least one)</Typography></AccordionSummary>
             <AccordionDetails>
               {currencies.map((c, i) => (
@@ -766,7 +1103,7 @@ export default function IdleRpgEdit() {
                         <InputLabel>Scaling stat</InputLabel>
                         <Select value={a.reactiveScalingStat} label="Scaling stat" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveScalingStat: e.target.value } : x))} displayEmpty>
                           <MenuItem value="">— None —</MenuItem>
-                          {STAT_IDS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                          {mainStatIds.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
                         </Select>
                       </FormControl>
                       <TextField size="small" label="Scaling coeff" type="number" value={a.reactiveScalingCoeff} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveScalingCoeff: e.target.value } : x))} sx={{ width: 120 }} inputProps={{ step: 0.001 }} />
@@ -777,8 +1114,7 @@ export default function IdleRpgEdit() {
                     onChange={(af) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, animFrames: af } : x))}
                     isReactive={a.abilityType === 'reactive'}
                   />
-                  {a.abilityType !== 'primary' && (
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%', mt: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%', mt: 1 }}>
                       <TextField size="small" label="Cooldown (turns)" type="number" value={a.cooldownTurns} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, cooldownTurns: e.target.value } : x))} sx={{ width: 120 }} />
                       <FormControl size="small" sx={{ minWidth: 130 }}>
                         <InputLabel>Resource cost</InputLabel>
@@ -790,7 +1126,7 @@ export default function IdleRpgEdit() {
                         </Select>
                       </FormControl>
                       <TextField size="small" label="Cost amount" type="number" value={a.resourceCostAmount} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, resourceCostAmount: e.target.value } : x))} sx={{ width: 100 }} />
-                      <TextField size="small" label="Unlock cost (AP)" type="number" value={a.unlockCost} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, unlockCost: e.target.value } : x))} sx={{ width: 120 }} />
+                      <TextField size="small" label="Unlock cost (Ability pts)" type="number" value={a.unlockCost} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, unlockCost: e.target.value } : x))} sx={{ width: 150 }} />
                       <TextField size="small" label="Min level" type="number" value={a.minLevel} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, minLevel: e.target.value } : x))} sx={{ width: 90 }} />
                       <FormControl size="small" sx={{ minWidth: 120 }}>
                         <InputLabel>Effect kind</InputLabel>
@@ -803,6 +1139,86 @@ export default function IdleRpgEdit() {
                       {a.effectKind === 'lifesteal' && (
                         <TextField size="small" label="Lifesteal %" type="number" value={a.effectLifestealPct} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effectLifestealPct: e.target.value } : x))} sx={{ width: 100 }} />
                       )}
+                      <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>Effect scaling terms</Typography>
+                      {a.effectScalingTerms.map((term, ti) => (
+                        <Box key={ti} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+                          <FormControl size="small" sx={{ minWidth: 200 }}>
+                            <InputLabel>Source</InputLabel>
+                            <Select
+                              value={term.sourceKind}
+                              label="Source"
+                              onChange={(e) => setAbilities((p) => p.map((x, j) => j !== i ? x : {
+                                ...x,
+                                effectScalingTerms: x.effectScalingTerms.map((sx, sj) => sj === ti ? { ...sx, sourceKind: e.target.value as DerivedScaleForm['sourceKind'] } : sx),
+                              }))}
+                            >
+                              <MenuItem value="main_stat">Main stat</MenuItem>
+                              <MenuItem value="equipped_weapon_damage">Equipped weapon damage</MenuItem>
+                              <MenuItem value="equipped_protective_armor">Equipped protective armor</MenuItem>
+                            </Select>
+                          </FormControl>
+                          {term.sourceKind === 'main_stat' && (
+                            <FormControl size="small" sx={{ minWidth: 140 }}>
+                              <InputLabel>Main stat</InputLabel>
+                              <Select
+                                value={term.sourceStatId}
+                                label="Main stat"
+                                onChange={(e) => setAbilities((p) => p.map((x, j) => j !== i ? x : {
+                                  ...x,
+                                  effectScalingTerms: x.effectScalingTerms.map((sx, sj) => sj === ti ? { ...sx, sourceStatId: e.target.value } : sx),
+                                }))}
+                              >
+                                {mainStatIds.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                              </Select>
+                            </FormControl>
+                          )}
+                          <TextField
+                            size="small"
+                            label="Percent"
+                            type="number"
+                            value={term.percent}
+                            onChange={(e) => setAbilities((p) => p.map((x, j) => j !== i ? x : {
+                              ...x,
+                              effectScalingTerms: x.effectScalingTerms.map((sx, sj) => sj === ti ? { ...sx, percent: e.target.value } : sx),
+                            }))}
+                            sx={{ width: 120 }}
+                          />
+                          <IconButton size="small" color="error" onClick={() => setAbilities((p) => p.map((x, j) => j !== i ? x : { ...x, effectScalingTerms: x.effectScalingTerms.filter((_, sj) => sj !== ti) }))}>−</IconButton>
+                        </Box>
+                      ))}
+                      <Button
+                        type="button"
+                        size="small"
+                        variant="outlined"
+                        onClick={() => setAbilities((p) => p.map((x, j) => j !== i ? x : { ...x, effectScalingTerms: [...x.effectScalingTerms, { ...emptyDerivedScale(), sourceStatId: fallbackMainStatId }] }))}
+                      >
+                        + Add effect scaling term
+                      </Button>
+                    </Box>
+                  {a.abilityType === 'passive' && (
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%', mt: 1 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>Passive derived stat modifiers</Typography>
+                      {a.derivedStatModifiers.map((mod, mi) => (
+                        <Box key={mi} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+                          <FormControl size="small" sx={{ minWidth: 220 }}>
+                            <InputLabel>Derived stat</InputLabel>
+                            <Select
+                              value={mod.statId}
+                              label="Derived stat"
+                              onChange={(e) => setAbilities((p) => p.map((x, j) => j !== i ? x : {
+                                ...x,
+                                derivedStatModifiers: x.derivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, statId: e.target.value as DerivedStatId } : sx),
+                              }))}
+                            >
+                              {DERIVED_STATS.map((ds) => <MenuItem key={ds.id} value={ds.id}>{ds.label}</MenuItem>)}
+                            </Select>
+                          </FormControl>
+                          <TextField size="small" label="Flat" type="number" value={mod.flat} onChange={(e) => setAbilities((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: x.derivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, flat: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                          <TextField size="small" label="Percent" type="number" value={mod.percent} onChange={(e) => setAbilities((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: x.derivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, percent: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                          <IconButton size="small" color="error" onClick={() => setAbilities((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: x.derivedStatModifiers.filter((_, sj) => sj !== mi) }))}>−</IconButton>
+                        </Box>
+                      ))}
+                      <Button type="button" size="small" variant="outlined" onClick={() => setAbilities((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: [...x.derivedStatModifiers, emptyDerivedModifier()] }))}>+ Add passive modifier</Button>
                     </Box>
                   )}
                 </Box>
@@ -824,12 +1240,6 @@ export default function IdleRpgEdit() {
                     <FormControlLabel control={<Checkbox size="small" checked={c.isHeroClass} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, isHeroClass: e.target.checked } : x))} />} label={<Typography variant="body2" sx={{ color: c.isHeroClass ? '#ffc145' : 'text.secondary', fontWeight: c.isHeroClass ? 700 : 400 }}>Hero Class</Typography>} />
                   </Box>
                   <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1 }}>
-                    <FormControl size="small" sx={{ minWidth: 100 }}>
-                      <InputLabel>Damage stat</InputLabel>
-                      <Select value={c.damageMainStat} label="Damage stat" onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, damageMainStat: e.target.value } : x))}>
-                        {STAT_IDS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-                      </Select>
-                    </FormControl>
                     <FormControl size="small" sx={{ minWidth: 220 }}>
                       <InputLabel>Primary attack ability</InputLabel>
                       <Select
@@ -871,6 +1281,49 @@ export default function IdleRpgEdit() {
                       ))}
                     </Select>
                   </FormControl>
+                  <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>Starting main stats</Typography>
+                  {c.startingMainStats.map((entry, si) => (
+                    <Box key={si} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+                      <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <InputLabel>Main stat</InputLabel>
+                        <Select
+                          value={entry.statId}
+                          label="Main stat"
+                          onChange={(e) => setClasses((p) => p.map((x, j) => j !== i ? x : {
+                            ...x,
+                            startingMainStats: x.startingMainStats.map((sx, sj) => sj === si ? { ...sx, statId: e.target.value } : sx),
+                          }))}
+                        >
+                          {mainStatIds.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Value" type="number" value={entry.value} onChange={(e) => setClasses((p) => p.map((x, j) => j !== i ? x : { ...x, startingMainStats: x.startingMainStats.map((sx, sj) => sj === si ? { ...sx, value: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                      <IconButton size="small" color="error" onClick={() => setClasses((p) => p.map((x, j) => j !== i ? x : { ...x, startingMainStats: x.startingMainStats.filter((_, sj) => sj !== si) }))}>−</IconButton>
+                    </Box>
+                  ))}
+                  <Button type="button" size="small" variant="outlined" onClick={() => setClasses((p) => p.map((x, j) => j !== i ? x : { ...x, startingMainStats: [...x.startingMainStats, emptyMainStatValue(fallbackMainStatId)] }))}>+ Add starting main stat</Button>
+                  <Typography variant="caption" color="text.secondary" sx={{ width: '100%', mt: 1 }}>Starting derived stat modifiers</Typography>
+                  {c.startingDerivedStatModifiers.map((mod, mi) => (
+                    <Box key={mi} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+                      <FormControl size="small" sx={{ minWidth: 220 }}>
+                        <InputLabel>Derived stat</InputLabel>
+                        <Select
+                          value={mod.statId}
+                          label="Derived stat"
+                          onChange={(e) => setClasses((p) => p.map((x, j) => j !== i ? x : {
+                            ...x,
+                            startingDerivedStatModifiers: x.startingDerivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, statId: e.target.value as DerivedStatId } : sx),
+                          }))}
+                        >
+                          {DERIVED_STATS.map((ds) => <MenuItem key={ds.id} value={ds.id}>{ds.label}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Flat" type="number" value={mod.flat} onChange={(e) => setClasses((p) => p.map((x, j) => j !== i ? x : { ...x, startingDerivedStatModifiers: x.startingDerivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, flat: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                      <TextField size="small" label="Percent" type="number" value={mod.percent} onChange={(e) => setClasses((p) => p.map((x, j) => j !== i ? x : { ...x, startingDerivedStatModifiers: x.startingDerivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, percent: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                      <IconButton size="small" color="error" onClick={() => setClasses((p) => p.map((x, j) => j !== i ? x : { ...x, startingDerivedStatModifiers: x.startingDerivedStatModifiers.filter((_, sj) => sj !== mi) }))}>−</IconButton>
+                    </Box>
+                  ))}
+                  <Button type="button" size="small" variant="outlined" onClick={() => setClasses((p) => p.map((x, j) => j !== i ? x : { ...x, startingDerivedStatModifiers: [...x.startingDerivedStatModifiers, emptyDerivedModifier()] }))}>+ Add class modifier</Button>
                   <IconButton size="small" color="error" sx={{ mt: 1 }} onClick={() => setClasses((p) => p.filter((_, j) => j !== i))} disabled={classes.length <= 1}>Remove class</IconButton>
                 </Paper>
               ))}
@@ -907,6 +1360,51 @@ export default function IdleRpgEdit() {
                     </Select>
                   </FormControl>
                   <TextField size="small" label="Resource Max" type="number" value={c.resourceMax} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, resourceMax: e.target.value } : x))} sx={{ width: 100 }} />
+                  <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>Main stats</Typography>
+                  {c.mainStats.map((entry, si) => (
+                    <Box key={si} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+                      <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <InputLabel>Main stat</InputLabel>
+                        <Select
+                          value={entry.statId}
+                          label="Main stat"
+                          onChange={(e) => setCreatures((p) => p.map((x, j) => j !== i ? x : {
+                            ...x,
+                            mainStats: x.mainStats.map((sx, sj) => sj === si ? { ...sx, statId: e.target.value } : sx),
+                          }))}
+                        >
+                          {mainStatIds.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Value" type="number" value={entry.value} onChange={(e) => setCreatures((p) => p.map((x, j) => j !== i ? x : { ...x, mainStats: x.mainStats.map((sx, sj) => sj === si ? { ...sx, value: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                      <IconButton size="small" color="error" onClick={() => setCreatures((p) => p.map((x, j) => j !== i ? x : { ...x, mainStats: x.mainStats.filter((_, sj) => sj !== si) }))}>−</IconButton>
+                    </Box>
+                  ))}
+                  <Button type="button" size="small" variant="outlined" onClick={() => setCreatures((p) => p.map((x, j) => j !== i ? x : { ...x, mainStats: [...x.mainStats, emptyMainStatValue(fallbackMainStatId)] }))}>+ Add main stat</Button>
+                  <TextField size="small" label="Weapon damage" type="number" value={c.weaponDamage} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, weaponDamage: e.target.value } : x))} sx={{ width: 120 }} />
+                  <TextField size="small" label="Protective armor" type="number" value={c.protectiveArmor} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, protectiveArmor: e.target.value } : x))} sx={{ width: 130 }} />
+                  <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>Derived stat modifiers</Typography>
+                  {c.derivedStatModifiers.map((mod, mi) => (
+                    <Box key={mi} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+                      <FormControl size="small" sx={{ minWidth: 220 }}>
+                        <InputLabel>Derived stat</InputLabel>
+                        <Select
+                          value={mod.statId}
+                          label="Derived stat"
+                          onChange={(e) => setCreatures((p) => p.map((x, j) => j !== i ? x : {
+                            ...x,
+                            derivedStatModifiers: x.derivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, statId: e.target.value as DerivedStatId } : sx),
+                          }))}
+                        >
+                          {DERIVED_STATS.map((ds) => <MenuItem key={ds.id} value={ds.id}>{ds.label}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Flat" type="number" value={mod.flat} onChange={(e) => setCreatures((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: x.derivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, flat: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                      <TextField size="small" label="Percent" type="number" value={mod.percent} onChange={(e) => setCreatures((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: x.derivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, percent: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                      <IconButton size="small" color="error" onClick={() => setCreatures((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: x.derivedStatModifiers.filter((_, sj) => sj !== mi) }))}>−</IconButton>
+                    </Box>
+                  ))}
+                  <Button type="button" size="small" variant="outlined" onClick={() => setCreatures((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: [...x.derivedStatModifiers, emptyDerivedModifier()] }))}>+ Add creature modifier</Button>
                   <IconButton size="small" color="error" onClick={() => setCreatures((p) => p.filter((_, j) => j !== i))}>−</IconButton>
                 </Box>
               ))}
@@ -946,13 +1444,58 @@ export default function IdleRpgEdit() {
                     </Select>
                   </FormControl>
                   <TextField size="small" label="Tags (comma)" value={item.tags} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, tags: e.target.value } : x))} placeholder="weapon:sword" sx={{ width: 140 }} />
-                  <TextField size="small" label="Stats (STR:2, ARM:5)" value={item.stats} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, stats: e.target.value } : x))} sx={{ width: 140 }} />
+                  <TextField size="small" label="Legacy stats (STR:2, ARM:5)" value={item.stats} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, stats: e.target.value } : x))} sx={{ width: 180 }} />
+                  <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>Main stat bonuses</Typography>
+                  {item.mainStatBonuses.map((entry, si) => (
+                    <Box key={si} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+                      <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <InputLabel>Main stat</InputLabel>
+                        <Select
+                          value={entry.statId}
+                          label="Main stat"
+                          onChange={(e) => setItems((p) => p.map((x, j) => j !== i ? x : {
+                            ...x,
+                            mainStatBonuses: x.mainStatBonuses.map((sx, sj) => sj === si ? { ...sx, statId: e.target.value } : sx),
+                          }))}
+                        >
+                          {mainStatIds.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Value" type="number" value={entry.value} onChange={(e) => setItems((p) => p.map((x, j) => j !== i ? x : { ...x, mainStatBonuses: x.mainStatBonuses.map((sx, sj) => sj === si ? { ...sx, value: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                      <IconButton size="small" color="error" onClick={() => setItems((p) => p.map((x, j) => j !== i ? x : { ...x, mainStatBonuses: x.mainStatBonuses.filter((_, sj) => sj !== si) }))}>−</IconButton>
+                    </Box>
+                  ))}
+                  <Button type="button" size="small" variant="outlined" onClick={() => setItems((p) => p.map((x, j) => j !== i ? x : { ...x, mainStatBonuses: [...x.mainStatBonuses, emptyMainStatValue(fallbackMainStatId)] }))}>+ Add main stat bonus</Button>
+                  <TextField size="small" label="Weapon damage" type="number" value={item.weaponDamage} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, weaponDamage: e.target.value } : x))} sx={{ width: 120 }} />
+                  <TextField size="small" label="Protective armor" type="number" value={item.protectiveArmor} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, protectiveArmor: e.target.value } : x))} sx={{ width: 130 }} />
                   <TextField size="small" label="Icon URL" value={item.iconUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 120 }} />
                   <TextField size="small" label="Animation URL (weapon tip-up)" value={item.animationUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, animationUrl: e.target.value } : x))} placeholder="for projectile frame" sx={{ width: 140 }} />
                   <TextField size="small" label="Projectile URL" value={item.projectileUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, projectileUrl: e.target.value } : x))} placeholder="custom projectile" sx={{ width: 120 }} />
                   <TextField size="small" label="Impact URL" value={item.impactUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, impactUrl: e.target.value } : x))} placeholder="custom impact" sx={{ width: 120 }} />
                   <TextField size="small" label="Price currency" value={item.priceCurrencyId} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, priceCurrencyId: e.target.value } : x))} placeholder="gold" sx={{ width: 90 }} />
                   <TextField size="small" label="Price" type="number" value={item.priceAmount} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, priceAmount: e.target.value } : x))} sx={{ width: 70 }} />
+                  <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>Derived stat modifiers</Typography>
+                  {item.derivedStatModifiers.map((mod, mi) => (
+                    <Box key={mi} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+                      <FormControl size="small" sx={{ minWidth: 220 }}>
+                        <InputLabel>Derived stat</InputLabel>
+                        <Select
+                          value={mod.statId}
+                          label="Derived stat"
+                          onChange={(e) => setItems((p) => p.map((x, j) => j !== i ? x : {
+                            ...x,
+                            derivedStatModifiers: x.derivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, statId: e.target.value as DerivedStatId } : sx),
+                          }))}
+                        >
+                          {DERIVED_STATS.map((ds) => <MenuItem key={ds.id} value={ds.id}>{ds.label}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Flat" type="number" value={mod.flat} onChange={(e) => setItems((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: x.derivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, flat: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                      <TextField size="small" label="Percent" type="number" value={mod.percent} onChange={(e) => setItems((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: x.derivedStatModifiers.map((sx, sj) => sj === mi ? { ...sx, percent: e.target.value } : sx) }))} sx={{ width: 110 }} />
+                      <IconButton size="small" color="error" onClick={() => setItems((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: x.derivedStatModifiers.filter((_, sj) => sj !== mi) }))}>−</IconButton>
+                    </Box>
+                  ))}
+                  <Button type="button" size="small" variant="outlined" onClick={() => setItems((p) => p.map((x, j) => j !== i ? x : { ...x, derivedStatModifiers: [...x.derivedStatModifiers, emptyDerivedModifier()] }))}>+ Add item modifier</Button>
                   <IconButton size="small" color="error" onClick={() => setItems((p) => p.filter((_, j) => j !== i))}>−</IconButton>
                 </Box>
               ))}

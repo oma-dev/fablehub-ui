@@ -14,6 +14,7 @@ import SwordIcon from '@mui/icons-material/SportsMartialArts'
 import type { CharacterState, IdleRpgPackV1, ItemTemplate } from '../../../../../../services/api'
 import charBackground from '../../../../../../assets/backgrounds/charBackground.png'
 import { allocateStat, equipItem } from '../../../../../../services/api'
+import { computePlayerCombatStats } from '../utils/combatStats'
 import ItemView from './ItemView'
 
 interface Props {
@@ -26,38 +27,59 @@ interface Props {
   readOnly?: boolean
 }
 
-type StatId = 'STR' | 'DEX' | 'INT' | 'LCK' | 'HP' | 'ARM'
-
-const STAT_ORDER: StatId[] = ['STR', 'DEX', 'INT', 'LCK', 'HP', 'ARM']
-
-const STAT_INFO: Record<StatId, { label: string; description: string }> = {
-  STR: { label: 'Strength', description: 'Increases damage for Strength-based classes. Each point adds +1 AP if STR is your main stat.' },
-  DEX: { label: 'Dexterity', description: 'Increases damage for Dexterity-based classes. (Future: dodge chance).' },
-  INT: { label: 'Intelligence', description: 'Increases damage for Intelligence/magic classes.' },
-  LCK: { label: 'Luck', description: 'Increases critical hit chance (future update).' },
-  HP: { label: 'Health', description: 'Directly adds maximum hit points (+1 HP per point).' },
-  ARM: { label: 'Armor', description: 'Reduces incoming damage by a flat amount (-1 damage taken per point).' },
+const DEFAULT_MAIN_STAT_INFO: Record<string, { label: string; description: string }> = {
+  STR: { label: 'Strength', description: 'Main stat used by allocation and derived formulas.' },
+  DEX: { label: 'Dexterity', description: 'Main stat used by allocation and derived formulas.' },
+  INT: { label: 'Intelligence', description: 'Main stat used by allocation and derived formulas.' },
+  LCK: { label: 'Luck', description: 'Main stat used by allocation and derived formulas.' },
 }
 
-function computeTotalStats(
+function resolveMainStatRows(pack: IdleRpgPackV1): Array<{ id: string; label: string; description: string }> {
+  const configured = (pack.mainStats ?? [])
+    .map((s) => ({ id: s.id, label: s.name || s.id, description: s.description || 'Main stat.' }))
+    .filter((s) => !!s.id)
+  if (configured.length > 0) return configured
+  return ['STR', 'DEX', 'INT', 'LCK'].map((id) => ({
+    id,
+    label: DEFAULT_MAIN_STAT_INFO[id]?.label ?? id,
+    description: DEFAULT_MAIN_STAT_INFO[id]?.description ?? 'Main stat.',
+  }))
+}
+
+function computeMainStatTotals(
   character: CharacterState,
   pack: IdleRpgPackV1,
-): Record<StatId, number> {
+): Record<string, number> {
   const cls = pack.classes.find((c) => c.id === character.classId)
-  const base: Record<StatId, number> = { STR: 0, DEX: 0, INT: 0, LCK: 0, HP: 0, ARM: 0 }
+  const rows = resolveMainStatRows(pack)
+  const statIds = new Set(rows.map((r) => r.id))
+  const base: Record<string, number> = {}
 
+  for (const [k, v] of Object.entries(cls?.starting?.mainStats ?? {})) {
+    base[k] = (base[k] ?? 0) + (v ?? 0)
+  }
   if (cls?.starting?.stats) {
-    for (const [k, v] of Object.entries(cls.starting.stats)) base[k as StatId] = (base[k as StatId] ?? 0) + (v ?? 0)
+    for (const [k, v] of Object.entries(cls.starting.stats)) {
+      if (!statIds.has(k)) continue
+      base[k] = (base[k] ?? 0) + (v ?? 0)
+    }
   }
   const itemMap = new Map(pack.items.map((it) => [it.id, it]))
   for (const itemId of Object.values(character.equipment)) {
     if (!itemId) continue
     const item = itemMap.get(itemId)
-    if (!item?.stats) continue
-    for (const [k, v] of Object.entries(item.stats)) base[k as StatId] = (base[k as StatId] ?? 0) + (v ?? 0)
+    if (!item) continue
+    for (const [k, v] of Object.entries(item.mainStatBonuses ?? {})) {
+      base[k] = (base[k] ?? 0) + (v ?? 0)
+    }
+    for (const [k, v] of Object.entries(item.stats ?? {})) {
+      if (!statIds.has(k)) continue
+      base[k] = (base[k] ?? 0) + (v ?? 0)
+    }
   }
   for (const [k, v] of Object.entries(character.allocatedStats ?? {})) {
-    base[k as StatId] = (base[k as StatId] ?? 0) + (v ?? 0)
+    if (!statIds.has(k)) continue
+    base[k] = (base[k] ?? 0) + (v ?? 0)
   }
   return base
 }
@@ -162,9 +184,10 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
   const [unequipping, setUnequipping] = useState<string | null>(null)
 
   const cls = pack.classes.find((c) => c.id === character.classId)
-  const mainStat = cls?.scaling?.damageMainStat ?? 'STR'
   const itemMap = new Map(pack.items.map((it) => [it.id, it]))
-  const totalStats = computeTotalStats(character, pack)
+  const totalStats = computeMainStatTotals(character, pack)
+  const mainStatRows = resolveMainStatRows(pack)
+  const combatStats = computePlayerCombatStats(character, pack)
 
   const xpTable = pack.rules.xpTable ?? {}
   const maxLevel = pack.rules.maxLevel ?? 10
@@ -173,7 +196,7 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
   const equippedDefense = character.equipment.defense_layer ? itemMap.get(character.equipment.defense_layer) : undefined
   const primaryCurrency = pack.economy.currencies[0]
 
-  const handleAllocate = async (stat: StatId) => {
+  const handleAllocate = async (stat: string) => {
     if (allocating || (character.statPoints ?? 0) <= 0) return
     setAllocating(stat)
     try {
@@ -195,9 +218,8 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
     }
   }
 
-  const baseHp = 50 + character.level * 10 + (totalStats.HP ?? 0)
-  const baseAp = character.level * 2 + (totalStats[mainStat as StatId] ?? 0)
-  const baseArm = totalStats.ARM ?? 0
+  const baseHp = combatStats.maxHp
+  const baseArm = combatStats.arm
 
   const resourceDef = cls?.resourceId
     ? (pack.resources ?? []).find((r) => r.id === cls.resourceId) ?? null
@@ -319,20 +341,6 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
             }}
           />
         </Tooltip>
-        <Tooltip title="Attack power (damage per hit)" arrow>
-          <Chip
-            label={`AP ${Math.max(1, baseAp)}`}
-            size="small"
-            sx={{
-              fontWeight: 700,
-              fontSize: 13,
-              height: 28,
-              bgcolor: 'rgba(245,158,11,0.12)',
-              color: '#fbbf24',
-              border: '1px solid rgba(245,158,11,0.3)',
-            }}
-          />
-        </Tooltip>
         <Tooltip title="Armor (damage reduction)" arrow>
           <Chip
             label={`ARM ${Math.max(0, baseArm)}`}
@@ -369,11 +377,10 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
 
       {/* Stat rows */}
       <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-        {STAT_ORDER.map((stat) => {
-          const info = STAT_INFO[stat]
+        {mainStatRows.map((row) => {
+          const stat = row.id
           const total = totalStats[stat] ?? 0
           const allocated = (character.allocatedStats ?? {})[stat] ?? 0
-          const isMainStat = stat === mainStat
           const canAllocate = (character.statPoints ?? 0) > 0
           return (
             <Box
@@ -385,22 +392,18 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
                 px: 1,
                 py: 0.5,
                 borderRadius: 1.5,
-                bgcolor: isMainStat ? 'rgba(245,158,11,0.08)' : 'transparent',
-                border: isMainStat ? '1px solid rgba(245,158,11,0.15)' : '1px solid transparent',
+                border: '1px solid transparent',
               }}
             >
-              <Tooltip title={info.description} arrow placement="left">
+              <Tooltip title={row.description} arrow placement="left">
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, cursor: 'help' }}>
                   <Typography
                     variant="body2"
-                    fontWeight={isMainStat ? 800 : 500}
-                    sx={{ width: 36, color: isMainStat ? '#fbbf24' : 'text.primary', fontSize: '0.9rem' }}
+                    fontWeight={500}
+                    sx={{ width: 52, color: 'text.primary', fontSize: '0.9rem' }}
                   >
                     {stat}
                   </Typography>
-                  {isMainStat && (
-                    <Typography variant="caption" sx={{ color: '#fbbf24', fontSize: 12 }}>★</Typography>
-                  )}
                 </Box>
               </Tooltip>
               <Typography variant="body1" fontWeight={700} sx={{ width: 32, textAlign: 'right' }}>
@@ -413,7 +416,7 @@ export default function CharacterPanel({ fableId, realmId, character, pack, onCh
               )}
               <Box sx={{ width: 32, display: 'flex', justifyContent: 'center' }}>
                 {!readOnly && canAllocate && (
-                  <Tooltip title={`Spend 1 point on ${info.label}`} arrow>
+                  <Tooltip title={`Spend 1 point on ${row.label}`} arrow>
                     <span>
                       <IconButton
                         size="small"

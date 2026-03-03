@@ -22,7 +22,6 @@ export type ExampleClassForm = {
   name: string
   description: string
   iconUrl: string
-  damageMainStat: string
   primaryAttackAbilityId: string
   attackTags: string
   attackRequired: boolean
@@ -131,7 +130,6 @@ const classes: ExampleClassForm[] = [
     name: 'Warlord',
     description: 'Tank/DPS Hybrid. High HP multiplier. Uses Flails.',
     iconUrl: '',
-    damageMainStat: 'STR',
     primaryAttackAbilityId: 'warlord_slam',
     attackTags: 'weapon:flail',
     attackRequired: true,
@@ -147,7 +145,6 @@ const classes: ExampleClassForm[] = [
     name: 'Sorcerer',
     description: 'Glass Cannon. Low HP, ignores Armor. Uses Staffs.',
     iconUrl: '',
-    damageMainStat: 'INT',
     primaryAttackAbilityId: 'sorcerer_bolt',
     attackTags: 'weapon:staff,weapon:wand',
     attackRequired: true,
@@ -163,7 +160,6 @@ const classes: ExampleClassForm[] = [
     name: 'Hunter',
     description: 'Evasion Tank. Avoids damage rather than mitigating it.',
     iconUrl: '',
-    damageMainStat: 'DEX',
     primaryAttackAbilityId: 'hunter_shot',
     attackTags: 'weapon:bow,weapon:dagger',
     attackRequired: true,
