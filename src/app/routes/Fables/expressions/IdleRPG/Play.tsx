@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import Badge from '@mui/material/Badge'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
@@ -30,10 +31,13 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
 import LockIcon from '@mui/icons-material/Lock'
+import MailOutlineIcon from '@mui/icons-material/MailOutline'
 import StarIcon from '@mui/icons-material/Star'
 import IconButton from '@mui/material/IconButton'
 import {
   getIdleRpgRealms,
+  getMailbox,
+  markMailboxMailRead,
   getMyCharacters,
   getPlayState,
   createCharacter,
@@ -42,6 +46,7 @@ import {
 import type {
   CharacterState,
   IdleRpgPackV1,
+  MailboxMail,
   IdleRpgRealm,
   PlayStateResponse,
 } from '@features/idle-rpg/api'
@@ -53,6 +58,7 @@ import PvPTab from './tabs/PvPTab'
 import DungeonsTab from './tabs/DungeonsTab'
 import RaidsTab from './tabs/RaidsTab'
 import AbilitiesTab from './tabs/AbilitiesTab'
+import MailboxTab from './tabs/MailboxTab'
 import { computePlayerCombatStats } from './utils/combatStats'
 import charBackground from '../../../../../assets/backgrounds/charBackground.png'
 
@@ -332,7 +338,7 @@ function EquipRow({ label, item, emptyText }: { label: string; item?: { name: st
 
 /* ------------------------------------------------------------------ */
 
-type Tab = 'tavern' | 'shop' | 'abilities' | 'guild' | 'dungeons' | 'raids' | 'pvp'
+type Tab = 'tavern' | 'shop' | 'abilities' | 'guild' | 'dungeons' | 'raids' | 'mailbox' | 'pvp'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'tavern', label: 'Tavern', icon: <LocalBarIcon /> },
@@ -341,6 +347,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'guild', label: 'Guild', icon: <GroupsIcon /> },
   { id: 'dungeons', label: 'Dungeons', icon: <CastleIcon /> },
   { id: 'raids', label: 'Raids', icon: <MilitaryTechIcon /> },
+  { id: 'mailbox', label: 'Mailbox', icon: <MailOutlineIcon /> },
   { id: 'pvp', label: 'PvP', icon: <SportsKabaddiIcon /> },
 ]
 
@@ -356,6 +363,12 @@ export default function FableIdleRPG() {
     targetCharacterId: string
     targetProfile: PlayStateResponse
   } | null>(null)
+  const [mailboxUnreadCount, setMailboxUnreadCount] = useState(0)
+  const [mailAlertQueue, setMailAlertQueue] = useState<MailboxMail[]>([])
+  const [activeMailAlert, setActiveMailAlert] = useState<MailboxMail | null>(null)
+  const [mailAlertActionLoading, setMailAlertActionLoading] = useState(false)
+  const [mailboxAutoOpenMailId, setMailboxAutoOpenMailId] = useState<string | null>(null)
+  const surfacedMailAlertIdsRef = useRef<Set<string>>(new Set())
 
   // Character creation
   const [showCreateChar, setShowCreateChar] = useState(false)
@@ -454,6 +467,66 @@ export default function FableIdleRPG() {
   }
 
   const handleClearPendingPvpFight = () => setPendingPvpFight(null)
+
+  const pollMailbox = useCallback(async () => {
+    if (!fableId || !realm?.id || !displayCharacter?.id) return
+    try {
+      const response = await getMailbox(fableId, realm.id, displayCharacter.id, { limit: 20 })
+      setMailboxUnreadCount(response.unreadCount)
+      const unreadAlerts = response.mails
+        .filter((mail) => !mail.isRead && (mail.alertKind === 'pvp_defense' || mail.alertKind === 'raid_finished'))
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      const unseenAlerts = unreadAlerts.filter((mail) => !surfacedMailAlertIdsRef.current.has(mail.id))
+      if (unseenAlerts.length > 0) {
+        unseenAlerts.forEach((mail) => surfacedMailAlertIdsRef.current.add(mail.id))
+        setMailAlertQueue((prev) => {
+          const existingIds = new Set(prev.map((mail) => mail.id))
+          const additions = unseenAlerts.filter((mail) => !existingIds.has(mail.id))
+          return additions.length > 0 ? [...prev, ...additions] : prev
+        })
+      }
+    } catch {
+      // mailbox polling should never break gameplay tabs
+    }
+  }, [displayCharacter?.id, fableId, realm?.id])
+
+  useEffect(() => {
+    if (!fableId || !realm?.id || !displayCharacter?.id) return
+    surfacedMailAlertIdsRef.current.clear()
+    setMailAlertQueue([])
+    setActiveMailAlert(null)
+    setMailboxUnreadCount(0)
+    void pollMailbox()
+    const intervalId = window.setInterval(() => {
+      void pollMailbox()
+    }, 10000)
+    return () => window.clearInterval(intervalId)
+  }, [displayCharacter?.id, fableId, pollMailbox, realm?.id])
+
+  useEffect(() => {
+    if (activeMailAlert || mailAlertQueue.length === 0) return
+    setActiveMailAlert(mailAlertQueue[0])
+    setMailAlertQueue((prev) => prev.slice(1))
+  }, [activeMailAlert, mailAlertQueue])
+
+  const handleMailAlertAction = useCallback(async (watchReplay: boolean) => {
+    if (!activeMailAlert || !fableId || !realm?.id || !displayCharacter?.id || mailAlertActionLoading) return
+    const selectedMail = activeMailAlert
+    setMailAlertActionLoading(true)
+    try {
+      await markMailboxMailRead(fableId, realm.id, displayCharacter.id, selectedMail.id)
+      if (watchReplay) {
+        setMailboxAutoOpenMailId(selectedMail.id)
+        setActiveTab('mailbox')
+      }
+    } catch {
+      // keep flow smooth even if read action fails
+    } finally {
+      setMailAlertActionLoading(false)
+      setActiveMailAlert(null)
+      void pollMailbox()
+    }
+  }, [activeMailAlert, displayCharacter?.id, fableId, mailAlertActionLoading, pollMailbox, realm?.id])
 
   if (!fableId) {
     return (
@@ -621,6 +694,36 @@ export default function FableIdleRPG() {
         </DialogActions>
       </Dialog>
 
+      <Dialog
+        open={!!activeMailAlert}
+        onClose={() => { void handleMailAlertAction(false) }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          {activeMailAlert?.alertKind === 'pvp_defense' ? 'You were attacked!' : 'Raid battle finished!'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            {activeMailAlert?.alertKind === 'pvp_defense'
+              ? 'A PvP battle report is waiting in your mailbox.'
+              : 'A raid battle report is waiting in your mailbox.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { void handleMailAlertAction(false) }} disabled={mailAlertActionLoading}>
+            Close
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => { void handleMailAlertAction(true) }}
+            disabled={mailAlertActionLoading || !activeMailAlert?.hasReplay}
+          >
+            Watch
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Left sidebar */}
       <Box
         sx={{
@@ -637,6 +740,16 @@ export default function FableIdleRPG() {
         <List sx={{ flex: 1, pt: 2, px: 1 }}>
           {TABS.map((tab) => {
             const isRaidsNoGuild = tab.id === 'raids' && !displayCharacter?.groupId
+            const isMailbox = tab.id === 'mailbox'
+            const iconNode = isMailbox && mailboxUnreadCount > 0 ? (
+              <Badge
+                color="error"
+                badgeContent={mailboxUnreadCount > 99 ? '99+' : mailboxUnreadCount}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+              >
+                {tab.icon}
+              </Badge>
+            ) : tab.icon
             return (
             <Tooltip key={tab.id} title={isRaidsNoGuild ? 'A guild is required' : ''}>
               <span>
@@ -647,7 +760,7 @@ export default function FableIdleRPG() {
               sx={{ mb: 0.5, py: 1.5 }}
             >
               <ListItemIcon sx={{ minWidth: 42, color: activeTab === tab.id ? 'primary.main' : 'text.secondary' }}>
-                {tab.icon}
+                {iconNode}
               </ListItemIcon>
               <ListItemText
                 primary={tab.label}
@@ -724,6 +837,17 @@ export default function FableIdleRPG() {
                 pack={pack}
                 groupId={displayCharacter.groupId}
                 onCharacterUpdate={handleCharacterUpdate}
+              />
+            )}
+            {activeTab === 'mailbox' && displayCharacter && realm && pack && (
+              <MailboxTab
+                fableId={fableId}
+                realmId={realm.id}
+                character={displayCharacter}
+                pack={pack}
+                autoOpenMailId={mailboxAutoOpenMailId}
+                onAutoOpenHandled={() => setMailboxAutoOpenMailId(null)}
+                onMailboxChanged={() => { void pollMailbox() }}
               />
             )}
             {activeTab === 'pvp' && displayCharacter && realm && pack && (

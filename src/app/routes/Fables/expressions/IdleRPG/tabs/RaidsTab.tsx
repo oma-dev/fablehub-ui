@@ -11,13 +11,11 @@ import {
   getRaids,
   getGroup,
   prepareRaidCall,
-  markRaidReplayViewed,
 } from '@features/idle-rpg/api'
 import type {
   CharacterState,
   IdleRpgGroup,
   IdleRpgPackV1,
-  RaidReplayPayload,
   RaidWithBoss,
 } from '@features/idle-rpg/api'
 import RaidReplayView from '../components/RaidReplayView'
@@ -33,8 +31,7 @@ interface Props {
 
 export default function RaidsTab({ fableId, realmId, character, pack, groupId, onCharacterUpdate: _onCharacterUpdate }: Props) {
   const [raids, setRaids] = useState<RaidWithBoss[]>([])
-  const [pendingReplay, setPendingReplay] = useState<RaidReplayPayload | null>(null)
-  const [watchingReplay, setWatchingReplay] = useState<RaidReplayPayload | null>(null)
+  const [watchingReplay, setWatchingReplay] = useState<IdleRpgGroup['lastRaidCombatResult'] | null>(null)
   const [group, setGroup] = useState<IdleRpgGroup | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -56,7 +53,6 @@ export default function RaidsTab({ fableId, realmId, character, pack, groupId, o
       .then(([raidsRes, g]) => {
         if (!cancelled) {
           setRaids(raidsRes.raids ?? [])
-          setPendingReplay(raidsRes.pendingReplay ?? null)
           setGroup(g)
         }
       })
@@ -84,26 +80,14 @@ export default function RaidsTab({ fableId, realmId, character, pack, groupId, o
     }
   }
 
-  const handleReplayDone = async () => {
-    await markRaidReplayViewed(fableId, realmId, groupId, { characterId: character.id })
-    setPendingReplay(null)
-    const raidsRes = await getRaids(fableId, realmId, character.id)
-    setRaids(raidsRes.raids ?? [])
-  }
-
-  const activeReplay = pendingReplay ?? watchingReplay
-  if (activeReplay) {
+  if (watchingReplay) {
     return (
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <RaidReplayView
-          replay={activeReplay}
+          replay={watchingReplay}
           group={group}
           pack={pack}
-          onDone={
-            pendingReplay
-              ? handleReplayDone
-              : () => setWatchingReplay(null)
-          }
+          onDone={() => setWatchingReplay(null)}
         />
       </Box>
     )

@@ -1,4 +1,4 @@
-import { get, post, patch } from './webclient'
+import { get, post, patch, del } from './webclient'
 
 // --- Types (aligned with backend) ---
 
@@ -584,6 +584,76 @@ export interface RaidReplayPayload {
   victory: boolean
   partyMaxHp?: Record<string, number>
   bossMaxHp?: number
+  partyMembers?: { id: string; name: string; level: number; classId: string; portraitUrl?: string | null }[]
+  initiatorCharacterId?: string
+}
+
+export type MailKind = 'pvp' | 'dungeon' | 'raid'
+export type MailAlertKind = 'pvp_defense' | 'raid_finished'
+
+export interface ReplayCombatantSnapshot {
+  id: string
+  name: string
+  level: number
+  maxHp: number
+  ap: number
+  arm: number
+  classId?: string
+  creatureId?: string
+  portraitUrl?: string | null
+  weaponItemId?: string | null
+}
+
+export interface PvpMailReplayPayload {
+  kind: 'pvp'
+  combat: CombatResult
+  challengerId: string
+  targetId: string
+  participants: ReplayCombatantSnapshot[]
+}
+
+export interface DungeonMailReplayPayload {
+  kind: 'dungeon'
+  combat: CombatResult
+  dungeonId: string
+  dungeonName: string
+  victory: boolean
+  player: ReplayCombatantSnapshot
+  boss: ReplayCombatantSnapshot
+  bossBackgroundImageUrl?: string
+}
+
+export interface RaidMailReplayPayload extends RaidReplayPayload {
+  kind: 'raid'
+  partyMembers: { id: string; name: string; level: number; classId: string; portraitUrl?: string | null }[]
+  initiatorCharacterId: string
+}
+
+export type MailReplayPayload = PvpMailReplayPayload | DungeonMailReplayPayload | RaidMailReplayPayload
+
+export interface MailboxMail {
+  id: string
+  sender: string
+  subject: string
+  message: string
+  kind: MailKind
+  alertKind?: MailAlertKind
+  hasReplay: boolean
+  replayId?: string
+  createdAt: string
+  readAt?: string
+  isRead: boolean
+}
+
+export interface MailboxListResponse {
+  mails: MailboxMail[]
+  unreadCount: number
+  nextCursor?: string
+}
+
+export interface MailboxReplayResponse {
+  mail: MailboxMail
+  replay: MailReplayPayload | null
 }
 
 export interface MerchantListing {
@@ -835,6 +905,52 @@ export function getRaids(fableId: string, realmId: string, characterId: string) 
   )
 }
 
+export function getMailbox(
+  fableId: string,
+  realmId: string,
+  characterId: string,
+  options?: { limit?: number; cursor?: string },
+) {
+  const query = new URLSearchParams()
+  if (options?.limit != null) query.set('limit', String(options.limit))
+  if (options?.cursor) query.set('cursor', options.cursor)
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  return get<MailboxListResponse>(`${charBase(fableId, realmId)}/${characterId}/mailbox${suffix}`)
+}
+
+export function getMailboxReplay(
+  fableId: string,
+  realmId: string,
+  characterId: string,
+  mailId: string,
+) {
+  return get<MailboxReplayResponse>(
+    `${charBase(fableId, realmId)}/${characterId}/mailbox/${encodeURIComponent(mailId)}/replay`,
+  )
+}
+
+export function markMailboxMailRead(
+  fableId: string,
+  realmId: string,
+  characterId: string,
+  mailId: string,
+) {
+  return post<{ ok: boolean }>(
+    `${charBase(fableId, realmId)}/${characterId}/mailbox/${encodeURIComponent(mailId)}/read`,
+  )
+}
+
+export function deleteMailboxMail(
+  fableId: string,
+  realmId: string,
+  characterId: string,
+  mailId: string,
+) {
+  return del<{ ok: boolean }>(
+    `${charBase(fableId, realmId)}/${characterId}/mailbox/${encodeURIComponent(mailId)}`,
+  )
+}
+
 export function getGuildMemberPlayState(
   fableId: string,
   realmId: string,
@@ -1079,6 +1195,10 @@ export const api = {
     setRaidReady,
     startRaid,
     markRaidReplayViewed,
+    getMailbox,
+    getMailboxReplay,
+    markMailboxMailRead,
+    deleteMailboxMail,
   },
   getRaids,
 }

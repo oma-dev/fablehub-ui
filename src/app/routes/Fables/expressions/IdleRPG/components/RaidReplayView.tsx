@@ -229,8 +229,10 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     return map
   }, [pack.statusEffects])
 
+  const partyMembersFallback = replay.partyMembers ?? []
   const getMember = (id: string): IdleRpgGroupMember | undefined =>
     group?.members?.find((m) => m.id === id)
+    ?? partyMembersFallback.find((m) => m.id === id)
   const getMemberPortrait = (member: IdleRpgGroupMember | undefined): string | null =>
     member
       ? (member.portraitUrl?.trim() || (pack.classes?.find((c) => c.id === member.classId)?.iconUrl ?? null)) ?? null
