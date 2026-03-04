@@ -223,8 +223,12 @@ export default function MailboxTab({
           statusTransforms={statusTransforms}
           playerIntroSoundUrl={leftClass?.introSoundUrl}
           playerIntroSoundVolumePercent={leftClass?.introSoundVolumePercent}
+          playerIntroSoundFadeInMs={leftClass?.introSoundFadeInMs}
+          playerIntroSoundFadeOutMs={leftClass?.introSoundFadeOutMs}
           creatureIntroSoundUrl={rightClass?.introSoundUrl}
           creatureIntroSoundVolumePercent={rightClass?.introSoundVolumePercent}
+          creatureIntroSoundFadeInMs={rightClass?.introSoundFadeInMs}
+          creatureIntroSoundFadeOutMs={rightClass?.introSoundFadeOutMs}
           player={{
             name: left.name,
             level: left.level,
@@ -279,10 +283,16 @@ export default function MailboxTab({
         arenaBackgroundImageUrl={replay.bossBackgroundImageUrl}
         playerIntroSoundUrl={playerClass?.introSoundUrl}
         playerIntroSoundVolumePercent={playerClass?.introSoundVolumePercent}
+        playerIntroSoundFadeInMs={playerClass?.introSoundFadeInMs}
+        playerIntroSoundFadeOutMs={playerClass?.introSoundFadeOutMs}
         creatureIntroSoundUrl={bossTemplate?.introSoundUrl}
         creatureIntroSoundVolumePercent={bossTemplate?.introSoundVolumePercent}
+        creatureIntroSoundFadeInMs={bossTemplate?.introSoundFadeInMs}
+        creatureIntroSoundFadeOutMs={bossTemplate?.introSoundFadeOutMs}
         bossBattleMusicUrl={bossTemplate?.bossBattleMusicUrl}
         bossBattleMusicVolumePercent={bossTemplate?.bossBattleMusicVolumePercent}
+        bossBattleMusicFadeInMs={bossTemplate?.bossBattleMusicFadeInMs}
+        bossBattleMusicFadeOutMs={bossTemplate?.bossBattleMusicFadeOutMs}
         player={{
           name: player.name,
           level: player.level,

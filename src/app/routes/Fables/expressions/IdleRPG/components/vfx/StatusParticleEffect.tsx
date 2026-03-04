@@ -11,6 +11,10 @@ interface Props {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   delayMs?: number
   lifetimeMs?: number
   startSizePx?: number
@@ -30,6 +34,8 @@ export default function StatusParticleEffect({
   url,
   soundUrl,
   soundVolumePercent,
+  soundFadeInMs = 0,
+  soundFadeOutMs = 0,
   delayMs = 0,
   lifetimeMs = 1000,
   startSizePx,
@@ -43,7 +49,7 @@ export default function StatusParticleEffect({
   rotationEnd,
   loop = false,
 }: Props) {
-  useParticleSound(true, soundUrl, soundVolumePercent, id, delayMs)
+  useParticleSound(true, soundUrl, soundVolumePercent, id, delayMs, soundFadeInMs, soundFadeOutMs)
 
   const clampedLifetimeMs = Math.max(100, lifetimeMs)
   const startSize = startSizePx ?? endSizePx ?? DEFAULT_SIZE

@@ -238,8 +238,12 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
               statusTransforms={statusTransforms}
               playerIntroSoundUrl={cls?.introSoundUrl}
               playerIntroSoundVolumePercent={cls?.introSoundVolumePercent}
+              playerIntroSoundFadeInMs={cls?.introSoundFadeInMs}
+              playerIntroSoundFadeOutMs={cls?.introSoundFadeOutMs}
               creatureIntroSoundUrl={targetCls?.introSoundUrl}
               creatureIntroSoundVolumePercent={targetCls?.introSoundVolumePercent}
+              creatureIntroSoundFadeInMs={targetCls?.introSoundFadeInMs}
+              creatureIntroSoundFadeOutMs={targetCls?.introSoundFadeOutMs}
               player={{
                 name: character.name,
                 level: character.level,

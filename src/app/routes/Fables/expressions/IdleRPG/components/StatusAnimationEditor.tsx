@@ -26,6 +26,8 @@ export type StatusParticleForm = {
   url: string
   soundUrl: string
   soundVolumePercent: string
+  soundFadeInMs: string
+  soundFadeOutMs: string
   delayMs: string
   lifetimeMs: string
   startSizePx: string
@@ -46,6 +48,8 @@ export function createEmptyStatusParticle(): StatusParticleForm {
     url: '',
     soundUrl: '',
     soundVolumePercent: '100',
+    soundFadeInMs: '0',
+    soundFadeOutMs: '0',
     delayMs: '0',
     lifetimeMs: '1000',
     startSizePx: '72',
@@ -82,6 +86,8 @@ export function hydrateStatusAnimationParticles(
     url: particle.url ?? '',
     soundUrl: particle.soundUrl ?? '',
     soundVolumePercent: asNumberString(particle.soundVolumePercent, '100'),
+    soundFadeInMs: asNumberString(particle.soundFadeInMs, '0'),
+    soundFadeOutMs: asNumberString(particle.soundFadeOutMs, '0'),
     delayMs: asNumberString(particle.delayMs, '0'),
     lifetimeMs: asNumberString(particle.lifetimeMs, '1000'),
     startSizePx: asNumberString(particle.startSizePx ?? particle.sizePx, '72'),
@@ -121,6 +127,8 @@ export function buildStatusParticleList(particles: StatusParticleForm[]): Status
       if (particle.url.trim()) out.url = particle.url.trim()
       if (particle.soundUrl.trim()) out.soundUrl = particle.soundUrl.trim()
       if (particle.soundUrl.trim()) out.soundVolumePercent = parseSoundVolumePercent(particle.soundVolumePercent)
+      if (particle.soundUrl.trim() && Number(particle.soundFadeInMs) > 0) out.soundFadeInMs = Number(particle.soundFadeInMs)
+      if (particle.soundUrl.trim() && Number(particle.soundFadeOutMs) > 0) out.soundFadeOutMs = Number(particle.soundFadeOutMs)
       const delayMs = parseNumber(particle.delayMs)
       if (delayMs != null) out.delayMs = delayMs
       const lifetimeMs = parseNumber(particle.lifetimeMs)
@@ -223,6 +231,24 @@ export default function StatusAnimationEditor({ particles, onChange, title }: Pr
             onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, soundVolumePercent: e.target.value } : x))}
             sx={{ width: 110 }}
             inputProps={{ min: 0, max: 100 }}
+          />
+          <TextField
+            size="small"
+            label="Snd Fade-in"
+            type="number"
+            value={particle.soundFadeInMs}
+            onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, soundFadeInMs: e.target.value } : x))}
+            sx={{ width: 120 }}
+            inputProps={{ min: 0 }}
+          />
+          <TextField
+            size="small"
+            label="Snd Fade-out"
+            type="number"
+            value={particle.soundFadeOutMs}
+            onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, soundFadeOutMs: e.target.value } : x))}
+            sx={{ width: 120 }}
+            inputProps={{ min: 0 }}
           />
           <TextField size="small" label="Delay (ms)" type="number" value={particle.delayMs} onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, delayMs: e.target.value } : x))} sx={{ width: 110 }} />
           <TextField size="small" label="Lifetime (ms)" type="number" value={particle.lifetimeMs} onChange={(e) => onChange(particles.map((x, i) => i === index ? { ...x, lifetimeMs: e.target.value } : x))} sx={{ width: 120 }} />

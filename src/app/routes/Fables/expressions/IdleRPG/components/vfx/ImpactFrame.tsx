@@ -11,6 +11,10 @@ interface Props {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   /** How long fully visible before starting fade, in ms */
   showMs?: number
   /** Fade-out (vanish) duration in ms */
@@ -45,6 +49,8 @@ export default function ImpactFrame({
   url,
   soundUrl,
   soundVolumePercent,
+  soundFadeInMs = 0,
+  soundFadeOutMs = 0,
   showMs = 100,
   vanishMs = 500,
   sizePx,
@@ -60,7 +66,7 @@ export default function ImpactFrame({
   mirrored = false,
   id,
 }: Props) {
-  useParticleSound(show, soundUrl, soundVolumePercent, id)
+  useParticleSound(show, soundUrl, soundVolumePercent, id, 0, soundFadeInMs, soundFadeOutMs)
 
   const totalSec = showMs / 1000 + vanishMs / 1000
   let fadeStart = showMs / 1000 / totalSec

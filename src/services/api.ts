@@ -62,6 +62,10 @@ export interface AnimationWeaponFrame {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple weapon frames). */
   delayMs?: number
@@ -98,6 +102,10 @@ export interface AnimationProjectileFrame {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple projectiles). */
   delayMs?: number
@@ -131,6 +139,10 @@ export interface AnimationImpactFrame {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple impact frames). */
   delayMs?: number
@@ -169,6 +181,10 @@ export interface AnimationBlockFrame {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   imageSource?: AnimationFrameImageSource
   delayMs?: number
   showMs?: number
@@ -214,6 +230,10 @@ export interface StatusAnimationParticle {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   imageSource?: AnimationFrameImageSource
   delayMs?: number
   lifetimeMs?: number
@@ -248,6 +268,10 @@ export interface StatusTransformConfig {
   soundUrl?: string
   /** Optional transform sound volume percent (0-100). Defaults to 100 when omitted. */
   soundVolumePercent?: number
+  /** Optional transform sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional transform sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   /** Ability ids granted while the transform status is active. */
   grantedAbilityIds?: string[]
 }
@@ -446,6 +470,10 @@ export interface ClassBlock {
   introSoundUrl?: string
   /** Optional intro sound volume in percent (0-100). Default 100. */
   introSoundVolumePercent?: number
+  /** Optional intro sound fade-in duration in ms. */
+  introSoundFadeInMs?: number
+  /** Optional intro sound fade-out duration in ms. */
+  introSoundFadeOutMs?: number
   /** When true, only one character per realm may pick this class. */
   isHeroClass?: boolean
   scaling?: { damageMainStat?: string; secondaryBenefits?: Record<string, string[]> }
@@ -481,12 +509,20 @@ export interface CreatureTemplate {
   introSoundUrl?: string
   /** Optional intro sound volume in percent (0-100). Default 100. */
   introSoundVolumePercent?: number
+  /** Optional intro sound fade-in duration in ms. */
+  introSoundFadeInMs?: number
+  /** Optional intro sound fade-out duration in ms. */
+  introSoundFadeOutMs?: number
   /** Optional combat replay background image URL (typically used by bosses). */
   backgroundImageUrl?: string
   /** Optional looping boss battle music URL used during boss combat replay. */
   bossBattleMusicUrl?: string
   /** Optional boss music volume in percent (0-100). Default 100. */
   bossBattleMusicVolumePercent?: number
+  /** Optional boss music fade-in duration in ms. */
+  bossBattleMusicFadeInMs?: number
+  /** Optional boss music fade-out duration in ms. */
+  bossBattleMusicFadeOutMs?: number
   tags?: string[]
   abilityIds?: string[]
   resourceId?: string

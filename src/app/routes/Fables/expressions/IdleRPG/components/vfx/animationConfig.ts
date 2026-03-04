@@ -13,6 +13,10 @@ export interface AnimationWeaponFrame {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple weapon frames). */
   delayMs?: number
@@ -52,6 +56,10 @@ export interface AnimationProjectileFrame {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple projectiles). */
   delayMs?: number
@@ -85,6 +93,10 @@ export interface AnimationImpactFrame {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   imageSource?: AnimationFrameImageSource
   /** Delay in ms before this frame starts (allows staggering multiple impact frames). */
   delayMs?: number
@@ -126,6 +138,10 @@ export interface AnimationBlockFrame {
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
   soundVolumePercent?: number
+  /** Optional sound fade-in duration in ms. */
+  soundFadeInMs?: number
+  /** Optional sound fade-out duration in ms. */
+  soundFadeOutMs?: number
   imageSource?: AnimationFrameImageSource
   delayMs?: number
   showMs?: number

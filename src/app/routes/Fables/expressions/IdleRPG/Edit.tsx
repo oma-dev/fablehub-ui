@@ -66,6 +66,11 @@ function parseSoundVolumePercent(input: string): number {
   if (Number.isNaN(value)) return 100
   return Math.min(100, Math.max(0, value))
 }
+function parseNonNegativeMilliseconds(input: string): number {
+  const value = Number(input)
+  if (Number.isNaN(value)) return 0
+  return Math.max(0, value)
+}
 function serializeKeyValueNumber(obj: Record<string, number> | undefined): string {
   if (!obj) return ''
   return Object.entries(obj).map(([k, v]) => `${k}:${v}`).join(', ')
@@ -137,11 +142,13 @@ type StatusEffectForm = {
   transformSwapPortraitDelayMs: string
   transformSoundUrl: string
   transformSoundVolumePercent: string
+  transformSoundFadeInMs: string
+  transformSoundFadeOutMs: string
   transformGrantedAbilityIds: string
   transformPreParticles: StatusParticleForm[]
 }
 type ClassForm = {
-  id: string; name: string; description: string; iconUrl: string; introSoundUrl: string; introSoundVolumePercent: string; isHeroClass: boolean
+  id: string; name: string; description: string; iconUrl: string; introSoundUrl: string; introSoundVolumePercent: string; introSoundFadeInMs: string; introSoundFadeOutMs: string; isHeroClass: boolean
   primaryAttackAbilityId: string
   attackTags: string; attackRequired: boolean; attackAllowEmpty: boolean
   defenseTags: string; defenseRequired: boolean; defenseAllowEmpty: boolean
@@ -150,7 +157,7 @@ type ClassForm = {
 }
 type CreatureForm = {
   id: string; name: string; role: 'quest' | 'boss'; level: string; hp: string; ap: string; arm: string
-  iconUrl: string; introSoundUrl: string; introSoundVolumePercent: string; backgroundImageUrl: string; bossBattleMusicUrl: string; bossBattleMusicVolumePercent: string; tags: string; abilityIds: string; resourceId: string; resourceMax: string
+  iconUrl: string; introSoundUrl: string; introSoundVolumePercent: string; introSoundFadeInMs: string; introSoundFadeOutMs: string; backgroundImageUrl: string; bossBattleMusicUrl: string; bossBattleMusicVolumePercent: string; bossBattleMusicFadeInMs: string; bossBattleMusicFadeOutMs: string; tags: string; abilityIds: string; resourceId: string; resourceMax: string
   mainStats: MainStatValueForm[]; weaponDamage: string; protectiveArmor: string; derivedStatModifiers: DerivedModifierForm[]
 }
 type ItemForm = {
@@ -187,11 +194,13 @@ const emptyStatusEffect = (): StatusEffectForm => ({
   transformSwapPortraitDelayMs: '0',
   transformSoundUrl: '',
   transformSoundVolumePercent: '100',
+  transformSoundFadeInMs: '0',
+  transformSoundFadeOutMs: '0',
   transformGrantedAbilityIds: '',
   transformPreParticles: [],
 })
 const emptyClass = (): ClassForm => ({
-  id: '', name: '', description: '', iconUrl: '', introSoundUrl: '', introSoundVolumePercent: '100', isHeroClass: false,
+  id: '', name: '', description: '', iconUrl: '', introSoundUrl: '', introSoundVolumePercent: '100', introSoundFadeInMs: '0', introSoundFadeOutMs: '0', isHeroClass: false,
   primaryAttackAbilityId: '',
   attackTags: '', attackRequired: true, attackAllowEmpty: false,
   defenseTags: '', defenseRequired: false, defenseAllowEmpty: true,
@@ -200,7 +209,7 @@ const emptyClass = (): ClassForm => ({
 })
 const emptyCreature = (): CreatureForm => ({
   id: '', name: '', role: 'quest', level: '1', hp: '10', ap: '2', arm: '0',
-  iconUrl: '', introSoundUrl: '', introSoundVolumePercent: '100', backgroundImageUrl: '', bossBattleMusicUrl: '', bossBattleMusicVolumePercent: '100', tags: '', abilityIds: '', resourceId: '', resourceMax: '',
+  iconUrl: '', introSoundUrl: '', introSoundVolumePercent: '100', introSoundFadeInMs: '0', introSoundFadeOutMs: '0', backgroundImageUrl: '', bossBattleMusicUrl: '', bossBattleMusicVolumePercent: '100', bossBattleMusicFadeInMs: '0', bossBattleMusicFadeOutMs: '0', tags: '', abilityIds: '', resourceId: '', resourceMax: '',
   mainStats: [], weaponDamage: '', protectiveArmor: '', derivedStatModifiers: [],
 })
 const emptyItem = (): ItemForm => ({
@@ -367,6 +376,8 @@ function hydrateStatusEffects(pack: IdleRpgPackV1, fallbackMainStatId: string): 
     transformSwapPortraitDelayMs: String(s.transform?.swapPortraitDelayMs ?? 0),
     transformSoundUrl: s.transform?.soundUrl ?? '',
     transformSoundVolumePercent: String(s.transform?.soundVolumePercent ?? 100),
+    transformSoundFadeInMs: String(s.transform?.soundFadeInMs ?? 0),
+    transformSoundFadeOutMs: String(s.transform?.soundFadeOutMs ?? 0),
     transformGrantedAbilityIds: (s.transform?.grantedAbilityIds ?? []).join(', '),
     transformPreParticles: hydrateStatusAnimationParticles(s.animation, 'preTransformParticles', false),
   }))
@@ -381,6 +392,8 @@ function hydrateClasses(pack: IdleRpgPackV1, allowedMainStatIds: string[], fallb
       iconUrl: c.iconUrl ?? '',
       introSoundUrl: c.introSoundUrl ?? '',
       introSoundVolumePercent: String((c as any).introSoundVolumePercent ?? 100),
+      introSoundFadeInMs: String((c as any).introSoundFadeInMs ?? 0),
+      introSoundFadeOutMs: String((c as any).introSoundFadeOutMs ?? 0),
       isHeroClass: c.isHeroClass ?? false,
       primaryAttackAbilityId: c.primaryAttackId ?? '',
       attackTags: c.slots?.attack_source?.allowedTagsAny?.join(', ') ?? '',
@@ -410,9 +423,13 @@ function hydrateCreatures(pack: IdleRpgPackV1, allowedMainStatIds: string[], fal
     iconUrl: c.iconUrl ?? '',
     introSoundUrl: c.introSoundUrl ?? '',
     introSoundVolumePercent: String((c as any).introSoundVolumePercent ?? 100),
+    introSoundFadeInMs: String((c as any).introSoundFadeInMs ?? 0),
+    introSoundFadeOutMs: String((c as any).introSoundFadeOutMs ?? 0),
     backgroundImageUrl: c.backgroundImageUrl ?? '',
     bossBattleMusicUrl: c.bossBattleMusicUrl ?? '',
     bossBattleMusicVolumePercent: String((c as any).bossBattleMusicVolumePercent ?? 100),
+    bossBattleMusicFadeInMs: String((c as any).bossBattleMusicFadeInMs ?? 0),
+    bossBattleMusicFadeOutMs: String((c as any).bossBattleMusicFadeOutMs ?? 0),
     tags: c.tags?.join(', ') ?? '',
     abilityIds: (c as any).abilityIds?.join(', ') ?? '',
     resourceId: (c as any).resourceId ?? '',
@@ -656,6 +673,8 @@ export default function IdleRpgEdit() {
           ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
           ...(c.introSoundUrl.trim() ? { introSoundUrl: c.introSoundUrl.trim() } : {}),
           ...(c.introSoundUrl.trim() ? { introSoundVolumePercent: parseSoundVolumePercent(c.introSoundVolumePercent) } : {}),
+          ...(c.introSoundUrl.trim() && parseNonNegativeMilliseconds(c.introSoundFadeInMs) > 0 ? { introSoundFadeInMs: parseNonNegativeMilliseconds(c.introSoundFadeInMs) } : {}),
+          ...(c.introSoundUrl.trim() && parseNonNegativeMilliseconds(c.introSoundFadeOutMs) > 0 ? { introSoundFadeOutMs: parseNonNegativeMilliseconds(c.introSoundFadeOutMs) } : {}),
           ...(c.isHeroClass ? { isHeroClass: true } : {}),
           primaryAttackId: c.primaryAttackAbilityId.trim() || '',
           slots: {
@@ -706,9 +725,13 @@ export default function IdleRpgEdit() {
           ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
           ...(c.introSoundUrl.trim() ? { introSoundUrl: c.introSoundUrl.trim() } : {}),
           ...(c.introSoundUrl.trim() ? { introSoundVolumePercent: parseSoundVolumePercent(c.introSoundVolumePercent) } : {}),
+          ...(c.introSoundUrl.trim() && parseNonNegativeMilliseconds(c.introSoundFadeInMs) > 0 ? { introSoundFadeInMs: parseNonNegativeMilliseconds(c.introSoundFadeInMs) } : {}),
+          ...(c.introSoundUrl.trim() && parseNonNegativeMilliseconds(c.introSoundFadeOutMs) > 0 ? { introSoundFadeOutMs: parseNonNegativeMilliseconds(c.introSoundFadeOutMs) } : {}),
           ...(c.backgroundImageUrl.trim() ? { backgroundImageUrl: c.backgroundImageUrl.trim() } : {}),
           ...(c.bossBattleMusicUrl.trim() ? { bossBattleMusicUrl: c.bossBattleMusicUrl.trim() } : {}),
           ...(c.bossBattleMusicUrl.trim() ? { bossBattleMusicVolumePercent: parseSoundVolumePercent(c.bossBattleMusicVolumePercent) } : {}),
+          ...(c.bossBattleMusicUrl.trim() && parseNonNegativeMilliseconds(c.bossBattleMusicFadeInMs) > 0 ? { bossBattleMusicFadeInMs: parseNonNegativeMilliseconds(c.bossBattleMusicFadeInMs) } : {}),
+          ...(c.bossBattleMusicUrl.trim() && parseNonNegativeMilliseconds(c.bossBattleMusicFadeOutMs) > 0 ? { bossBattleMusicFadeOutMs: parseNonNegativeMilliseconds(c.bossBattleMusicFadeOutMs) } : {}),
           ...(c.tags.trim() ? { tags: parseTags(c.tags) } : {}),
           ...(c.abilityIds.trim() ? { abilityIds: parseTags(c.abilityIds) } : {}),
           ...(c.resourceId.trim() ? { resourceId: c.resourceId.trim() } : {}),
@@ -839,6 +862,8 @@ export default function IdleRpgEdit() {
               ...(transformSoundUrl ? {
                 soundUrl: transformSoundUrl,
                 soundVolumePercent: parseSoundVolumePercent(s.transformSoundVolumePercent),
+                ...(parseNonNegativeMilliseconds(s.transformSoundFadeInMs) > 0 ? { soundFadeInMs: parseNonNegativeMilliseconds(s.transformSoundFadeInMs) } : {}),
+                ...(parseNonNegativeMilliseconds(s.transformSoundFadeOutMs) > 0 ? { soundFadeOutMs: parseNonNegativeMilliseconds(s.transformSoundFadeOutMs) } : {}),
               } : {}),
               ...(transformGrantedAbilityIds.length > 0 ? { grantedAbilityIds: transformGrantedAbilityIds } : {}),
             },
@@ -1308,6 +1333,24 @@ export default function IdleRpgEdit() {
                     />
                     <TextField
                       size="small"
+                      label="Transform Fade-in (ms)"
+                      type="number"
+                      value={s.transformSoundFadeInMs}
+                      onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformSoundFadeInMs: e.target.value } : x))}
+                      sx={{ width: 170 }}
+                      inputProps={{ min: 0, step: 1 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Transform Fade-out (ms)"
+                      type="number"
+                      value={s.transformSoundFadeOutMs}
+                      onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformSoundFadeOutMs: e.target.value } : x))}
+                      sx={{ width: 170 }}
+                      inputProps={{ min: 0, step: 1 }}
+                    />
+                    <TextField
+                      size="small"
                       label="Granted Ability IDs (comma)"
                       value={s.transformGrantedAbilityIds}
                       onChange={(e) => setStatusEffects((p) => p.map((x, j) => j === i ? { ...x, transformGrantedAbilityIds: e.target.value } : x))}
@@ -1359,6 +1402,24 @@ export default function IdleRpgEdit() {
                       onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, introSoundVolumePercent: e.target.value } : x))}
                       sx={{ width: 130 }}
                       inputProps={{ min: 0, max: 100 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Intro Fade-in (ms)"
+                      type="number"
+                      value={c.introSoundFadeInMs}
+                      onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, introSoundFadeInMs: e.target.value } : x))}
+                      sx={{ width: 140 }}
+                      inputProps={{ min: 0, step: 1 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Intro Fade-out (ms)"
+                      type="number"
+                      value={c.introSoundFadeOutMs}
+                      onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, introSoundFadeOutMs: e.target.value } : x))}
+                      sx={{ width: 140 }}
+                      inputProps={{ min: 0, step: 1 }}
                     />
                     <FormControlLabel control={<Checkbox size="small" checked={c.isHeroClass} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, isHeroClass: e.target.checked } : x))} />} label={<Typography variant="body2" sx={{ color: c.isHeroClass ? '#ffc145' : 'text.secondary', fontWeight: c.isHeroClass ? 700 : 400 }}>Hero Class</Typography>} />
                   </Box>
@@ -1483,6 +1544,24 @@ export default function IdleRpgEdit() {
                     sx={{ width: 130 }}
                     inputProps={{ min: 0, max: 100 }}
                   />
+                  <TextField
+                    size="small"
+                    label="Intro Fade-in (ms)"
+                    type="number"
+                    value={c.introSoundFadeInMs}
+                    onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, introSoundFadeInMs: e.target.value } : x))}
+                    sx={{ width: 140 }}
+                    inputProps={{ min: 0, step: 1 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Intro Fade-out (ms)"
+                    type="number"
+                    value={c.introSoundFadeOutMs}
+                    onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, introSoundFadeOutMs: e.target.value } : x))}
+                    sx={{ width: 140 }}
+                    inputProps={{ min: 0, step: 1 }}
+                  />
                   <TextField size="small" label="Boss Bg URL" value={c.backgroundImageUrl} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, backgroundImageUrl: e.target.value } : x))} placeholder="Used in boss replay" sx={{ width: 200 }} />
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', minWidth: 280, flex: 1 }}>
                     <TextField size="small" label="Boss BGM URL" value={c.bossBattleMusicUrl} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, bossBattleMusicUrl: e.target.value } : x))} placeholder="Looping music during boss fight" sx={{ minWidth: 180, flex: 1 }} />
@@ -1496,6 +1575,24 @@ export default function IdleRpgEdit() {
                     onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, bossBattleMusicVolumePercent: e.target.value } : x))}
                     sx={{ width: 130 }}
                     inputProps={{ min: 0, max: 100 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Boss BGM Fade-in (ms)"
+                    type="number"
+                    value={c.bossBattleMusicFadeInMs}
+                    onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, bossBattleMusicFadeInMs: e.target.value } : x))}
+                    sx={{ width: 170 }}
+                    inputProps={{ min: 0, step: 1 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Boss BGM Fade-out (ms)"
+                    type="number"
+                    value={c.bossBattleMusicFadeOutMs}
+                    onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, bossBattleMusicFadeOutMs: e.target.value } : x))}
+                    sx={{ width: 170 }}
+                    inputProps={{ min: 0, step: 1 }}
                   />
                   <TextField size="small" label="Tags (comma)" value={c.tags} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, tags: e.target.value } : x))} sx={{ flex: 1 }} />
                   <TextField size="small" label="Abilities (comma IDs)" value={c.abilityIds} onChange={(e) => setCreatures((p) => p.map((x, j) => j === i ? { ...x, abilityIds: e.target.value } : x))} placeholder="fireball, heal" sx={{ width: 160 }} />

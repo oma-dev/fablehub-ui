@@ -340,8 +340,12 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
               statusTransforms={statusTransforms}
               playerIntroSoundUrl={cls?.introSoundUrl}
               playerIntroSoundVolumePercent={cls?.introSoundVolumePercent}
+              playerIntroSoundFadeInMs={cls?.introSoundFadeInMs}
+              playerIntroSoundFadeOutMs={cls?.introSoundFadeOutMs}
               creatureIntroSoundUrl={creatureDef?.introSoundUrl}
               creatureIntroSoundVolumePercent={creatureDef?.introSoundVolumePercent}
+              creatureIntroSoundFadeInMs={creatureDef?.introSoundFadeInMs}
+              creatureIntroSoundFadeOutMs={creatureDef?.introSoundFadeOutMs}
               player={{
                 name: character.name,
                 level: character.level,
