@@ -7,7 +7,7 @@ import Divider from '@mui/material/Divider'
 import Paper from '@mui/material/Paper'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
-import { buyItem, equipItem } from '@features/idle-rpg/api'
+import { buyItem, equipItem, sellItem } from '@features/idle-rpg/api'
 import type { CharacterState, IdleRpgPackV1, ItemTemplate } from '@features/idle-rpg/api'
 import CharacterPanel from '../components/CharacterPanel'
 import ItemView from '../components/ItemView'
@@ -34,6 +34,7 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
   const [error, setError] = useState<string | null>(null)
   const [buyingId, setBuyingId] = useState<string | null>(null)
   const [equippingId, setEquippingId] = useState<string | null>(null)
+  const [sellingId, setSellingId] = useState<string | null>(null)
 
   const itemMap = new Map(pack.items.map((it) => [it.id, it]))
   const gold = character.balances.gold ?? 0
@@ -63,6 +64,19 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
       setError(err instanceof Error ? err.message : 'Could not equip item')
     } finally {
       setEquippingId(null)
+    }
+  }
+
+  const handleSell = async (itemId: string) => {
+    setError(null)
+    setSellingId(itemId)
+    try {
+      const updated = await sellItem(fableId, realmId, character.id, itemId, 1)
+      onCharacterUpdate(updated)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not sell item')
+    } finally {
+      setSellingId(null)
     }
   }
 
@@ -302,7 +316,7 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
                           size="small"
                           variant="outlined"
                           color="primary"
-                          disabled={equippingId !== null}
+                          disabled={equippingId !== null || sellingId !== null}
                           onClick={() => handleEquip(inv.itemId, item.slot)}
                           sx={{ minWidth: ITEM_SIZE, fontSize: 9, py: 0.1, textTransform: 'none' }}
                         >
@@ -316,6 +330,18 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
                         </Button>
                       </Tooltip>
                     )}
+                    <Tooltip title={`Sell for ${Math.max(0, item.sellValue ?? 0)} ${primaryCurrency?.name ?? 'Gold'}`} arrow>
+                      <Button
+                        size="small"
+                        variant="text"
+                        color="warning"
+                        disabled={sellingId !== null || equippingId !== null}
+                        onClick={() => handleSell(inv.itemId)}
+                        sx={{ minWidth: ITEM_SIZE, fontSize: 9, py: 0.1, textTransform: 'none' }}
+                      >
+                        {sellingId === inv.itemId ? '…' : `Sell ${Math.max(0, item.sellValue ?? 0)}`}
+                      </Button>
+                    </Tooltip>
                   </Box>
                 )
               })}

@@ -495,6 +495,8 @@ export interface ClassBlock {
   resourceId?: string
   passives?: string[]
   abilities?: { regular?: string[]; ultimate?: string | null }
+  /** Abilities auto-assigned on character creation and non-removable from equipped loadout. */
+  defaultAbilityIds?: string[]
   starting?: {
     mainStats?: Record<string, number>
     derivedStatModifiers?: DerivedStatModifier[]
@@ -562,6 +564,8 @@ export interface ItemTemplate {
   /** Optional custom impact image URL for this weapon. */
   impactUrl?: string
   price?: { currencyId: string; amount: number }
+  /** Optional per-item sell value. Missing value is treated as 0 by backend. */
+  sellValue?: number
 }
 
 export interface MainStatDefinition {
@@ -1063,6 +1067,18 @@ export function buyItem(fableId: string, realmId: string, characterId: string, i
   return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/merchant/buy`, { body: { itemId } })
 }
 
+export function sellItem(
+  fableId: string,
+  realmId: string,
+  characterId: string,
+  itemId: string,
+  quantity = 1,
+) {
+  return post<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/inventory/sell`, {
+    body: { itemId, quantity },
+  })
+}
+
 export function equipItem(fableId: string, realmId: string, characterId: string, slot: string, itemId?: string) {
   return patch<CharacterState>(`${charBase(fableId, realmId)}/${characterId}/equipment`, { body: { slot, itemId } })
 }
@@ -1270,6 +1286,7 @@ export const api = {
     startQuest,
     claimQuest,
     buyItem,
+    sellItem,
     equipItem,
     allocateStat,
     getGroups,

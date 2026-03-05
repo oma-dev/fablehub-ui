@@ -56,6 +56,8 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
   const resourceMap = new Map((pack.resources ?? []).map((r) => [r.id, r]))
 
   const cls = pack.classes.find((c) => c.id === character.classId)
+  const classDefaultAbilityIds = (cls?.defaultAbilityIds ?? []).filter((id) => !!abilityMap.get(id))
+  const classDefaultAbilitySet = new Set(classDefaultAbilityIds)
 
   const primaryAbility =
     (pack.abilities ?? []).find(
@@ -90,6 +92,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
     .map((id) => abilityMap.get(id))
     .filter((a): a is Ability => !!a)
     .sort((a, b) => (a.requirements?.minLevel ?? 0) - (b.requirements?.minLevel ?? 0))
+  const removableEquippedIds = equippedIds.filter((id) => !classDefaultAbilitySet.has(id))
 
   const unlockedNotEquipped = [...unlockedIds]
     .filter((id) => !equippedSet.has(id))
@@ -111,11 +114,11 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
   }
 
   const handleEquip = async (abilityId: string) => {
-    if (equippedIds.length >= currentSlotCount) return
+    if (removableEquippedIds.length >= currentSlotCount) return
     setError(null)
     setEquipping(true)
     try {
-      const updated = await equipAbilities(fableId, realmId, character.id, [...equippedIds, abilityId])
+      const updated = await equipAbilities(fableId, realmId, character.id, [...removableEquippedIds, abilityId])
       onCharacterUpdate(updated)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to equip ability')
@@ -125,6 +128,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
   }
 
   const handleUnequip = async (abilityId: string) => {
+    if (classDefaultAbilitySet.has(abilityId)) return
     setError(null)
     setEquipping(true)
     try {
@@ -132,7 +136,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
         fableId,
         realmId,
         character.id,
-        equippedIds.filter((id) => id !== abilityId),
+        removableEquippedIds.filter((id) => id !== abilityId),
       )
       onCharacterUpdate(updated)
     } catch (err: unknown) {
@@ -159,7 +163,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
     mb: 1.5,
   } as const
 
-  const slotsAvailable = equippedIds.length < currentSlotCount
+  const slotsAvailable = removableEquippedIds.length < currentSlotCount
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', p: 2.5, gap: 2 }}>
@@ -228,7 +232,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
           {/* Numbered Slots */}
           {Array.from({ length: maxPossibleSlots }, (_, i) => {
             const isSlotUnlocked = i < currentSlotCount
-            const equipped = equippedIds[i] ? abilityMap.get(equippedIds[i]) : undefined
+            const equipped = removableEquippedIds[i] ? abilityMap.get(removableEquippedIds[i]) : undefined
             const unlockLevel = getUnlockLevelForSlot(i)
 
             if (!isSlotUnlocked) {
@@ -332,6 +336,32 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
             )
           })}
         </Box>
+        {classDefaultAbilityIds.length > 0 && (
+          <Box sx={{ mt: 1.5, display: 'flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', mr: 0.5 }}>
+              Class defaults (locked):
+            </Typography>
+            {classDefaultAbilityIds.map((id) => {
+              const ability = abilityMap.get(id)
+              if (!ability) return null
+              return (
+                <Chip
+                  key={id}
+                  label={ability.name}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    bgcolor: alpha('#f59e0b', 0.18),
+                    color: '#fbbf24',
+                    border: '1px solid rgba(245,158,11,0.35)',
+                  }}
+                />
+              )
+            })}
+          </Box>
+        )}
       </Paper>
 
       {/* Unlocked Abilities (not equipped) */}

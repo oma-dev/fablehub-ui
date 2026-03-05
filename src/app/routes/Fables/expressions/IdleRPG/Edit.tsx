@@ -159,7 +159,7 @@ type ClassForm = {
   primaryAttackAbilityId: string
   attackTags: string; attackRequired: boolean; attackAllowEmpty: boolean
   defenseTags: string; defenseRequired: boolean; defenseAllowEmpty: boolean
-  regularAbilityIds: string; ultimateAbilityId: string; resourceId: string
+  regularAbilityIds: string; ultimateAbilityId: string; defaultAbilityIds: string; resourceId: string
   startingMainStats: MainStatValueForm[]; startingDerivedStatModifiers: DerivedModifierForm[]
 }
 type CreatureForm = {
@@ -170,7 +170,7 @@ type CreatureForm = {
 type ItemForm = {
   id: string; name: string; rarity: string; slot: string; tags: string; stats: string
   mainStatBonuses: MainStatValueForm[]; weaponDamage: string; protectiveArmor: string; derivedStatModifiers: DerivedModifierForm[]
-  iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string
+  iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string; sellValue: string
 }
 type QuestForm = { id: string; name: string; creatureId: string; durationSec: string; iconUrl: string; rewardXp: string; rewardCurrency: string; lootTableId: string }
 type DungeonForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string }
@@ -213,7 +213,7 @@ const emptyClass = (): ClassForm => ({
   primaryAttackAbilityId: '',
   attackTags: '', attackRequired: true, attackAllowEmpty: false,
   defenseTags: '', defenseRequired: false, defenseAllowEmpty: true,
-  regularAbilityIds: '', ultimateAbilityId: '', resourceId: '',
+  regularAbilityIds: '', ultimateAbilityId: '', defaultAbilityIds: '', resourceId: '',
   startingMainStats: [], startingDerivedStatModifiers: [],
 })
 const emptyCreature = (): CreatureForm => ({
@@ -224,7 +224,7 @@ const emptyCreature = (): CreatureForm => ({
 const emptyItem = (): ItemForm => ({
   id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '',
   mainStatBonuses: [], weaponDamage: '', protectiveArmor: '', derivedStatModifiers: [],
-  iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '',
+  iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '', sellValue: '',
 })
 const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', durationSec: '60', iconUrl: '', rewardXp: '10', rewardCurrency: '', lootTableId: '' })
 const emptyDungeon = (): DungeonForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '' })
@@ -419,6 +419,7 @@ function hydrateClasses(pack: IdleRpgPackV1, allowedMainStatIds: string[], fallb
       defenseAllowEmpty: c.slots?.defense_layer?.allowEmpty ?? true,
       regularAbilityIds: c.abilities?.regular?.join(', ') ?? '',
       ultimateAbilityId: c.abilities?.ultimate ?? '',
+      defaultAbilityIds: (c.defaultAbilityIds ?? []).join(', '),
       resourceId: (c as any).resourceId ?? '',
       startingMainStats: hydrateMainStatValues((c as any).starting?.mainStats ?? (c as any).starting?.stats, allowedMainStatIds, fallbackMainStatId),
       startingDerivedStatModifiers: hydrateDerivedModifiers((c as any).starting?.derivedStatModifiers),
@@ -474,6 +475,7 @@ function hydrateItems(pack: IdleRpgPackV1, allowedMainStatIds: string[], fallbac
     impactUrl: i.impactUrl ?? '',
     priceCurrencyId: i.price?.currencyId ?? '',
     priceAmount: i.price?.amount != null ? String(i.price.amount) : '',
+    sellValue: i.sellValue != null ? String(i.sellValue) : '',
   }))
 }
 
@@ -714,6 +716,9 @@ export default function IdleRpgEdit() {
                 },
               }
             : {}),
+          ...(parseTags(c.defaultAbilityIds).length > 0
+            ? { defaultAbilityIds: parseTags(c.defaultAbilityIds) }
+            : {}),
           ...(c.resourceId.trim() ? { resourceId: c.resourceId.trim() } : {}),
           ...(Object.keys(filteredMainStats).length > 0 || startingDerivedStatModifiers.length > 0
             ? {
@@ -782,6 +787,9 @@ export default function IdleRpgEdit() {
           ...(i.impactUrl.trim() ? { impactUrl: i.impactUrl.trim() } : {}),
           ...(i.priceCurrencyId.trim() && i.priceAmount.trim()
             ? { price: { currencyId: i.priceCurrencyId.trim(), amount: Number(i.priceAmount) || 0 } }
+            : {}),
+          ...(i.sellValue.trim() !== '' && !Number.isNaN(Number(i.sellValue))
+            ? { sellValue: Math.max(0, Number(i.sellValue)) }
             : {}),
         }
       })
@@ -1491,6 +1499,7 @@ export default function IdleRpgEdit() {
                   <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 1 }}>
                     <TextField size="small" label="Regular ability IDs (comma)" value={c.regularAbilityIds} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, regularAbilityIds: e.target.value } : x))} placeholder="fireball, heal" sx={{ minWidth: 220 }} />
                     <TextField size="small" label="Ultimate ability ID" value={c.ultimateAbilityId} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, ultimateAbilityId: e.target.value } : x))} placeholder="ultimate_slash" sx={{ width: 160 }} />
+                    <TextField size="small" label="Default ability IDs (comma)" value={c.defaultAbilityIds} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, defaultAbilityIds: e.target.value } : x))} placeholder="battle_focus, shield_wall" sx={{ minWidth: 260 }} />
                   </Box>
                   <FormControl size="small" sx={{ minWidth: 160 }}>
                     <InputLabel>Resource</InputLabel>
@@ -1756,6 +1765,7 @@ export default function IdleRpgEdit() {
                   <TextField size="small" label="Impact URL" value={item.impactUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, impactUrl: e.target.value } : x))} placeholder="custom impact" sx={{ width: 120 }} />
                   <TextField size="small" label="Price currency" value={item.priceCurrencyId} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, priceCurrencyId: e.target.value } : x))} placeholder="gold" sx={{ width: 90 }} />
                   <TextField size="small" label="Price" type="number" value={item.priceAmount} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, priceAmount: e.target.value } : x))} sx={{ width: 70 }} />
+                  <TextField size="small" label="Sell value" type="number" value={item.sellValue} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, sellValue: e.target.value } : x))} sx={{ width: 90 }} />
                   <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>Derived stat modifiers</Typography>
                   {item.derivedStatModifiers.map((mod, mi) => (
                     <Box key={mi} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
