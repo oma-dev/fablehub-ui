@@ -16,7 +16,7 @@ import InputLabel from '@mui/material/InputLabel'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
-import TextField from '@mui/material/TextField'
+import TextField from './components/forms/BufferedTextField'
 import Typography from '@mui/material/Typography'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { getIdleRpgRealm, getFable, updateIdleRpgRealm } from '@features/idle-rpg/api'
@@ -1057,7 +1057,7 @@ export default function IdleRpgEdit() {
             <TextField label="Player cap" type="number" fullWidth size="small" value={playerCap} onChange={(e) => setPlayerCap(Number(e.target.value) || 0)} inputProps={{ min: 1, max: 100 }} />
           </Paper>
 
-          <Accordion defaultExpanded>
+          <Accordion TransitionProps={{ unmountOnExit: true }} defaultExpanded>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Rules</Typography></AccordionSummary>
             <AccordionDetails>
               <TextField label="Max level" type="number" size="small" value={maxLevel} onChange={(e) => setMaxLevel(Number(e.target.value) || 1)} sx={{ mr: 2, width: 120 }} inputProps={{ min: 1 }} />
@@ -1079,7 +1079,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion defaultExpanded>
+          <Accordion TransitionProps={{ unmountOnExit: true }} defaultExpanded>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Main Stats</Typography></AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -1097,7 +1097,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
+          <Accordion TransitionProps={{ unmountOnExit: true }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Derived Stat Scaling</Typography></AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -1158,7 +1158,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion defaultExpanded>
+          <Accordion TransitionProps={{ unmountOnExit: true }} defaultExpanded>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Currencies (at least one)</Typography></AccordionSummary>
             <AccordionDetails>
               {currencies.map((c, i) => (
@@ -1173,7 +1173,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
+          <Accordion TransitionProps={{ unmountOnExit: true }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Resources</Typography></AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -1200,7 +1200,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
+          <Accordion TransitionProps={{ unmountOnExit: true }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Abilities</Typography></AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -1312,7 +1312,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion defaultExpanded>
+          <Accordion TransitionProps={{ unmountOnExit: true }} defaultExpanded>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Status Effects</Typography></AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -1424,7 +1424,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion defaultExpanded>
+          <Accordion TransitionProps={{ unmountOnExit: true }} defaultExpanded>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Classes (at least one)</Typography></AccordionSummary>
             <AccordionDetails>
               {classes.map((c, i) => (
@@ -1560,7 +1560,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
+          <Accordion TransitionProps={{ unmountOnExit: true }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Creatures</Typography></AccordionSummary>
             <AccordionDetails>
               {creatures.map((c, i) => (
@@ -1703,7 +1703,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
+          <Accordion TransitionProps={{ unmountOnExit: true }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Items</Typography></AccordionSummary>
             <AccordionDetails>
               {items.map((item, i) => (
@@ -1795,7 +1795,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
+          <Accordion TransitionProps={{ unmountOnExit: true }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Quests</Typography></AccordionSummary>
             <AccordionDetails>
               {quests.map((q, i) => (
@@ -1815,7 +1815,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
+          <Accordion TransitionProps={{ unmountOnExit: true }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Dungeons</Typography></AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -1844,7 +1844,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
+          <Accordion TransitionProps={{ unmountOnExit: true }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Raids</Typography></AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -1883,7 +1883,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
+          <Accordion TransitionProps={{ unmountOnExit: true }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Merchant listings</Typography></AccordionSummary>
             <AccordionDetails>
               {listings.map((l, i) => (
@@ -1898,7 +1898,7 @@ export default function IdleRpgEdit() {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
+          <Accordion TransitionProps={{ unmountOnExit: true }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={600}>Loot tables</Typography></AccordionSummary>
             <AccordionDetails>
               {lootTables.map((t, ti) => (
@@ -1944,5 +1944,6 @@ export default function IdleRpgEdit() {
     </Box>
   )
 }
+
 
 
