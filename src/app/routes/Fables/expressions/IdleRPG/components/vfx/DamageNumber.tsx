@@ -5,6 +5,7 @@ const DAMAGE_SCALE = 3
 const DAMAGE_FONT_SIZE = Math.round(22 * DAMAGE_SCALE)
 const DAMAGE_TOP = -8 * DAMAGE_SCALE
 const DAMAGE_FLIGHT_Y = -48 * DAMAGE_SCALE
+const VFX_Z_INDEX_BASE = 2600
 
 interface Props {
   value: number
@@ -67,7 +68,7 @@ export default function DamageNumber({ value, type, id, abilityName, isCritical 
           marginLeft: 'auto',
           marginRight: 'auto',
           pointerEvents: 'none',
-          zIndex: 20 + stackIndex,
+          zIndex: VFX_Z_INDEX_BASE + stackIndex,
           fontWeight: 900,
           fontSize: numberFontSize,
           color,

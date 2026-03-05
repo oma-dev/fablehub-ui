@@ -4,6 +4,7 @@ import type { ImpactStyle } from './animationConfig'
 
 const IMPACT_SCALE = 5
 const IMPACT_SIZE = Math.round(64 * IMPACT_SCALE)  // 96
+const VFX_Z_INDEX = 2400
 
 interface Props {
   show: boolean
@@ -187,7 +188,7 @@ export default function ImpactEffect({ show, style, color, id }: Props) {
             width: IMPACT_SIZE,
             height: IMPACT_SIZE,
             pointerEvents: 'none',
-            zIndex: 15,
+            zIndex: VFX_Z_INDEX,
             transformOrigin: 'center center',
           }}
         >

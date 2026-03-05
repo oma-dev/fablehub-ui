@@ -46,6 +46,7 @@ interface Props {
 }
 
 const ARC_PEAK = -70
+const VFX_Z_INDEX = 2300
 
 /** Projectile flight duration in seconds. Lower = faster. */
 export const PROJECTILE_SPEED = 0.4
@@ -143,7 +144,7 @@ function WeaponProjectile({
         }}
         exit={{ opacity: 0, scale: 0.3 }}
         transition={{ duration, ease: motionEase }}
-        style={{ position: 'absolute', pointerEvents: 'none', zIndex: 10 }}
+        style={{ position: 'absolute', pointerEvents: 'none', zIndex: VFX_Z_INDEX }}
       >
         {imgEl}
       </motion.div>
@@ -173,7 +174,7 @@ function WeaponProjectile({
       }}
       exit={{ opacity: 0, scale: 0.3 }}
       transition={{ duration: durationSec, ease: motionEase }}
-      style={{ position: 'absolute', pointerEvents: 'none', zIndex: 10 }}
+      style={{ position: 'absolute', pointerEvents: 'none', zIndex: VFX_Z_INDEX }}
     >
       {imgEl}
     </motion.div>
@@ -208,7 +209,7 @@ function OrbProjectile({
       animate={{ left: to.x, top: to.y, x: '-50%', y: '-50%', opacity: 1, scale: 1, rotate: finalRotation }}
       exit={{ opacity: 0, scale: 0.3 }}
       transition={{ duration: durationSec, ease: motionEase }}
-      style={{ position: 'absolute', pointerEvents: 'none', zIndex: 10 }}
+      style={{ position: 'absolute', pointerEvents: 'none', zIndex: VFX_Z_INDEX }}
     >
       <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
         <motion.circle

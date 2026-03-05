@@ -4,6 +4,7 @@ import { useParticleSound } from './playParticleSound'
 
 const DEFAULT_SIZE = 120
 const DEFAULT_FADE_IN_MS = 200
+const VFX_Z_INDEX = 2100
 
 interface Props {
   show: boolean
@@ -136,7 +137,7 @@ export default function WeaponFrame({
             width: baseSize,
             height: baseSize,
             pointerEvents: 'none',
-            zIndex: 8,
+            zIndex: VFX_Z_INDEX,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

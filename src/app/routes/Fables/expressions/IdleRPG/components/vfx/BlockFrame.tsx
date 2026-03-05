@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useParticleSound } from './playParticleSound'
 
 const DEFAULT_SIZE = 140
+const VFX_Z_INDEX = 2500
 
 interface Props {
   show: boolean
@@ -95,7 +96,7 @@ export default function BlockFrame({
             width: baseSize,
             height: baseSize,
             pointerEvents: 'none',
-            zIndex: 20,
+            zIndex: VFX_Z_INDEX,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

@@ -3,6 +3,7 @@ import { getAccelerationEase } from './motionEasing'
 import { useParticleSound } from './playParticleSound'
 
 const DEFAULT_SIZE = 96
+const VFX_Z_INDEX = 2200
 
 interface Props {
   id: string | number
@@ -117,7 +118,7 @@ export default function StatusParticleEffect({
         width: baseSize,
         height: baseSize,
         pointerEvents: 'none',
-        zIndex: 11,
+        zIndex: VFX_Z_INDEX,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
