@@ -802,6 +802,10 @@ export interface SummonedCombatantSnapshot {
   name: string
   level?: number
   portraitUrl?: string
+  introSoundUrl?: string
+  introSoundVolumePercent?: number
+  introSoundFadeInMs?: number
+  introSoundFadeOutMs?: number
   maxHp: number
   currentHp: number
   ap: number
