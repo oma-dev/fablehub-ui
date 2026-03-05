@@ -29,16 +29,6 @@ interface Props {
 
 type Phase = 'idle' | 'questPicker' | 'questActive' | 'combat' | 'result'
 
-function pickRandom<T>(arr: T[], n: number): T[] {
-  const copy = [...arr]
-  const result: T[] = []
-  while (result.length < n && copy.length > 0) {
-    const idx = Math.floor(Math.random() * copy.length)
-    result.push(copy.splice(idx, 1)[0])
-  }
-  return result
-}
-
 export default function TavernTab({ fableId, realmId, character, pack, onCharacterUpdate }: Props) {
   const [phase, setPhase] = useState<Phase>(() =>
     character.questState.activeQuest ? 'questActive' : 'idle',
@@ -82,11 +72,25 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
     [pack.quests, activeQuest],
   )
 
+  const questOffersFromBackend = useMemo(() => {
+    const offeredIds = character.questState.offeredQuestIds ?? []
+    const seen = new Set<string>()
+    const quests: Quest[] = []
+    for (const questId of offeredIds) {
+      if (!questId || seen.has(questId)) continue
+      const quest = pack.quests.find((q) => q.id === questId)
+      if (!quest) continue
+      seen.add(questId)
+      quests.push(quest)
+    }
+    return quests
+  }, [character.questState.offeredQuestIds, pack.quests])
+
   const openQuestPicker = useCallback(() => {
-    setRandomQuests(pickRandom(pack.quests, 3))
+    setRandomQuests(questOffersFromBackend)
     setPhase('questPicker')
     setError(null)
-  }, [pack.quests])
+  }, [questOffersFromBackend])
 
   const handleSelectQuest = async (quest: Quest) => {
     if (startingQuestId) return
@@ -202,6 +206,11 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
         </DialogTitle>
         <DialogContent>
           <List sx={{ display: 'flex', flexDirection: 'column', gap: 1, pt: 1 }}>
+            {randomQuests.length === 0 && (
+              <Typography variant="body2" color="text.secondary" sx={{ px: 1, py: 1 }}>
+                No quest offers available right now.
+              </Typography>
+            )}
             {randomQuests.map((q) => {
               const creature = creatureForQuest(q)
               return (

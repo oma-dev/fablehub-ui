@@ -886,6 +886,8 @@ export interface QuestProgress {
 
 export interface CharacterQuestState {
   activeQuest?: QuestProgress
+  offeredQuestIds?: string[]
+  offeredAt?: number
   completed: { questId: string; completedAt: number }[]
   cooldowns?: Record<string, number>
 }
