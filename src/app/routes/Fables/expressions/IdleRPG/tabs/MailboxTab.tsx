@@ -3,6 +3,10 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
 import IconButton from '@mui/material/IconButton'
 import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
@@ -56,6 +60,19 @@ function getPvpReplayParticipants(replay: PvpMailReplayPayload, characterId: str
   return { left, right }
 }
 
+function getPvpSettlementDialogData(replay: PvpMailReplayPayload, viewerCharacterId: string): { title: string; message: string } | null {
+  const settlement = replay.settlement
+  if (!settlement) return null
+  const normalizedAmount = Math.max(0, Math.floor(Number(settlement.amount) || 0))
+  const won = settlement.winnerId === viewerCharacterId
+  return {
+    title: won ? 'PvP Reward' : 'PvP Penalty',
+    message: won
+      ? `You won ${normalizedAmount} ${settlement.currencyName}.`
+      : `You lost ${normalizedAmount} ${settlement.currencyName}.`,
+  }
+}
+
 export default function MailboxTab({
   fableId,
   realmId,
@@ -74,9 +91,11 @@ export default function MailboxTab({
   const [activeReplayMailId, setActiveReplayMailId] = useState<string | null>(null)
   const [openingMailId, setOpeningMailId] = useState<string | null>(null)
   const [actionMailId, setActionMailId] = useState<string | null>(null)
+  const [pvpSettlementDialog, setPvpSettlementDialog] = useState<{ title: string; message: string } | null>(null)
   const replayOpenInFlightRef = useRef<Set<string>>(new Set())
   const autoOpenInFlightMailIdRef = useRef<string | null>(null)
   const autoOpenHandledMailIdRef = useRef<string | null>(null)
+  const activeReplayMail = activeReplayMailId ? mails.find((mail) => mail.id === activeReplayMailId) : null
 
   const statusAnimations = useMemo(() => {
     const map: Record<string, any> = {}
@@ -253,6 +272,14 @@ export default function MailboxTab({
           }}
           victory={replay.combat.winnerId === left.id}
           onFinish={() => {
+            const shouldShowSettlementDialog = activeReplayMail?.alertKind === 'pvp_defense'
+            const settlementDialog = shouldShowSettlementDialog
+              ? getPvpSettlementDialogData(replay, character.id)
+              : null
+            if (settlementDialog && shouldShowSettlementDialog) {
+              setPvpSettlementDialog(settlementDialog)
+              return
+            }
             setActiveReplay(null)
             setActiveReplayMailId(null)
           }}
@@ -322,32 +349,67 @@ export default function MailboxTab({
     )
   }
 
+  const settlementDialogNode = (
+    <Dialog
+      open={!!pvpSettlementDialog}
+      onClose={() => {
+        setPvpSettlementDialog(null)
+        setActiveReplay(null)
+        setActiveReplayMailId(null)
+      }}
+    >
+      <DialogTitle>{pvpSettlementDialog?.title ?? 'PvP Settlement'}</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2">{pvpSettlementDialog?.message}</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button
+          variant="contained"
+          onClick={() => {
+            setPvpSettlementDialog(null)
+            setActiveReplay(null)
+            setActiveReplayMailId(null)
+          }}
+        >
+          Continue
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+
   if (activeReplay) {
     if (activeReplay.kind === 'raid') {
       return (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <RaidReplayView
-            key={`mail-replay-${activeReplayMailId ?? activeReplay.kind}`}
-            replay={activeReplay}
-            group={null}
-            pack={pack}
-            onDone={() => {
-              setActiveReplay(null)
-              setActiveReplayMailId(null)
-            }}
-          />
-        </Box>
+        <>
+          {settlementDialogNode}
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <RaidReplayView
+              key={`mail-replay-${activeReplayMailId ?? activeReplay.kind}`}
+              replay={activeReplay}
+              group={null}
+              pack={pack}
+              onDone={() => {
+                setActiveReplay(null)
+                setActiveReplayMailId(null)
+              }}
+            />
+          </Box>
+        </>
       )
     }
     return (
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        {renderCombatReplay(activeReplay)}
-      </Box>
+      <>
+        {settlementDialogNode}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          {renderCombatReplay(activeReplay)}
+        </Box>
+      </>
     )
   }
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', p: 3, gap: 2 }}>
+      {settlementDialogNode}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Typography variant="h5" fontWeight={700}>Mailbox</Typography>
         <Button variant="outlined" size="small" onClick={() => void loadMailbox()} disabled={loading}>

@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
 import Paper from '@mui/material/Paper'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -9,6 +13,7 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
+import Button from '@mui/material/Button'
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi'
 import {
   getRealmRoster,
@@ -40,6 +45,32 @@ interface Props {
   onClearPendingPvpFight?: () => void
 }
 
+function formatCooldownRemaining(durationMs: number): string {
+  const remainingSeconds = Math.max(1, Math.ceil(durationMs / 1000))
+  const hours = Math.floor(remainingSeconds / 3600)
+  const minutes = Math.floor((remainingSeconds % 3600) / 60)
+  const seconds = remainingSeconds % 60
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+}
+
+function getPvpSettlementDialogData(
+  combat: CombatResult | null,
+  viewerCharacterId: string,
+): { title: string; message: string } | null {
+  const settlement = combat?.pvpSettlement
+  if (!settlement) return null
+  const normalizedAmount = Math.max(0, Math.floor(Number(settlement.amount) || 0))
+  const won = settlement.winnerId === viewerCharacterId
+  return {
+    title: won ? 'PvP Reward' : 'PvP Penalty',
+    message: won
+      ? `You won ${normalizedAmount} ${settlement.currencyName}.`
+      : `You lost ${normalizedAmount} ${settlement.currencyName}.`,
+  }
+}
+
 export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFight, onClearPendingPvpFight }: Props) {
   const [roster, setRoster] = useState<RealmRosterEntry[]>([])
   const [rosterLoading, setRosterLoading] = useState(true)
@@ -56,8 +87,16 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
     victory: boolean
     targetProfile: PlayStateResponse
   } | null>(null)
+  const [pvpSettlementDialog, setPvpSettlementDialog] = useState<{ title: string; message: string } | null>(null)
+  const [cooldownNowMs, setCooldownNowMs] = useState(() => Date.now())
 
   const otherCharacters = roster.filter((r) => r.id !== character.id)
+  const pvpCooldownUntil = Number(character.progression?.pvpAttackCooldownUntil ?? 0)
+  const pvpCooldownRemainingMs = Math.max(0, pvpCooldownUntil - cooldownNowMs)
+  const isPvpCooldownActive = pvpCooldownRemainingMs > 0
+  const fightButtonLabel = isPvpCooldownActive
+    ? `Cooldown: ${formatCooldownRemaining(pvpCooldownRemainingMs)}`
+    : 'Fight'
 
   useEffect(() => {
     let cancelled = false
@@ -92,6 +131,13 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
   }, [fableId, realmId, character.id])
 
   useEffect(() => {
+    if (!selectedCharacterId && !isPvpCooldownActive) return
+    setCooldownNowMs(Date.now())
+    const intervalId = window.setInterval(() => setCooldownNowMs(Date.now()), 1000)
+    return () => window.clearInterval(intervalId)
+  }, [selectedCharacterId, isPvpCooldownActive])
+
+  useEffect(() => {
     if (!selectedCharacterId) {
       setProfile(null)
       setProfileError(null)
@@ -119,6 +165,13 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
   useEffect(() => {
     if (!pendingPvpFight || fighting || combatResult) return
     const { targetCharacterId, targetProfile } = pendingPvpFight
+    if (isPvpCooldownActive) {
+      onClearPendingPvpFight?.()
+      setSelectedCharacterId(targetCharacterId)
+      setProfile(targetProfile)
+      setProfileError(`PvP cooldown active: ${formatCooldownRemaining(pvpCooldownRemainingMs)} remaining.`)
+      return
+    }
     onClearPendingPvpFight?.() // Clear immediately to prevent double-invocation (e.g. StrictMode)
     let cancelled = false
     setFighting(true)
@@ -134,7 +187,17 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
         if (!cancelled) setFighting(false)
       })
     return () => { cancelled = true }
-  }, [pendingPvpFight, fableId, realmId, character.id, onClearPendingPvpFight])
+  }, [
+    pendingPvpFight,
+    fighting,
+    combatResult,
+    isPvpCooldownActive,
+    pvpCooldownRemainingMs,
+    fableId,
+    realmId,
+    character.id,
+    onClearPendingPvpFight,
+  ])
 
   const handleCloseCard = () => {
     setSelectedCharacterId(null)
@@ -142,6 +205,10 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
 
   const handleFight = async () => {
     if (!selectedCharacterId || !profile) return
+    if (isPvpCooldownActive) {
+      setProfileError(`PvP cooldown active: ${formatCooldownRemaining(pvpCooldownRemainingMs)} remaining.`)
+      return
+    }
     setFighting(true)
     try {
       const combat = await pvpFight(fableId, realmId, character.id, selectedCharacterId)
@@ -155,11 +222,20 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
     }
   }
 
-  const handleCombatFinish = () => {
+  const finalizeCombatReplay = () => {
     setCombatResult(null)
     onClearPendingPvpFight?.()
     // Refresh history
     getPvpHistory(fableId, realmId, character.id).then(setHistory)
+  }
+
+  const handleCombatFinish = () => {
+    const settlementDialog = getPvpSettlementDialogData(combatResult?.combat ?? null, character.id)
+    if (settlementDialog) {
+      setPvpSettlementDialog(settlementDialog)
+      return
+    }
+    finalizeCombatReplay()
   }
 
   const inCombat = !!combatResult
@@ -204,6 +280,29 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
         gap: inCombat ? 0 : 2,
       }}
     >
+      <Dialog
+        open={!!pvpSettlementDialog}
+        onClose={() => {
+          setPvpSettlementDialog(null)
+          finalizeCombatReplay()
+        }}
+      >
+        <DialogTitle>{pvpSettlementDialog?.title ?? 'PvP Settlement'}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">{pvpSettlementDialog?.message}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setPvpSettlementDialog(null)
+              finalizeCombatReplay()
+            }}
+          >
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
       {inCombat && combatResult && targetStats ? (() => {
         const targetCls = pack.classes.find((c) => c.id === combatResult!.targetProfile.character.classId)
         const targetWeaponId = combatResult!.targetProfile.character.equipment?.attack_source
@@ -398,6 +497,8 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
             showFightButton={!!selectedCharacterId && !!profile}
             onFight={handleFight}
             fighting={fighting}
+            fightButtonLabel={fightButtonLabel}
+            fightButtonDisabled={isPvpCooldownActive}
           />
         </>
       )}

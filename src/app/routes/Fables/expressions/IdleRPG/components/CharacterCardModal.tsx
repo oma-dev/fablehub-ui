@@ -19,6 +19,8 @@ interface Props {
   showFightButton?: boolean
   onFight?: () => void
   fighting?: boolean
+  fightButtonLabel?: string
+  fightButtonDisabled?: boolean
 }
 
 export default function CharacterCardModal({
@@ -32,6 +34,8 @@ export default function CharacterCardModal({
   showFightButton = false,
   onFight,
   fighting = false,
+  fightButtonLabel,
+  fightButtonDisabled = false,
 }: Props) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -58,11 +62,11 @@ export default function CharacterCardModal({
                 color="primary"
                 startIcon={<SportsKabaddiIcon />}
                 onClick={onFight}
-                disabled={fighting}
+                disabled={fighting || fightButtonDisabled}
                 size="large"
                 sx={{ px: 4, py: 1.5 }}
               >
-                {fighting ? 'Fighting...' : 'Fight'}
+                {fighting ? 'Fighting...' : (fightButtonLabel ?? 'Fight')}
               </Button>
             )}
           </Box>

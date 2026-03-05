@@ -456,6 +456,22 @@ export interface IdleRpgPackV1 {
     abilitySlotsByLevel?: Record<number, number>
     baseMaxHp?: number
     baseMaxHpPerLevel?: number
+    pvp?: {
+      attackerCooldownMs?: number
+      transferCurrencyId?: string
+      transferByLevelGap?: Array<{
+        minGap: number
+        maxGap?: number
+        percentOfLoserBalance?: number
+        flatAmount?: number
+      }>
+    }
+    raidSchedule?: {
+      startHourUtc: number
+      startMinuteUtc?: number
+      intervalDays?: number
+      anchorDateUtc: string
+    }
   }
   economy: {
     currencies: { id: string; name: string; iconUrl?: string }[]
@@ -695,6 +711,13 @@ export interface PvpMailReplayPayload {
   challengerId: string
   targetId: string
   participants: ReplayCombatantSnapshot[]
+  settlement?: {
+    currencyId: string
+    currencyName: string
+    amount: number
+    winnerId: string
+    loserId: string
+  }
 }
 
 export interface DungeonMailReplayPayload {
@@ -823,6 +846,13 @@ export interface CombatResult {
   winnerId: string | null
   finalHp: Record<string, number>
   timeout?: boolean
+  pvpSettlement?: {
+    currencyId: string
+    currencyName: string
+    amount: number
+    winnerId: string
+    loserId: string
+  }
 }
 
 // --- Character state (simplified from backend RealmCharacter) ---
@@ -864,8 +894,8 @@ export interface CharacterState {
   merchant?: { listings: MerchantListing[]; lastUpdatedAt: number }
   /** Idle RPG group/guild (when in one). */
   groupId?: string | null
-  /** Progression: completed dungeons, boss cooldowns. */
-  progression?: { completedDungeonIds?: string[]; dungeonBossCooldowns?: Record<string, number> }
+  /** Progression: completed dungeons, boss cooldowns, and PvP attack cooldown. */
+  progression?: { completedDungeonIds?: string[]; dungeonBossCooldowns?: Record<string, number>; pvpAttackCooldownUntil?: number }
   /** Ability IDs unlocked with ability points. */
   unlockedAbilityIds?: string[]
   /** Ability IDs equipped in slots (ordered; index = slot). */
@@ -1222,6 +1252,13 @@ export interface RaidCallResponse {
   readyCharacterIds: string[]
   raid: Raid | null
   boss: CreatureTemplate | null
+  nextScheduledStartAt: number
+  raidSchedule?: {
+    startHourUtc: number
+    startMinuteUtc: number
+    intervalDays: number
+    anchorDateUtc: string
+  }
 }
 
 export function getRaidCall(fableId: string, realmId: string, groupId: string) {

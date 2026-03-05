@@ -313,6 +313,12 @@ type QuestForm = { id: string; name: string; creatureId: string; durationSec: st
 type DungeonForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string }
 type RaidForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string; currencyId: string; costAmount: string }
 type LootEntryForm = { itemId: string; weight: string; classId: string }
+type PvpTransferBracketForm = {
+  minGap: string
+  maxGap: string
+  percentOfLoserBalance: string
+  flatAmount: string
+}
 
 const emptyXp = (): XpEntry => ({ level: '', xp: '' })
 const emptyResource = (): ResourceForm => ({ id: '', name: '', description: '', colorHex: '#3b82f6', isGenerative: false, max: '100', regenPerTurn: '5', gainOnHit: '0' })
@@ -367,6 +373,12 @@ const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', duratio
 const emptyDungeon = (): DungeonForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '' })
 const emptyRaid = (): RaidForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '', currencyId: '', costAmount: '0' })
 const emptyLootEntry = (): LootEntryForm => ({ itemId: '', weight: '1', classId: '' })
+const emptyPvpTransferBracket = (): PvpTransferBracketForm => ({
+  minGap: '0',
+  maxGap: '',
+  percentOfLoserBalance: '',
+  flatAmount: '',
+})
 
 export default function IdleRpgCreate() {
   const { fableId } = useParams<{ fableId: string }>()
@@ -384,6 +396,13 @@ export default function IdleRpgCreate() {
   const [xpEntries, setXpEntries] = useState<XpEntry[]>([{ level: '2', xp: '100' }, { level: '3', xp: '250' }])
   const [abilityPointsPerLevel, setAbilityPointsPerLevel] = useState('1')
   const [abilitySlotsByLevel, setAbilitySlotsByLevel] = useState('')
+  const [pvpAttackCooldownMinutes, setPvpAttackCooldownMinutes] = useState('')
+  const [pvpTransferCurrencyId, setPvpTransferCurrencyId] = useState('')
+  const [pvpTransferBrackets, setPvpTransferBrackets] = useState<PvpTransferBracketForm[]>([])
+  const [raidScheduleStartHourUtc, setRaidScheduleStartHourUtc] = useState('')
+  const [raidScheduleStartMinuteUtc, setRaidScheduleStartMinuteUtc] = useState('0')
+  const [raidScheduleIntervalDays, setRaidScheduleIntervalDays] = useState('1')
+  const [raidScheduleAnchorDateUtc, setRaidScheduleAnchorDateUtc] = useState('')
   // Economy
   const [currencies, setCurrencies] = useState<{ id: string; name: string; iconUrl?: string }[]>([{ id: 'gold', name: 'Gold' }])
   // Resources
@@ -421,6 +440,47 @@ export default function IdleRpgCreate() {
     setAbilityPointsPerLevel(String((pack.rules as any).abilityPointsPerLevel ?? 1))
     const absMap = (pack.rules as any).abilitySlotsByLevel as Record<number, number> | undefined
     setAbilitySlotsByLevel(absMap ? Object.entries(absMap).map(([k, v]) => `${k}:${v}`).join(',') : '')
+    const pvpRules = (pack.rules as any).pvp as {
+      attackerCooldownMs?: number
+      transferCurrencyId?: string
+      transferByLevelGap?: Array<{ minGap?: number; maxGap?: number; percentOfLoserBalance?: number; flatAmount?: number }>
+    } | undefined
+    setPvpAttackCooldownMinutes(
+      pvpRules?.attackerCooldownMs != null
+        ? String(Math.max(0, Math.floor(Number(pvpRules.attackerCooldownMs) / 60000)))
+        : '',
+    )
+    setPvpTransferCurrencyId(pvpRules?.transferCurrencyId ?? '')
+    setPvpTransferBrackets(
+      (pvpRules?.transferByLevelGap ?? []).map((row) => ({
+        minGap: row.minGap != null ? String(row.minGap) : '0',
+        maxGap: row.maxGap != null ? String(row.maxGap) : '',
+        percentOfLoserBalance: row.percentOfLoserBalance != null ? String(row.percentOfLoserBalance) : '',
+        flatAmount: row.flatAmount != null ? String(row.flatAmount) : '',
+      })),
+    )
+    const raidScheduleRules = (pack.rules as any).raidSchedule as {
+      startHourUtc?: number
+      startMinuteUtc?: number
+      intervalDays?: number
+      anchorDateUtc?: string
+    } | undefined
+    setRaidScheduleStartHourUtc(
+      raidScheduleRules?.startHourUtc != null
+        ? String(raidScheduleRules.startHourUtc)
+        : '',
+    )
+    setRaidScheduleStartMinuteUtc(
+      raidScheduleRules?.startMinuteUtc != null
+        ? String(raidScheduleRules.startMinuteUtc)
+        : '0',
+    )
+    setRaidScheduleIntervalDays(
+      raidScheduleRules?.intervalDays != null
+        ? String(raidScheduleRules.intervalDays)
+        : '1',
+    )
+    setRaidScheduleAnchorDateUtc(raidScheduleRules?.anchorDateUtc ?? '')
     const hydratedMainStats = hydrateMainStats(pack)
     const defaultMainStatId = hydratedMainStats.find((s) => s.id.trim())?.id?.trim() || 'STR'
     const allowedMainStatIds = hydratedMainStats.map((s) => s.id.trim()).filter(Boolean)
@@ -573,6 +633,13 @@ export default function IdleRpgCreate() {
     })))
     setAbilityPointsPerLevel(String(ex.abilityPointsPerLevel ?? 1))
     setAbilitySlotsByLevel(ex.abilitySlotsByLevel ?? '')
+    setPvpAttackCooldownMinutes('')
+    setPvpTransferCurrencyId('')
+    setPvpTransferBrackets([])
+    setRaidScheduleStartHourUtc('')
+    setRaidScheduleStartMinuteUtc('0')
+    setRaidScheduleIntervalDays('1')
+    setRaidScheduleAnchorDateUtc('')
     const defaultMainStats = DEFAULT_MAIN_STATS.map((s) => ({ id: s.id, name: s.name, description: s.description ?? '' }))
     setMainStats(defaultMainStats)
     setDerivedStats(DERIVED_STATS.map((d) => emptyDerivedStat(d.id)))
@@ -929,6 +996,66 @@ export default function IdleRpgCreate() {
       }
     })
 
+    const parsedPvpTransferBrackets = pvpTransferBrackets
+      .map((row) => {
+        const minGap = Number(row.minGap)
+        const maxGap = row.maxGap.trim() !== '' ? Number(row.maxGap) : undefined
+        const percentOfLoserBalance = row.percentOfLoserBalance.trim() !== ''
+          ? Number(row.percentOfLoserBalance)
+          : undefined
+        const flatAmount = row.flatAmount.trim() !== '' ? Number(row.flatAmount) : undefined
+        if (Number.isNaN(minGap)) return null
+        if (maxGap != null && Number.isNaN(maxGap)) return null
+        if (percentOfLoserBalance != null && Number.isNaN(percentOfLoserBalance)) return null
+        if (flatAmount != null && Number.isNaN(flatAmount)) return null
+        const normalizedMinGap = Math.max(0, Math.floor(minGap))
+        const normalizedMaxGap = maxGap != null ? Math.max(0, Math.floor(maxGap)) : undefined
+        if (normalizedMaxGap != null && normalizedMaxGap < normalizedMinGap) return null
+        const normalizedPercent = percentOfLoserBalance != null ? Math.max(0, percentOfLoserBalance) : undefined
+        const normalizedFlat = flatAmount != null ? Math.max(0, Math.floor(flatAmount)) : undefined
+        const hasTransferAmount = (normalizedPercent ?? 0) > 0 || (normalizedFlat ?? 0) > 0
+        if (!hasTransferAmount) return null
+        return {
+          minGap: normalizedMinGap,
+          ...(normalizedMaxGap != null ? { maxGap: normalizedMaxGap } : {}),
+          ...(normalizedPercent != null ? { percentOfLoserBalance: normalizedPercent } : {}),
+          ...(normalizedFlat != null ? { flatAmount: normalizedFlat } : {}),
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => !!row)
+
+    const parsedPvpCooldownMinutes = Number(pvpAttackCooldownMinutes)
+    const parsedPvpCooldownMs = Number.isNaN(parsedPvpCooldownMinutes)
+      ? 0
+      : Math.max(0, Math.floor(parsedPvpCooldownMinutes * 60000))
+    const parsedRaidStartHourUtc = Number(raidScheduleStartHourUtc)
+    const parsedRaidStartMinuteUtc = raidScheduleStartMinuteUtc.trim() !== ''
+      ? Number(raidScheduleStartMinuteUtc)
+      : 0
+    const parsedRaidIntervalDays = raidScheduleIntervalDays.trim() !== ''
+      ? Number(raidScheduleIntervalDays)
+      : 1
+    const normalizedRaidSchedule = (
+      raidScheduleStartHourUtc.trim() !== '' &&
+      raidScheduleAnchorDateUtc.trim() !== '' &&
+      Number.isFinite(parsedRaidStartHourUtc) &&
+      Number.isFinite(parsedRaidStartMinuteUtc) &&
+      Number.isFinite(parsedRaidIntervalDays) &&
+      parsedRaidStartHourUtc >= 0 &&
+      parsedRaidStartHourUtc <= 23 &&
+      parsedRaidStartMinuteUtc >= 0 &&
+      parsedRaidStartMinuteUtc <= 59 &&
+      parsedRaidIntervalDays >= 1 &&
+      /^\d{4}-\d{2}-\d{2}$/.test(raidScheduleAnchorDateUtc.trim())
+    )
+      ? {
+          startHourUtc: Math.floor(parsedRaidStartHourUtc),
+          startMinuteUtc: Math.floor(parsedRaidStartMinuteUtc),
+          intervalDays: Math.floor(parsedRaidIntervalDays),
+          anchorDateUtc: raidScheduleAnchorDateUtc.trim(),
+        }
+      : null
+
     const statusEffectList: StatusEffectTemplate[] = statusEffects
       .filter((s) => s.id.trim() && s.name.trim())
       .map((s) => {
@@ -973,6 +1100,20 @@ export default function IdleRpgCreate() {
         maxLevel, xpTable, combatPresetId, statPointsPerLevel,
         ...(Number(abilityPointsPerLevel) > 0 ? { abilityPointsPerLevel: Number(abilityPointsPerLevel) } : {}),
         ...(Object.keys(parsedAbilitySlots).length > 0 ? { abilitySlotsByLevel: parsedAbilitySlots } : {}),
+        ...(
+          parsedPvpCooldownMs > 0 ||
+          pvpTransferCurrencyId.trim() ||
+          parsedPvpTransferBrackets.length > 0
+            ? {
+                pvp: {
+                  ...(parsedPvpCooldownMs > 0 ? { attackerCooldownMs: parsedPvpCooldownMs } : {}),
+                  ...(pvpTransferCurrencyId.trim() ? { transferCurrencyId: pvpTransferCurrencyId.trim() } : {}),
+                  ...(parsedPvpTransferBrackets.length > 0 ? { transferByLevelGap: parsedPvpTransferBrackets } : {}),
+                },
+              }
+            : {}
+        ),
+        ...(normalizedRaidSchedule ? { raidSchedule: normalizedRaidSchedule } : {}),
       },
       economy: { currencies: validCurrencies },
       ...(resourceList.length > 0 ? { resources: resourceList } : {}),
@@ -1095,6 +1236,133 @@ export default function IdleRpgCreate() {
                 <TextField label="Ability points/level" type="number" size="small" value={abilityPointsPerLevel} onChange={(e) => setAbilityPointsPerLevel(e.target.value)} sx={{ width: 160 }} inputProps={{ min: 0 }} />
                 <TextField label="Ability slots by level" size="small" value={abilitySlotsByLevel} onChange={(e) => setAbilitySlotsByLevel(e.target.value)} placeholder="1:1,5:2,10:3" sx={{ width: 220 }} helperText="level:slots, comma-separated" />
               </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>PvP</Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                <TextField
+                  label="Attack cooldown (minutes)"
+                  type="number"
+                  size="small"
+                  value={pvpAttackCooldownMinutes}
+                  onChange={(e) => setPvpAttackCooldownMinutes(e.target.value)}
+                  inputProps={{ min: 0 }}
+                  sx={{ width: 200 }}
+                />
+                <FormControl size="small" sx={{ minWidth: 190 }}>
+                  <InputLabel>Transfer currency</InputLabel>
+                  <Select
+                    value={pvpTransferCurrencyId}
+                    label="Transfer currency"
+                    onChange={(e) => setPvpTransferCurrencyId(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="">— None —</MenuItem>
+                    {currencies.filter((c) => c.id.trim()).map((c) => (
+                      <MenuItem key={c.id} value={c.id}>{c.name || c.id}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                Level gap uses absolute difference: |attacker level - defender level|.
+              </Typography>
+              {pvpTransferBrackets.map((row, rowIndex) => (
+                <Box key={rowIndex} sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <TextField
+                    size="small"
+                    label="Min gap"
+                    type="number"
+                    value={row.minGap}
+                    onChange={(e) => setPvpTransferBrackets((prev) => prev.map((x, i) => i === rowIndex ? { ...x, minGap: e.target.value } : x))}
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 100 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Max gap (empty=+)"
+                    type="number"
+                    value={row.maxGap}
+                    onChange={(e) => setPvpTransferBrackets((prev) => prev.map((x, i) => i === rowIndex ? { ...x, maxGap: e.target.value } : x))}
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 160 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="% of loser balance"
+                    type="number"
+                    value={row.percentOfLoserBalance}
+                    onChange={(e) => setPvpTransferBrackets((prev) => prev.map((x, i) => i === rowIndex ? { ...x, percentOfLoserBalance: e.target.value } : x))}
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 170 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Flat amount"
+                    type="number"
+                    value={row.flatAmount}
+                    onChange={(e) => setPvpTransferBrackets((prev) => prev.map((x, i) => i === rowIndex ? { ...x, flatAmount: e.target.value } : x))}
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 120 }}
+                  />
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => setPvpTransferBrackets((prev) => prev.filter((_, i) => i !== rowIndex))}
+                  >
+                    −
+                  </IconButton>
+                </Box>
+              ))}
+              <Button
+                type="button"
+                size="small"
+                variant="outlined"
+                sx={{ mt: 1 }}
+                onClick={() => setPvpTransferBrackets((prev) => [...prev, emptyPvpTransferBracket()])}
+              >
+                + Add PvP reward/penalty bracket
+              </Button>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>Raid schedule (UTC)</Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                <TextField
+                  label="Start hour (UTC)"
+                  type="number"
+                  size="small"
+                  value={raidScheduleStartHourUtc}
+                  onChange={(e) => setRaidScheduleStartHourUtc(e.target.value)}
+                  inputProps={{ min: 0, max: 23 }}
+                  sx={{ width: 170 }}
+                />
+                <TextField
+                  label="Start minute (UTC)"
+                  type="number"
+                  size="small"
+                  value={raidScheduleStartMinuteUtc}
+                  onChange={(e) => setRaidScheduleStartMinuteUtc(e.target.value)}
+                  inputProps={{ min: 0, max: 59 }}
+                  sx={{ width: 180 }}
+                />
+                <TextField
+                  label="Interval days"
+                  type="number"
+                  size="small"
+                  value={raidScheduleIntervalDays}
+                  onChange={(e) => setRaidScheduleIntervalDays(e.target.value)}
+                  inputProps={{ min: 1 }}
+                  sx={{ width: 150 }}
+                />
+                <TextField
+                  label="Anchor date (UTC)"
+                  type="date"
+                  size="small"
+                  value={raidScheduleAnchorDateUtc}
+                  onChange={(e) => setRaidScheduleAnchorDateUtc(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ width: 190 }}
+                />
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                Leave start hour or anchor date empty to disable fixed raid scheduling.
+              </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>XP table (level → xp required)</Typography>
               {xpEntries.map((e, i) => (
                 <Box key={i} sx={{ display: 'flex', gap: 1, mb: 1 }}>

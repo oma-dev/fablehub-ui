@@ -364,7 +364,6 @@ export default function FableIdleRPG() {
     targetProfile: PlayStateResponse
   } | null>(null)
   const [mailboxUnreadCount, setMailboxUnreadCount] = useState(0)
-  const [mailAlertQueue, setMailAlertQueue] = useState<MailboxMail[]>([])
   const [activeMailAlert, setActiveMailAlert] = useState<MailboxMail | null>(null)
   const [mailAlertActionLoading, setMailAlertActionLoading] = useState(false)
   const [mailboxAutoOpenMailId, setMailboxAutoOpenMailId] = useState<string | null>(null)
@@ -475,15 +474,14 @@ export default function FableIdleRPG() {
       setMailboxUnreadCount(response.unreadCount)
       const unreadAlerts = response.mails
         .filter((mail) => !mail.isRead && (mail.alertKind === 'pvp_defense' || mail.alertKind === 'raid_finished'))
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       const unseenAlerts = unreadAlerts.filter((mail) => !surfacedMailAlertIdsRef.current.has(mail.id))
       if (unseenAlerts.length > 0) {
         unseenAlerts.forEach((mail) => surfacedMailAlertIdsRef.current.add(mail.id))
-        setMailAlertQueue((prev) => {
-          const existingIds = new Set(prev.map((mail) => mail.id))
-          const additions = unseenAlerts.filter((mail) => !existingIds.has(mail.id))
-          return additions.length > 0 ? [...prev, ...additions] : prev
-        })
+        const latestAlert = unseenAlerts[0]
+        if (latestAlert) {
+          setActiveMailAlert(latestAlert)
+        }
       }
     } catch {
       // mailbox polling should never break gameplay tabs
@@ -493,7 +491,6 @@ export default function FableIdleRPG() {
   useEffect(() => {
     if (!fableId || !realm?.id || !displayCharacter?.id) return
     surfacedMailAlertIdsRef.current.clear()
-    setMailAlertQueue([])
     setActiveMailAlert(null)
     setMailboxUnreadCount(0)
     void pollMailbox()
@@ -502,12 +499,6 @@ export default function FableIdleRPG() {
     }, 10000)
     return () => window.clearInterval(intervalId)
   }, [displayCharacter?.id, fableId, pollMailbox, realm?.id])
-
-  useEffect(() => {
-    if (activeMailAlert || mailAlertQueue.length === 0) return
-    setActiveMailAlert(mailAlertQueue[0])
-    setMailAlertQueue((prev) => prev.slice(1))
-  }, [activeMailAlert, mailAlertQueue])
 
   const handleMailAlertAction = useCallback(async (watchReplay: boolean) => {
     if (!activeMailAlert || !fableId || !realm?.id || !displayCharacter?.id || mailAlertActionLoading) return

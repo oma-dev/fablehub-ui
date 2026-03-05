@@ -28,11 +28,35 @@ interface Props {
   onRequestPvpFight?: (targetCharacterId: string, targetProfile: PlayStateResponse) => void
 }
 
+function formatCooldownRemaining(durationMs: number): string {
+  const remainingSeconds = Math.max(1, Math.ceil(durationMs / 1000))
+  const hours = Math.floor(remainingSeconds / 3600)
+  const minutes = Math.floor((remainingSeconds % 3600) / 60)
+  const seconds = remainingSeconds % 60
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+}
+
 export default function GuildRoster({ fableId, realmId, group, pack, viewerCharacter, onRequestPvpFight }: Props) {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [profile, setProfile] = useState<PlayStateResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [cooldownNowMs, setCooldownNowMs] = useState(() => Date.now())
+  const pvpCooldownUntil = Number(viewerCharacter.progression?.pvpAttackCooldownUntil ?? 0)
+  const pvpCooldownRemainingMs = Math.max(0, pvpCooldownUntil - cooldownNowMs)
+  const isPvpCooldownActive = pvpCooldownRemainingMs > 0
+  const fightButtonLabel = isPvpCooldownActive
+    ? `Cooldown: ${formatCooldownRemaining(pvpCooldownRemainingMs)}`
+    : 'Fight'
+
+  useEffect(() => {
+    if (!selectedMemberId && !isPvpCooldownActive) return
+    setCooldownNowMs(Date.now())
+    const intervalId = window.setInterval(() => setCooldownNowMs(Date.now()), 1000)
+    return () => window.clearInterval(intervalId)
+  }, [selectedMemberId, isPvpCooldownActive])
 
   useEffect(() => {
     if (!selectedMemberId) {
@@ -134,6 +158,8 @@ export default function GuildRoster({ fableId, realmId, group, pack, viewerChara
         realmId={realmId}
         showFightButton={canFight}
         onFight={handleFight}
+        fightButtonLabel={fightButtonLabel}
+        fightButtonDisabled={isPvpCooldownActive}
       />
     </>
   )

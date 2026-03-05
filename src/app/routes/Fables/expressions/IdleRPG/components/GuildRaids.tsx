@@ -3,16 +3,19 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
-import { getRaidCall, setRaidReady, startRaid } from '@features/idle-rpg/api'
+import { getRaidCall, setRaidReady } from '@features/idle-rpg/api'
 import type { CharacterState, IdleRpgGroup, IdleRpgPackV1, RaidCallResponse } from '@features/idle-rpg/api'
 
-const RAID_PREPARE_DURATION_MS = 20 * 1000 // 20 seconds (for testing; was 1 hour)
+function formatCountdown(milliseconds: number): string {
+  if (milliseconds <= 0) return '0:00'
+  const minutes = Math.floor(milliseconds / 60000)
+  const seconds = Math.floor((milliseconds % 60000) / 1000)
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
 
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return '0:00'
-  const m = Math.floor(ms / 60000)
-  const s = Math.floor((ms % 60000) / 1000)
-  return `${m}:${s.toString().padStart(2, '0')}`
+function formatUtcDateTime(timestampMs: number): string {
+  if (!Number.isFinite(timestampMs) || timestampMs <= 0) return ''
+  return `${new Date(timestampMs).toISOString().slice(0, 16).replace('T', ' ')} UTC`
 }
 
 interface Props {
@@ -28,62 +31,67 @@ interface Props {
 export default function GuildRaids({ fableId, realmId, groupId, group, character, pack: _pack, onUpdate }: Props) {
   const [raidCall, setRaidCall] = useState<RaidCallResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [readying, setReadying] = useState(false)
-  const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const isLeader = group.leaderId === character.id
   const isReady = raidCall?.readyCharacterIds.includes(character.id) ?? false
 
   useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+    return () => {
+      window.clearInterval(timerId)
+    }
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    getRaidCall(fableId, realmId, groupId)
-      .then((r) => { if (!cancelled) setRaidCall(r ?? null) })
-      .catch(() => { if (!cancelled) setRaidCall(null) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+    const fetchRaidCall = async (initialLoad: boolean) => {
+      if (initialLoad) setLoading(true)
+      try {
+        const response = await getRaidCall(fableId, realmId, groupId)
+        if (!cancelled) setRaidCall(response ?? null)
+      } catch {
+        if (!cancelled) setRaidCall(null)
+      } finally {
+        if (initialLoad && !cancelled) setLoading(false)
+      }
+    }
+    void fetchRaidCall(true)
+    const intervalId = window.setInterval(() => {
+      void fetchRaidCall(false)
+    }, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
   }, [fableId, realmId, groupId, onUpdate])
 
-  const now = Date.now()
-  const endsAt = raidCall?.preparedAt != null ? raidCall.preparedAt + RAID_PREPARE_DURATION_MS : 0
-  const countdownMs = Math.max(0, endsAt - now)
-  const canStart = isLeader && countdownMs === 0 && (raidCall?.readyCharacterIds.length ?? 0) > 0
+  const scheduledStartAt = raidCall?.nextScheduledStartAt ?? 0
+  const countdownMs = Math.max(0, scheduledStartAt - nowMs)
 
   const handleReady = async () => {
     if (isReady || readying) return
     setError(null)
     setReadying(true)
     try {
-      const updated = await setRaidReady(fableId, realmId, groupId, { characterId: character.id })
-      setRaidCall(updated)
+      const updatedCall = await setRaidReady(fableId, realmId, groupId, { characterId: character.id })
+      setRaidCall(updatedCall)
       onUpdate?.()
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to set ready')
+    } catch (unknownError: unknown) {
+      setError(unknownError instanceof Error ? unknownError.message : 'Failed to set ready')
     } finally {
       setReadying(false)
-    }
-  }
-
-  const handleStart = async () => {
-    if (!canStart || starting) return
-    setError(null)
-    setStarting(true)
-    try {
-      await startRaid(fableId, realmId, groupId, { characterId: character.id })
-      setRaidCall(null)
-      onUpdate?.()
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to start raid')
-    } finally {
-      setStarting(false)
     }
   }
 
   if (loading) {
     return (
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography color="text.secondary">Loading raid call…</Typography>
+        <Typography color="text.secondary">Loading raid call...</Typography>
       </Paper>
     )
   }
@@ -112,27 +120,31 @@ export default function GuildRaids({ fableId, realmId, groupId, group, character
               <Box>
                 <Typography variant="body2" fontWeight={600}>{raidCall.boss.name}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Lv.{raidCall.boss.level} · HP {raidCall.boss.hp} · AP {raidCall.boss.ap} · ARM {raidCall.boss.arm}
+                  Lv.{raidCall.boss.level} | HP {raidCall.boss.hp} | AP {raidCall.boss.ap} | ARM {raidCall.boss.arm}
                 </Typography>
               </Box>
             </Box>
           )}
+
           <Typography variant="body2" color="text.secondary">
             {countdownMs > 0
-              ? `Raid starts in ${formatCountdown(countdownMs)}`
-              : 'Raid can start now (leader only).'}
+              ? `Raid starts in ${formatCountdown(countdownMs)} (${formatUtcDateTime(scheduledStartAt)})`
+              : 'Raid start time reached. It will start automatically shortly.'}
           </Typography>
+
+          {raidCall.raidSchedule && (
+            <Typography variant="caption" color="text.secondary">
+              Schedule: {`${String(raidCall.raidSchedule.startHourUtc).padStart(2, '0')}:${String(raidCall.raidSchedule.startMinuteUtc).padStart(2, '0')} UTC every ${raidCall.raidSchedule.intervalDays} day(s), anchor ${raidCall.raidSchedule.anchorDateUtc}`}
+            </Typography>
+          )}
+
           {!isReady && (
             <Button variant="contained" size="small" onClick={handleReady} disabled={readying}>
-              {readying ? '…' : 'READY'}
+              {readying ? '...' : 'READY'}
             </Button>
           )}
           {isReady && <Typography variant="body2" color="success.main">You are ready.</Typography>}
-          {canStart && (
-            <Button variant="contained" color="primary" size="small" onClick={handleStart} disabled={starting}>
-              {starting ? 'Starting…' : 'Start raid'}
-            </Button>
-          )}
+
           {raidCall.readyCharacterIds.length > 0 && (
             <Box>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
@@ -140,20 +152,20 @@ export default function GuildRaids({ fableId, realmId, groupId, group, character
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {raidCall.readyCharacterIds.map((id) => {
-                  const m = group.members?.find((x) => x.id === id)
+                  const member = group.members?.find((x) => x.id === id)
                   return (
                     <Typography key={id} variant="body2" component="span" sx={{ mr: 1 }}>
-                      {m?.name ?? id}
+                      {member?.name ?? id}
                     </Typography>
                   )
                 })}
               </Box>
             </Box>
           )}
+
           {error && <Typography color="error" variant="body2">{error}</Typography>}
         </Box>
       )}
     </Paper>
   )
 }
-
