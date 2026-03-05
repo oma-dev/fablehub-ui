@@ -219,6 +219,8 @@ export interface AnimationFrames {
   weapon?: AnimationWeaponFrame[]
   projectile?: AnimationProjectileFrame[]
   impact?: AnimationImpactFrame[]
+  avoid?: AnimationBlockFrame[]
+  /** @deprecated Use avoid[] instead. */
   block?: AnimationBlockFrame[]
   card?: CardAnimationConfig
 }
@@ -276,11 +278,20 @@ export interface StatusTransformConfig {
   grantedAbilityIds?: string[]
 }
 
-/** Reactive ability configuration (e.g. block chance). */
+export type ReactiveTriggerTiming = 'on_incoming_cast' | 'on_hit_taken'
+
+/** Reactive ability configuration. */
 export interface ReactiveConfig {
-  baseChance: number
+  triggerTiming?: ReactiveTriggerTiming
+  priority?: number
+  maxTriggersPerTurn?: number
+  /** @deprecated Legacy block chance support. Prefer avoid effects with kind='avoid'. */
+  baseChance?: number
+  /** @deprecated Legacy block chance support. Prefer avoid effects with kind='avoid'. */
   scalingTerms?: ScalingTerm[]
+  /** @deprecated Legacy block chance support. Prefer avoid effects with kind='avoid'. */
   scalingStat?: StatId
+  /** @deprecated Legacy block chance support. Prefer avoid effects with kind='avoid'. */
   scalingCoeff?: number
 }
 
@@ -297,8 +308,7 @@ export type DerivedStatId =
   | 'resource_regeneration'
   | 'max_hp'
   | 'hp_regeneration'
-  | 'block_chance'
-  | 'dodge_chance'
+  | 'avoid_chance'
   | 'damage_resistance'
   | 'critical_hit_chance'
   | 'critical_hit_damage'
@@ -306,6 +316,7 @@ export type DerivedStatId =
 
 export type ScalingSource =
   | { kind: 'main_stat'; statId: MainStatId }
+  | { kind: 'derived_stat'; statId: DerivedStatId }
   | { kind: 'equipped_weapon_damage' }
   | { kind: 'equipped_protective_armor' }
 
@@ -324,6 +335,7 @@ export type EffectKind =
   | 'damage'
   | 'heal'
   | 'apply_status'
+  | 'avoid'
   | 'execute'
   | 'lifesteal'
   | 'stun'
@@ -754,7 +766,7 @@ export interface CreateIdleRpgBody {
 export type CombatEventType =
   | 'damage' | 'heal' | 'dot_tick' | 'hot_tick'
   | 'status_applied' | 'status_expired' | 'status_dispelled' | 'stun_skip'
-  | 'execute' | 'resource_change' | 'block'
+  | 'execute' | 'resource_change' | 'block' | 'avoid'
 
 export interface ActiveStatusEffect {
   id: string
@@ -782,8 +794,14 @@ export interface CombatTurnEvent {
   statusTemplateId?: string
   resourceAfter?: { current: number; max: number }
   statusEffectName?: string
+  avoided?: boolean
+  avoidAbilityId?: string
+  avoidAnimationFrames?: AnimationFrames
+  /** @deprecated Legacy block compatibility. */
   blocked?: boolean
+  /** @deprecated Legacy block compatibility. */
   blockAbilityId?: string
+  /** @deprecated Legacy block compatibility. */
   blockAnimationFrames?: AnimationFrames
 }
 

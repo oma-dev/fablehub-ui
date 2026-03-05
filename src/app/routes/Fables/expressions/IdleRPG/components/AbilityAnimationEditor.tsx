@@ -149,7 +149,7 @@ export function hydrateAnimFrames(af?: AnimationFrames | null): AbilityAnimFrame
       acceleration: String(f.acceleration ?? 0),
       rotationStart: String(f.rotationStart ?? 0), rotationEnd: String(f.rotationEnd ?? f.rotationStart ?? 0),
     })),
-    block: (af.block ?? []).map(f => ({
+    block: (af.avoid ?? af.block ?? []).map(f => ({
       enabled: true, imageSource: (f.imageSource ?? 'url') as AnimationFrameImageSource, url: f.url ?? '',
       soundUrl: f.soundUrl ?? '',
       soundVolumePercent: String(f.soundVolumePercent ?? 100),
@@ -281,7 +281,7 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     ...(weapon.length ? { weapon } : {}),
     ...(projectile.length ? { projectile } : {}),
     ...(impact.length ? { impact } : {}),
-    ...(block.length ? { block } : {}),
+    ...(block.length ? { avoid: block, block } : {}),
     ...(hasOnlyDefaultCard ? {} : { card }),
   }
 }
@@ -529,7 +529,7 @@ export default function AbilityAnimationEditor({ animFrames, onChange, isReactiv
       />
       {isReactive && (
         <FrameListEditor
-          label="Block (defender card border)"
+          label="Avoid (defender card border)"
           frames={animFrames.block}
           phaseType="block"
           onChange={(frames) => onChange({ ...animFrames, block: frames })}

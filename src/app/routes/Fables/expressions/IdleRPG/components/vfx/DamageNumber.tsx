@@ -30,8 +30,6 @@ function getDisplayConfig(type: CombatEventType, value: number): { color: string
       return { color: '#78909c', prefix: '', label: '' }
     case 'resource_change':
       return { color: '#4fc3f7', prefix: value >= 0 ? '+' : '' }
-    case 'block':
-      return { color: '#90caf9', prefix: '', label: 'BLOCKED!' }
     default:
       return { color: '#ef5350', prefix: '-' }
   }

@@ -886,9 +886,11 @@ export default function CombatReplay({
       if (!shouldLunge) await sleep(maxWeaponMs)
     }
 
-    // Detect block events in this group
-    const blockEvent = events.find(ev => ev.type === 'block' && ev.blocked)
-    const isBlocked = !!blockEvent
+    // Detect avoid events in this group (supports legacy block events)
+    const avoidEvent = events.find(
+      (ev) => (ev.type === 'avoid' && ev.avoided) || (ev.type === 'block' && ev.blocked),
+    )
+    const isAvoided = !!avoidEvent
 
     // --- Projectile frames ---
     const projFrames = frames?.projectile ?? []
@@ -951,7 +953,7 @@ export default function CombatReplay({
     if (abortRef.current) return
 
     // --- Block frames (shown at defender portrait center when blocked) ---
-    if (isBlocked && blockEvent) {
+    if (isAvoided && avoidEvent) {
       const defenderSide: 'player' | 'creature' = attackerSide === 'player' ? 'creature' : 'player'
       const isRightSideDefender = defenderSide === 'creature'
       const resolveBlockTiming = (f: AnimationBlockFrame) => {
@@ -959,7 +961,13 @@ export default function CombatReplay({
         const lt = f.lifetimeMs ?? (f.showMs != null ? f.showMs + (f.vanishMs ?? 500) : 800)
         return { showMs: Math.floor(lt * 0.4), vanishMs: Math.ceil(lt * 0.6) }
       }
-      const blockAnimFrames = (blockEvent.blockAnimationFrames?.block ?? []).filter(f => f.url?.trim())
+      const blockAnimFrames = (
+        avoidEvent.avoidAnimationFrames?.avoid
+        ?? avoidEvent.avoidAnimationFrames?.block
+        ?? avoidEvent.blockAnimationFrames?.avoid
+        ?? avoidEvent.blockAnimationFrames?.block
+        ?? []
+      ).filter(f => f.url?.trim())
       if (blockAnimFrames.length > 0) {
         blockAnimFrames.forEach(async (f) => {
           if (f.delayMs) await sleep(f.delayMs)
@@ -990,9 +998,9 @@ export default function CombatReplay({
       const isDefenderPlayer = defenderSide === 'player'
       dmgKeyRef.current++
       if (isDefenderPlayer) {
-        setPlayerDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Blocked!' })
+        setPlayerDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Avoided!' })
       } else {
-        setCreatureDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Blocked!' })
+        setCreatureDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Avoided!' })
       }
 
       const maxBlockMs = blockAnimFrames.length > 0
@@ -1193,7 +1201,9 @@ export default function CombatReplay({
       const nonResourceNonBlockEvents = nonResourceEvents.filter((event) => event.type !== 'block')
       const isBlockedCastGroup =
         nonResourceEvents.length > 0
-        && nonResourceEvents.every((event) => event.type === 'block' && event.blocked)
+        && nonResourceEvents.every((event) =>
+          (event.type === 'block' && event.blocked) || (event.type === 'avoid' && event.avoided),
+        )
 
       let attackerSide: 'player' | 'creature' = 'player'
       if (isBlockedCastGroup) {

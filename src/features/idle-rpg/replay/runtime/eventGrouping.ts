@@ -17,7 +17,7 @@ export function groupCombatTurnEvents(events: CombatTurnEvent[]): EventGroup[] {
     const key =
       event.castId
         ? `cast:${event.castId}`
-        : event.type === 'block' && previousGroup?.kind === 'cast'
+        : (event.type === 'block' || event.type === 'avoid') && previousGroup?.kind === 'cast'
           ? previousGroup.key
           : event.abilityId
             ? `legacy:${event.sourceId}:${event.abilityId}`
@@ -38,4 +38,3 @@ export function groupCombatTurnEvents(events: CombatTurnEvent[]): EventGroup[] {
 
   return groups
 }
-

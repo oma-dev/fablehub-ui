@@ -9,11 +9,12 @@ import Select from '@mui/material/Select'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
-type SourceKind = 'main_stat' | 'equipped_weapon_damage' | 'equipped_protective_armor'
+type SourceKind = 'main_stat' | 'derived_stat' | 'equipped_weapon_damage' | 'equipped_protective_armor'
 type EffectKind =
   | 'damage'
   | 'heal'
   | 'apply_status'
+  | 'avoid'
   | 'execute'
   | 'lifesteal'
   | 'stun'
@@ -52,6 +53,7 @@ const EFFECT_KINDS: EffectKind[] = [
   'damage',
   'heal',
   'apply_status',
+  'avoid',
   'execute',
   'lifesteal',
   'stun',
@@ -60,6 +62,18 @@ const EFFECT_KINDS: EffectKind[] = [
   'stat_modifiers',
   'derived_stat_modifiers',
   'dispel',
+]
+
+const DERIVED_STAT_SOURCE_IDS = [
+  'max_resource_amount',
+  'resource_regeneration',
+  'max_hp',
+  'hp_regeneration',
+  'avoid_chance',
+  'damage_resistance',
+  'critical_hit_chance',
+  'critical_hit_damage',
+  'cooldown_reduction',
 ]
 
 export function createEmptyScaleTerm(fallbackMainStatId = 'STR'): EffectScaleForm {
@@ -117,7 +131,10 @@ export function hydrateEffectRows(effects: any[] | undefined, fallbackMainStatId
     derivedStatModifiers: serializeNumberMap(effect?.derivedStatModifiers),
     scalingTerms: (effect?.scalingTerms ?? []).map((term: any) => ({
       sourceKind: term.source.kind as SourceKind,
-      sourceStatId: term.source.kind === 'main_stat' ? term.source.statId : fallbackMainStatId,
+      sourceStatId:
+        term.source.kind === 'main_stat' || term.source.kind === 'derived_stat'
+          ? term.source.statId
+          : fallbackMainStatId,
       percent: String(term.percent ?? 0),
     })),
   }))
@@ -139,11 +156,14 @@ export function buildEffectPayload(rows: EffectFormRow[]): any[] {
         .filter((t) => t.percent.trim() !== '' && !Number.isNaN(Number(t.percent)))
         .map((t) => ({
           percent: Number(t.percent),
-          source: t.sourceKind === 'main_stat'
-            ? { kind: 'main_stat' as const, statId: t.sourceStatId.trim() || 'STR' }
-            : t.sourceKind === 'equipped_weapon_damage'
-              ? { kind: 'equipped_weapon_damage' as const }
-              : { kind: 'equipped_protective_armor' as const },
+          source:
+            t.sourceKind === 'main_stat'
+              ? { kind: 'main_stat' as const, statId: t.sourceStatId.trim() || 'STR' }
+              : t.sourceKind === 'derived_stat'
+                ? { kind: 'derived_stat' as const, statId: t.sourceStatId.trim() || 'avoid_chance' }
+                : t.sourceKind === 'equipped_weapon_damage'
+                  ? { kind: 'equipped_weapon_damage' as const }
+                  : { kind: 'equipped_protective_armor' as const },
         }))
       if (scalingTerms.length > 0) out.scalingTerms = scalingTerms
 
@@ -274,6 +294,7 @@ export default function EffectsEditor({
                   })))}
                 >
                   <MenuItem value="main_stat">Main stat</MenuItem>
+                  <MenuItem value="derived_stat">Derived stat</MenuItem>
                   <MenuItem value="equipped_weapon_damage">Equipped weapon damage</MenuItem>
                   <MenuItem value="equipped_protective_armor">Equipped protective armor</MenuItem>
                 </Select>
@@ -290,6 +311,21 @@ export default function EffectsEditor({
                     })))}
                   >
                     {mainStatIds.map((statId) => <MenuItem key={statId} value={statId}>{statId}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              )}
+              {term.sourceKind === 'derived_stat' && (
+                <FormControl size="small" sx={{ minWidth: 190 }}>
+                  <InputLabel>Derived stat</InputLabel>
+                  <Select
+                    value={term.sourceStatId}
+                    label="Derived stat"
+                    onChange={(e) => onChange(effects.map((x, j) => j !== effectIndex ? x : ({
+                      ...x,
+                      scalingTerms: x.scalingTerms.map((sx, sj) => sj === termIndex ? { ...sx, sourceStatId: e.target.value } : sx),
+                    })))}
+                  >
+                    {DERIVED_STAT_SOURCE_IDS.map((statId) => <MenuItem key={statId} value={statId}>{statId}</MenuItem>)}
                   </Select>
                 </FormControl>
               )}

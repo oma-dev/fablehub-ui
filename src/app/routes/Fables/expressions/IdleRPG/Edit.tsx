@@ -91,18 +91,18 @@ const DERIVED_STATS: Array<{ id: DerivedStatId; label: string }> = [
   { id: 'resource_regeneration', label: 'Resource Regeneration / Turn' },
   { id: 'max_hp', label: 'Max HP Bonus' },
   { id: 'hp_regeneration', label: 'HP Regeneration / Turn' },
-  { id: 'block_chance', label: 'Block Chance (%)' },
-  { id: 'dodge_chance', label: 'Dodge Chance (%)' },
+  { id: 'avoid_chance', label: 'Avoid Chance (%)' },
   { id: 'damage_resistance', label: 'Damage Resistance (%)' },
   { id: 'critical_hit_chance', label: 'Critical Hit Chance (%)' },
   { id: 'critical_hit_damage', label: 'Critical Hit Damage (%)' },
   { id: 'cooldown_reduction', label: 'Cooldown Reduction (%)' },
 ]
+const DERIVED_STAT_ID_SET = new Set<DerivedStatId>(DERIVED_STATS.map((row) => row.id))
 const SLOTS = ['attack_source', 'defense_layer'] as const
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
 const ABILITY_TYPES: Ability['abilityType'][] = ['primary', 'regular', 'passive', 'ultimate', 'reactive']
 type DerivedScaleForm = {
-  sourceKind: 'main_stat' | 'equipped_weapon_damage' | 'equipped_protective_armor'
+  sourceKind: 'main_stat' | 'derived_stat' | 'equipped_weapon_damage' | 'equipped_protective_armor'
   sourceStatId: string
   percent: string
 }
@@ -117,6 +117,11 @@ const emptyMainStat = (): MainStatForm => ({ id: '', name: '', description: '' }
 const emptyDerivedModifier = (): DerivedModifierForm => ({ statId: 'max_hp', flat: '', percent: '' })
 const emptyMainStatValue = (fallbackMainStatId = 'STR'): MainStatValueForm => ({ statId: fallbackMainStatId, value: '' })
 
+function coerceDerivedStatId(value: string, fallback: DerivedStatId = 'avoid_chance'): DerivedStatId {
+  if (DERIVED_STAT_ID_SET.has(value as DerivedStatId)) return value as DerivedStatId
+  return fallback
+}
+
 // --- Form state types (same as Create) ---
 type XpEntry = { level: string; xp: string }
 type ResourceForm = { id: string; name: string; description: string; colorHex: string; isGenerative: boolean; max: string; regenPerTurn: string; gainOnHit: string }
@@ -126,7 +131,9 @@ type AbilityForm = {
   effects: EffectFormRow[]
   derivedStatModifiers: DerivedModifierForm[]
   animFrames: AbilityAnimFrames
-  reactiveBaseChance: string; reactiveScalingStat: string; reactiveScalingCoeff: string
+  reactiveTriggerTiming: 'on_incoming_cast' | 'on_hit_taken'
+  reactivePriority: string
+  reactiveMaxTriggersPerTurn: string
 }
 type StatusEffectForm = {
   id: string
@@ -178,7 +185,9 @@ const emptyAbility = (): AbilityForm => ({
   effects: [createEmptyEffectRow()],
   derivedStatModifiers: [],
   animFrames: emptyAnimFrames(),
-  reactiveBaseChance: '0.2', reactiveScalingStat: '', reactiveScalingCoeff: '0',
+  reactiveTriggerTiming: 'on_incoming_cast',
+  reactivePriority: '0',
+  reactiveMaxTriggersPerTurn: '',
 })
 const emptyStatusEffect = (): StatusEffectForm => ({
   id: '',
@@ -240,7 +249,10 @@ function hydrateDerivedStats(pack: IdleRpgPackV1, mainStats: MainStatForm[]): De
     const src = pack.derivedStats?.[id] as DerivedStatDefinition | undefined
     const scaling = (src?.scaling ?? []).map((t) => ({
       sourceKind: t.source.kind,
-      sourceStatId: t.source.kind === 'main_stat' ? t.source.statId : fallbackMainStatId,
+      sourceStatId:
+        t.source.kind === 'main_stat' || t.source.kind === 'derived_stat'
+          ? t.source.statId
+          : fallbackMainStatId,
       percent: String(t.percent ?? 0),
     }))
     return {
@@ -266,11 +278,14 @@ function buildDerivedStats(rows: DerivedStatForm[]): Partial<Record<DerivedStatI
       .filter((s) => s.percent.trim() !== '' && !Number.isNaN(Number(s.percent)))
       .map((s) => ({
         percent: Number(s.percent),
-        source: s.sourceKind === 'main_stat'
-          ? { kind: 'main_stat' as const, statId: s.sourceStatId.trim() || 'STR' }
-          : s.sourceKind === 'equipped_weapon_damage'
-            ? { kind: 'equipped_weapon_damage' as const }
-            : { kind: 'equipped_protective_armor' as const },
+        source:
+          s.sourceKind === 'main_stat'
+            ? { kind: 'main_stat' as const, statId: s.sourceStatId.trim() || 'STR' }
+            : s.sourceKind === 'derived_stat'
+              ? { kind: 'derived_stat' as const, statId: coerceDerivedStatId(s.sourceStatId.trim()) }
+              : s.sourceKind === 'equipped_weapon_damage'
+                ? { kind: 'equipped_weapon_damage' as const }
+                : { kind: 'equipped_protective_armor' as const },
       }))
     if (scaling.length > 0) def.scaling = scaling
     if (
@@ -355,9 +370,9 @@ function hydrateAbilities(pack: IdleRpgPackV1, fallbackMainStatId: string): Abil
     effects: hydrateEffectRows((a as any).effects, fallbackMainStatId),
     derivedStatModifiers: hydrateDerivedModifiers((a as any).derivedStatModifiers),
     animFrames: hydrateAnimFrames(a.animationFrames),
-    reactiveBaseChance: String((a as any).reactiveConfig?.baseChance ?? 0.2),
-    reactiveScalingStat: (a as any).reactiveConfig?.scalingStat ?? '',
-    reactiveScalingCoeff: String((a as any).reactiveConfig?.scalingCoeff ?? 0),
+    reactiveTriggerTiming: ((a as any).reactiveConfig?.triggerTiming ?? 'on_incoming_cast') as 'on_incoming_cast' | 'on_hit_taken',
+    reactivePriority: String((a as any).reactiveConfig?.priority ?? 0),
+    reactiveMaxTriggersPerTurn: String((a as any).reactiveConfig?.maxTriggersPerTurn ?? ''),
   }))
 }
 
@@ -653,9 +668,9 @@ export default function IdleRpgEdit() {
         if (animationFrames) def.animationFrames = animationFrames
         if (a.abilityType === 'reactive') {
           def.reactiveConfig = {
-            baseChance: Number(a.reactiveBaseChance) || 0.2,
-            ...(a.reactiveScalingStat && mainStatIdList.includes(a.reactiveScalingStat) ? { scalingStat: a.reactiveScalingStat as any } : {}),
-            ...(Number(a.reactiveScalingCoeff) > 0 ? { scalingCoeff: Number(a.reactiveScalingCoeff) } : {}),
+            triggerTiming: a.reactiveTriggerTiming,
+            ...(Number(a.reactivePriority) !== 0 ? { priority: Number(a.reactivePriority) } : {}),
+            ...(Number(a.reactiveMaxTriggersPerTurn) > 0 ? { maxTriggersPerTurn: Number(a.reactiveMaxTriggersPerTurn) } : {}),
           }
         }
         return def
@@ -1198,15 +1213,34 @@ export default function IdleRpgEdit() {
                   </Box>
                   {a.abilityType === 'reactive' && (
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: '100%', mt: 1 }}>
-                      <TextField size="small" label="Base block chance (0-1)" type="number" value={a.reactiveBaseChance} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveBaseChance: e.target.value } : x))} sx={{ width: 160 }} inputProps={{ step: 0.05, min: 0, max: 1 }} />
-                      <FormControl size="small" sx={{ minWidth: 100 }}>
-                        <InputLabel>Scaling stat</InputLabel>
-                        <Select value={a.reactiveScalingStat} label="Scaling stat" onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveScalingStat: e.target.value } : x))} displayEmpty>
-                          <MenuItem value="">— None —</MenuItem>
-                          {mainStatIds.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                      <FormControl size="small" sx={{ minWidth: 180 }}>
+                        <InputLabel>Trigger timing</InputLabel>
+                        <Select
+                          value={a.reactiveTriggerTiming}
+                          label="Trigger timing"
+                          onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveTriggerTiming: e.target.value as 'on_incoming_cast' | 'on_hit_taken' } : x))}
+                        >
+                          <MenuItem value="on_incoming_cast">On incoming cast</MenuItem>
+                          <MenuItem value="on_hit_taken">On hit taken</MenuItem>
                         </Select>
                       </FormControl>
-                      <TextField size="small" label="Scaling coeff" type="number" value={a.reactiveScalingCoeff} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveScalingCoeff: e.target.value } : x))} sx={{ width: 120 }} inputProps={{ step: 0.001 }} />
+                      <TextField
+                        size="small"
+                        label="Priority"
+                        type="number"
+                        value={a.reactivePriority}
+                        onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactivePriority: e.target.value } : x))}
+                        sx={{ width: 120 }}
+                      />
+                      <TextField
+                        size="small"
+                        label="Max triggers/turn"
+                        type="number"
+                        value={a.reactiveMaxTriggersPerTurn}
+                        onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, reactiveMaxTriggersPerTurn: e.target.value } : x))}
+                        sx={{ width: 150 }}
+                        inputProps={{ min: 1 }}
+                      />
                     </Box>
                   )}
                   <AbilityAnimationEditor
@@ -1898,4 +1932,5 @@ export default function IdleRpgEdit() {
     </Box>
   )
 }
+
 

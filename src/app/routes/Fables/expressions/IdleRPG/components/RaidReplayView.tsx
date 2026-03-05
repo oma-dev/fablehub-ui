@@ -748,7 +748,9 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       }
 
       // Detect block
-      const blockEvent = events.find(ev => ev.type === 'block' && ev.blocked)
+      const blockEvent = events.find(
+        (ev) => (ev.type === 'avoid' && ev.avoided) || (ev.type === 'block' && ev.blocked),
+      )
       const isBlocked = !!blockEvent
 
       // Weapon frames
@@ -844,7 +846,13 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           const lt = f.lifetimeMs ?? (f.showMs != null ? f.showMs + (f.vanishMs ?? 500) : 800)
           return { showMs: Math.floor(lt * 0.4), vanishMs: Math.ceil(lt * 0.6) }
         }
-        const blockAnimFrames = (blockEvent.blockAnimationFrames?.block ?? []).filter(f => f.url?.trim())
+        const blockAnimFrames = (
+          blockEvent.avoidAnimationFrames?.avoid
+          ?? blockEvent.avoidAnimationFrames?.block
+          ?? blockEvent.blockAnimationFrames?.avoid
+          ?? blockEvent.blockAnimationFrames?.block
+          ?? []
+        ).filter(f => f.url?.trim())
         if (blockAnimFrames.length > 0) {
           blockAnimFrames.forEach(async (f) => {
             if (f.delayMs) await sleep(f.delayMs)
@@ -860,7 +868,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           })
         }
         dmgKeyRef.current++
-        setTargetDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Blocked!' })
+        setTargetDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Avoided!' })
         const maxBlockMs = blockAnimFrames.length > 0
           ? Math.max(...blockAnimFrames.map(f => { const t = resolveBlockTiming(f); return (f.delayMs ?? 0) + t.showMs + t.vanishMs }))
           : 600
@@ -1016,7 +1024,9 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       const nonResourceNonBlockEvents = nonResourceEvents.filter((event) => event.type !== 'block')
       const isBlockedCastGroup =
         nonResourceEvents.length > 0
-        && nonResourceEvents.every((event) => event.type === 'block' && event.blocked)
+        && nonResourceEvents.every((event) =>
+          (event.type === 'block' && event.blocked) || (event.type === 'avoid' && event.avoided),
+        )
 
       let attackerSide: 'party' | 'boss' = 'party'
       if (isBlockedCastGroup) {
