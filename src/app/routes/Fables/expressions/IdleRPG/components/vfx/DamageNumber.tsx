@@ -11,6 +11,8 @@ interface Props {
   type: CombatEventType
   id: string | number
   abilityName?: string
+  isCritical?: boolean
+  stackIndex?: number
 }
 
 function getDisplayConfig(type: CombatEventType, value: number): { color: string; prefix: string; label?: string } {
@@ -35,30 +37,39 @@ function getDisplayConfig(type: CombatEventType, value: number): { color: string
   }
 }
 
-export default function DamageNumber({ value, type, id, abilityName }: Props) {
+export default function DamageNumber({ value, type, id, abilityName, isCritical = false, stackIndex = 0 }: Props) {
   const { color, prefix, label } = getDisplayConfig(type, value)
 
   if (type === 'status_applied' || type === 'status_expired') return null
 
   const displayText = label || `${prefix}${value}`
+  const showCriticalLabel = isCritical && !label
+  const numberFontSize = showCriticalLabel
+    ? DAMAGE_FONT_SIZE * 1.35
+    : (label ? DAMAGE_FONT_SIZE * 0.7 : DAMAGE_FONT_SIZE)
+  const popScale = showCriticalLabel ? 1.45 : 1.2
+  const stackOffsetY = Math.max(0, stackIndex) * Math.round(DAMAGE_FONT_SIZE * 0.45)
 
   return (
     <AnimatePresence>
       <motion.div
         key={id}
-        initial={{ opacity: 1, y: 0, scale: 0.5 }}
-        animate={{ opacity: 0, y: DAMAGE_FLIGHT_Y, scale: 1.2 }}
+        initial={{ opacity: 1, y: 0, scale: showCriticalLabel ? 0.65 : 0.5 }}
+        animate={{ opacity: 0, y: DAMAGE_FLIGHT_Y, scale: popScale }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.9, ease: 'easeOut' }}
         style={{
           position: 'absolute',
-          top: DAMAGE_TOP,
-          left: '50%',
-          transform: 'translateX(-50%)',
+          top: DAMAGE_TOP - stackOffsetY,
+          left: 0,
+          right: 0,
+          width: 'fit-content',
+          marginLeft: 'auto',
+          marginRight: 'auto',
           pointerEvents: 'none',
-          zIndex: 20,
+          zIndex: 20 + stackIndex,
           fontWeight: 900,
-          fontSize: label ? DAMAGE_FONT_SIZE * 0.7 : DAMAGE_FONT_SIZE,
+          fontSize: numberFontSize,
           color,
           textShadow: '0 2px 6px rgba(0,0,0,0.5)',
           fontFamily: 'monospace',
@@ -66,6 +77,11 @@ export default function DamageNumber({ value, type, id, abilityName }: Props) {
           textAlign: 'center',
         }}
       >
+        {showCriticalLabel && (
+          <div style={{ fontSize: DAMAGE_FONT_SIZE * 1.5, marginBottom: -6, color: '#ffd54f' }}>
+            CRITICAL DAMAGE!
+          </div>
+        )}
         {abilityName && (
           <div style={{ fontSize: DAMAGE_FONT_SIZE * 0.35, marginBottom: -4, opacity: 0.85 }}>
             {abilityName}
@@ -76,4 +92,3 @@ export default function DamageNumber({ value, type, id, abilityName }: Props) {
     </AnimatePresence>
   )
 }
-

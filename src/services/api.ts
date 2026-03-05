@@ -803,6 +803,8 @@ export interface CombatTurnEvent {
   blockAbilityId?: string
   /** @deprecated Legacy block compatibility. */
   blockAnimationFrames?: AnimationFrames
+  /** Present on damage events when the hit crits. */
+  isCritical?: boolean
 }
 
 export interface CombatTurn {

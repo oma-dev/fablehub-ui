@@ -59,8 +59,17 @@ const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
 const CARD_LUNGE_DURATION_MS = 260
 const CARD_RETURN_DURATION_MS = 240
 const TRANSFORM_SWAP_HOLD_MS = 2000
+const DAMAGE_POPUP_LIFETIME_MS = 950
 const DAMAGE_NUMBER_EVENT_TYPES = new Set<CombatEventType>(['damage', 'heal', 'dot_tick', 'hot_tick', 'execute'])
 const STATUS_BURST_EVENT_TYPES = new Set<CombatEventType>(['status_applied', 'dot_tick', 'hot_tick'])
+
+type DamagePopup = {
+  value: number
+  type: CombatEventType
+  key: number
+  abilityName?: string
+  isCritical?: boolean
+}
 
 function getPreferredTransformTemplateId(
   effects: ActiveStatusEffect[],
@@ -333,10 +342,12 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   const [projectileRotationStart, setProjectileRotationStart] = useState(0)
   const [projectileRotationEnd, setProjectileRotationEnd] = useState(0)
   const [projectileDurationMs, setProjectileDurationMs] = useState<number | undefined>(undefined)
-  const [partyDmg, setPartyDmg] = useState<{ value: number; type: CombatEventType; key: number; abilityName?: string } | null>(null)
-  const [bossDmg, setBossDmg] = useState<{ value: number; type: CombatEventType; key: number; abilityName?: string } | null>(null)
+  const [partyDmg, setPartyDmg] = useState<DamagePopup[]>([])
+  const [bossDmg, setBossDmg] = useState<DamagePopup[]>([])
   const dmgKeyRef = useRef(0)
   const vfxKeyRef = useRef(0)
+  const partyDmgTimerRef = useRef<number[]>([])
+  const bossDmgTimerRef = useRef<number[]>([])
 
   type ActiveWF = {
     key: number
@@ -449,6 +460,39 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+  const clearDamagePopupTimers = useCallback((side: 'party' | 'boss') => {
+    const timerRef = side === 'party' ? partyDmgTimerRef : bossDmgTimerRef
+    timerRef.current.forEach((timerId) => window.clearTimeout(timerId))
+    timerRef.current = []
+  }, [])
+
+  const clearDamagePopups = useCallback((side?: 'party' | 'boss') => {
+    if (!side || side === 'party') {
+      clearDamagePopupTimers('party')
+      setPartyDmg([])
+    }
+    if (!side || side === 'boss') {
+      clearDamagePopupTimers('boss')
+      setBossDmg([])
+    }
+  }, [clearDamagePopupTimers])
+
+  const pushDamagePopup = useCallback((side: 'party' | 'boss', popup: DamagePopup) => {
+    if (side === 'party') setPartyDmg((previous) => [...previous, popup])
+    else setBossDmg((previous) => [...previous, popup])
+
+    const timerId = window.setTimeout(() => {
+      if (side === 'party') {
+        setPartyDmg((previous) => previous.filter((entry) => entry.key !== popup.key))
+      } else {
+        setBossDmg((previous) => previous.filter((entry) => entry.key !== popup.key))
+      }
+    }, DAMAGE_POPUP_LIFETIME_MS)
+
+    const timerRef = side === 'party' ? partyDmgTimerRef : bossDmgTimerRef
+    timerRef.current.push(timerId)
+  }, [])
 
   const clearTransformTimer = useCallback((side: 'party' | 'boss') => {
     const timerRef = side === 'party' ? partyTransformTimerRef : bossTransformTimerRef
@@ -719,7 +763,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       if (abortRef.current || events.length === 0) return
       const setAttackerVariant = attackerSide === 'party' ? setPartyVariant : setBossVariant
       const setTargetImpact = attackerSide === 'party' ? setShowBossImpact : setShowPartyImpact
-      const setTargetDmg = attackerSide === 'party' ? setBossDmg : setPartyDmg
+      const targetPopupSide: 'party' | 'boss' = attackerSide === 'party' ? 'boss' : 'party'
       const setTargetVariant = attackerSide === 'party' ? setBossVariant : setPartyVariant
       const frames = anim.frames
       const isRightSideAttacker = attackerSide === 'boss'
@@ -868,7 +912,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           })
         }
         dmgKeyRef.current++
-        setTargetDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Avoided!' })
+        pushDamagePopup(targetPopupSide, { value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Avoided!' })
         const maxBlockMs = blockAnimFrames.length > 0
           ? Math.max(...blockAnimFrames.map(f => { const t = resolveBlockTiming(f); return (f.delayMs ?? 0) + t.showMs + t.vanishMs }))
           : 600
@@ -884,9 +928,10 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           await sleep(280)
         }
         setAttackerVariant('idle')
-        setTargetDmg(null)
         return
       }
+
+      const hasCriticalDamage = events.some((event) => event.type === 'damage' && event.isCritical === true)
 
       // Impact frames
       const impactFrames = (frames?.impact ?? []).filter(f => f.url?.trim())
@@ -901,7 +946,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
           if (f.delayMs) await sleep(f.delayMs)
           const { showMs, vanishMs } = resolveImpactTiming(f)
           setActiveImpactFrames(prev => [...prev, {
-            key: ++vfxKeyRef.current, side: defenderSide, url: f.url!.trim(), soundUrl: f.soundUrl?.trim() || undefined, soundVolumePercent: f.soundVolumePercent ?? 100, soundFadeInMs: f.soundFadeInMs ?? 0, soundFadeOutMs: f.soundFadeOutMs ?? 0,
+            key: ++vfxKeyRef.current, side: defenderSide, url: f.url!.trim(), soundUrl: f.soundUrl?.trim() || undefined, soundVolumePercent: hasCriticalDamage ? (f.soundVolumePercent ?? 100) * 2 : (f.soundVolumePercent ?? 100), soundFadeInMs: f.soundFadeInMs ?? 0, soundFadeOutMs: f.soundFadeOutMs ?? 0,
             showMs, vanishMs, sizePx: f.sizePx, startSizePx: f.startSizePx, endSizePx: f.endSizePx,
             offsetX: isRightSideDefender ? -(f.offsetX ?? 0) : (f.offsetX ?? 0),
             offsetY: f.offsetY ?? 0,
@@ -932,9 +977,9 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         dmgKeyRef.current++
         const isOnBoss = ev.targetId === bossId
         if (isOnBoss) {
-          setBossDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+          pushDamagePopup('boss', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
         } else {
-          setPartyDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+          pushDamagePopup('party', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
         }
         const targetHpAfter = Math.max(0, ev.targetHpAfter)
         setCombatantHp((prev) => ({ ...prev, [ev.targetId]: targetHpAfter }))
@@ -965,7 +1010,6 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       setTargetVariant('idle')
 
       setAttackerVariant('idle')
-      setTargetDmg(null)
 
       const remainingTransformPauseMs = transformPauseUntilMs > 0
         ? Math.max(0, transformPauseUntilMs - Date.now())
@@ -978,6 +1022,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
       getPortraitPos,
       bossId,
       partyOrder,
+      pushDamagePopup,
       triggerStatusBurstForEvent,
       getCardLungeDestinationX,
       setCardMotion,
@@ -992,14 +1037,12 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         dmgKeyRef.current++
         const isOnBoss = ev.targetId === bossId
         if (isOnBoss) {
-          setBossDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+          pushDamagePopup('boss', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
         } else {
-          setPartyDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+          pushDamagePopup('party', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
         }
         setCombatantHp((prev) => ({ ...prev, [ev.targetId]: Math.max(0, ev.targetHpAfter) }))
         await sleep(240)
-        setPartyDmg(null)
-        setBossDmg(null)
       } else if (STATUS_BURST_EVENT_TYPES.has(ev.type)) {
         await sleep(180)
       }
@@ -1008,7 +1051,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         await sleep(transformPauseMs)
       }
     }
-  }, [bossId, triggerStatusBurstForEvent])
+  }, [bossId, pushDamagePopup, triggerStatusBurstForEvent])
 
   const playTurn = useCallback(async (turn: CombatResult['turns'][number]) => {
     const groups = groupCombatTurnEvents(turn.events as CombatTurnEvent[])
@@ -1149,7 +1192,8 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
   useEffect(() => () => {
     clearTransformTimer('party')
     clearTransformTimer('boss')
-  }, [clearTransformTimer])
+    clearDamagePopups()
+  }, [clearTransformTimer, clearDamagePopups])
 
   const handleSkip = () => {
     stopPlayback()
@@ -1170,8 +1214,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
     setProjectileAcceleration(0)
     setProjectileRotationStart(0)
     setProjectileRotationEnd(0)
-    setPartyDmg(null)
-    setBossDmg(null)
+    clearDamagePopups()
     setActiveWeaponFrames([])
     setActiveImpactFrames([])
     setActiveBlockFrames([])
@@ -1384,9 +1427,17 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                             )
                           }
                           <AnimatePresence>
-                            {partyDmg && (
-                              <DamageNumber value={partyDmg.value} type={partyDmg.type} id={partyDmg.key} abilityName={partyDmg.abilityName} />
-                            )}
+                            {partyDmg.map((popup, index) => (
+                              <DamageNumber
+                                key={popup.key}
+                                value={popup.value}
+                                type={popup.type}
+                                id={popup.key}
+                                abilityName={popup.abilityName}
+                                isCritical={popup.isCritical}
+                                stackIndex={partyDmg.length - index - 1}
+                              />
+                            ))}
                           </AnimatePresence>
                         </>
                       )}
@@ -1599,9 +1650,17 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
                     )
                   }
                   <AnimatePresence>
-                    {bossDmg && (
-                      <DamageNumber value={bossDmg.value} type={bossDmg.type} id={bossDmg.key} abilityName={bossDmg.abilityName} />
-                    )}
+                    {bossDmg.map((popup, index) => (
+                      <DamageNumber
+                        key={popup.key}
+                        value={popup.value}
+                        type={popup.type}
+                        id={popup.key}
+                        abilityName={popup.abilityName}
+                        isCritical={popup.isCritical}
+                        stackIndex={bossDmg.length - index - 1}
+                      />
+                    ))}
                   </AnimatePresence>
                 </Box>
                 <Box sx={{ textAlign: 'center' }}>

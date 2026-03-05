@@ -286,6 +286,15 @@ interface ActiveStatusParticleEntry {
 
 const DAMAGE_NUMBER_EVENT_TYPES = new Set<CombatEventType>(['damage', 'heal', 'dot_tick', 'hot_tick', 'execute'])
 const STATUS_BURST_EVENT_TYPES = new Set<CombatEventType>(['status_applied', 'dot_tick', 'hot_tick'])
+const DAMAGE_POPUP_LIFETIME_MS = 950
+
+type DamagePopup = {
+  value: number
+  type: CombatEventType
+  key: number
+  abilityName?: string
+  isCritical?: boolean
+}
 
 function getPreferredTransformTemplateId(
   effects: ActiveStatusEffect[],
@@ -482,9 +491,8 @@ export default function CombatReplay({
   const [activeStatusLoopParticles, setActiveStatusLoopParticles] = useState<ActiveStatusParticleEntry[]>([])
   const [activeStatusBurstParticles, setActiveStatusBurstParticles] = useState<ActiveStatusParticleEntry[]>([])
 
-  type DmgState = { value: number; type: CombatEventType; key: number; abilityName?: string } | null
-  const [playerDmg, setPlayerDmg] = useState<DmgState>(null)
-  const [creatureDmg, setCreatureDmg] = useState<DmgState>(null)
+  const [playerDmg, setPlayerDmg] = useState<DamagePopup[]>([])
+  const [creatureDmg, setCreatureDmg] = useState<DamagePopup[]>([])
   const [playerStatusEffects, setPlayerStatusEffects] = useState<ActiveStatusEffect[]>([])
   const [creatureStatusEffects, setCreatureStatusEffects] = useState<ActiveStatusEffect[]>([])
   const [playerTransformTemplateId, setPlayerTransformTemplateId] = useState<string | null>(null)
@@ -495,6 +503,8 @@ export default function CombatReplay({
   const bossBgmRef = useRef<HTMLAudioElement | null>(null)
   const playerTransformTimerRef = useRef<number | null>(null)
   const creatureTransformTimerRef = useRef<number | null>(null)
+  const playerDmgTimerRef = useRef<number[]>([])
+  const creatureDmgTimerRef = useRef<number[]>([])
 
   const playerAnim = getAttackAnimationConfig(player.styleId, player.animationFrames)
   const creatureAnim = getAttackAnimationConfig(creature.styleId, creature.animationFrames)
@@ -514,6 +524,39 @@ export default function CombatReplay({
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+  const clearDamagePopupTimers = useCallback((side: 'player' | 'creature') => {
+    const timerRef = side === 'player' ? playerDmgTimerRef : creatureDmgTimerRef
+    for (const timerId of timerRef.current) window.clearTimeout(timerId)
+    timerRef.current = []
+  }, [])
+
+  const clearDamagePopups = useCallback((side?: 'player' | 'creature') => {
+    if (!side || side === 'player') {
+      clearDamagePopupTimers('player')
+      setPlayerDmg([])
+    }
+    if (!side || side === 'creature') {
+      clearDamagePopupTimers('creature')
+      setCreatureDmg([])
+    }
+  }, [clearDamagePopupTimers])
+
+  const pushDamagePopup = useCallback((side: 'player' | 'creature', popup: DamagePopup) => {
+    if (side === 'player') setPlayerDmg((previous) => [...previous, popup])
+    else setCreatureDmg((previous) => [...previous, popup])
+
+    const timerId = window.setTimeout(() => {
+      if (side === 'player') {
+        setPlayerDmg((previous) => previous.filter((entry) => entry.key !== popup.key))
+      } else {
+        setCreatureDmg((previous) => previous.filter((entry) => entry.key !== popup.key))
+      }
+    }, DAMAGE_POPUP_LIFETIME_MS)
+
+    if (side === 'player') playerDmgTimerRef.current.push(timerId)
+    else creatureDmgTimerRef.current.push(timerId)
+  }, [])
 
   const clearTransformTimer = useCallback((side: 'player' | 'creature') => {
     const timerRef = side === 'player' ? playerTransformTimerRef : creatureTransformTimerRef
@@ -998,9 +1041,9 @@ export default function CombatReplay({
       const isDefenderPlayer = defenderSide === 'player'
       dmgKeyRef.current++
       if (isDefenderPlayer) {
-        setPlayerDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Avoided!' })
+        pushDamagePopup('player', { value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Avoided!' })
       } else {
-        setCreatureDmg({ value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Avoided!' })
+        pushDamagePopup('creature', { value: 0, type: 'block', key: dmgKeyRef.current, abilityName: 'Avoided!' })
       }
 
       const maxBlockMs = blockAnimFrames.length > 0
@@ -1021,10 +1064,10 @@ export default function CombatReplay({
         await sleep(280)
       }
       setAttackerVariant('idle')
-      setPlayerDmg(null)
-      setCreatureDmg(null)
       return
     }
+
+    const hasCriticalDamage = events.some((event) => event.type === 'damage' && event.isCritical === true)
 
     // --- Impact frames ---
     const impactFrames = (frames?.impact ?? []).filter(f => f.url?.trim())
@@ -1050,7 +1093,7 @@ export default function CombatReplay({
           side: attackerSide === 'player' ? 'creature' : 'player',
           url: f.url!.trim(),
           soundUrl: f.soundUrl?.trim() || undefined,
-          soundVolumePercent: f.soundVolumePercent ?? 100,
+          soundVolumePercent: hasCriticalDamage ? (f.soundVolumePercent ?? 100) * 2 : (f.soundVolumePercent ?? 100),
           soundFadeInMs: f.soundFadeInMs ?? 0,
           soundFadeOutMs: f.soundFadeOutMs ?? 0,
           showMs,
@@ -1092,10 +1135,10 @@ export default function CombatReplay({
       const isOnPlayer = ev.targetId === playerId
       dmgKeyRef.current++
       if (isOnPlayer) {
-        setPlayerDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+        pushDamagePopup('player', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
         setPlayerHp(Math.max(0, ev.targetHpAfter))
       } else {
-        setCreatureDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+        pushDamagePopup('creature', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
         setCreatureHp(Math.max(0, ev.targetHpAfter))
       }
     }
@@ -1107,10 +1150,10 @@ export default function CombatReplay({
           const isOnPlayer = ev.targetId === playerId
           dmgKeyRef.current++
           if (isOnPlayer) {
-            setPlayerDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+            pushDamagePopup('player', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
             setPlayerHp(Math.max(0, ev.targetHpAfter))
           } else {
-            setCreatureDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+            pushDamagePopup('creature', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
             setCreatureHp(Math.max(0, ev.targetHpAfter))
           }
         }
@@ -1133,8 +1176,6 @@ export default function CombatReplay({
     setTargetVariant('idle')
 
     setAttackerVariant('idle')
-    setPlayerDmg(null)
-    setCreatureDmg(null)
 
     const remainingTransformPauseMs = transformPauseUntilMs > 0
       ? Math.max(0, transformPauseUntilMs - Date.now())
@@ -1147,6 +1188,7 @@ export default function CombatReplay({
     player.weaponUrl,
     creature.weaponUrl,
     getPortraitPos,
+    pushDamagePopup,
     triggerStatusBurstForEvent,
     getCardLungeDestinationX,
     setCardMotion,
@@ -1168,15 +1210,13 @@ export default function CombatReplay({
         const isOnPlayer = ev.targetId === playerId
         dmgKeyRef.current++
         if (isOnPlayer) {
-          setPlayerDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+          pushDamagePopup('player', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
           setPlayerHp(Math.max(0, ev.targetHpAfter))
         } else {
-          setCreatureDmg({ value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName })
+          pushDamagePopup('creature', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
           setCreatureHp(Math.max(0, ev.targetHpAfter))
         }
         await sleep(240)
-        setPlayerDmg(null)
-        setCreatureDmg(null)
       } else if (STATUS_BURST_EVENT_TYPES.has(ev.type)) {
         await sleep(180)
       }
@@ -1185,7 +1225,7 @@ export default function CombatReplay({
         await sleep(transformPauseMs)
       }
     }
-  }, [playerId, triggerStatusBurstForEvent])
+  }, [playerId, pushDamagePopup, triggerStatusBurstForEvent])
 
   const playTurn = useCallback(async (turn: CombatResult['turns'][number]) => {
     const groups = groupCombatTurnEvents(turn.events)
@@ -1374,7 +1414,8 @@ export default function CombatReplay({
   useEffect(() => () => {
     clearTransformTimer('player')
     clearTransformTimer('creature')
-  }, [clearTransformTimer])
+    clearDamagePopups()
+  }, [clearTransformTimer, clearDamagePopups])
 
   const handleSkip = () => {
     stopPlayback()
@@ -1392,8 +1433,7 @@ export default function CombatReplay({
     setActiveBlockFrames([])
     setActiveStatusLoopParticles([])
     setActiveStatusBurstParticles([])
-    setPlayerDmg(null)
-    setCreatureDmg(null)
+    clearDamagePopups()
 
     let pHp = player.maxHp
     let cHp = creature.maxHp
@@ -1588,9 +1628,17 @@ export default function CombatReplay({
                 )
               }
               <AnimatePresence>
-                {playerDmg && (
-                  <DamageNumber value={playerDmg.value} type={playerDmg.type} id={playerDmg.key} abilityName={playerDmg.abilityName} />
-                )}
+                {playerDmg.map((popup, index) => (
+                  <DamageNumber
+                    key={popup.key}
+                    value={popup.value}
+                    type={popup.type}
+                    id={popup.key}
+                    abilityName={popup.abilityName}
+                    isCritical={popup.isCritical}
+                    stackIndex={playerDmg.length - index - 1}
+                  />
+                ))}
               </AnimatePresence>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
@@ -1738,9 +1786,17 @@ export default function CombatReplay({
                 )
               }
               <AnimatePresence>
-                {creatureDmg && (
-                  <DamageNumber value={creatureDmg.value} type={creatureDmg.type} id={creatureDmg.key} abilityName={creatureDmg.abilityName} />
-                )}
+                {creatureDmg.map((popup, index) => (
+                  <DamageNumber
+                    key={popup.key}
+                    value={popup.value}
+                    type={popup.type}
+                    id={popup.key}
+                    abilityName={popup.abilityName}
+                    isCritical={popup.isCritical}
+                    stackIndex={creatureDmg.length - index - 1}
+                  />
+                ))}
               </AnimatePresence>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
