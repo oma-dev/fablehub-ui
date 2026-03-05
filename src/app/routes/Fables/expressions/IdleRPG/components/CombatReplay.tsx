@@ -10,6 +10,7 @@ import type {
   CombatEventType,
   CombatResult,
   CombatTurnEvent,
+  SummonedCombatantSnapshot,
   StatusAnimation,
   StatusTransformConfig,
 } from '@features/idle-rpg/api'
@@ -117,6 +118,8 @@ const CARD_GAP = 1.5 * SCALE
 const CARD_PADDING = 2.5 * SCALE
 const CARD_RADIUS = 3 * SCALE
 const CARD_MAX_WIDTH = Math.round(380 * SCALE)
+const BACKLINE_STACK_SCALE_STEP = 0.12
+const BACKLINE_STACK_OFFSET_PX = 128
 const VS_WIDTH = Math.round(70 * SCALE)
 const TURN_FONT_SIZE = Math.round(14 * SCALE)
 const RESULT_FONT_SIZE = `${1.5 * SCALE}rem`
@@ -124,6 +127,7 @@ const BUTTON_FONT_SIZE = `${1.1 * SCALE}rem`
 const CARD_LUNGE_DURATION_MS = 260
 const CARD_RETURN_DURATION_MS = 240
 const TRANSFORM_SWAP_HOLD_MS = 2000
+const SUMMON_SPAWN_DELAY_MS = 1000
 
 type CardMotionEase = 'linear' | [number, number, number, number]
 type CardMotionTransition = { type: 'tween'; duration: number; ease: CardMotionEase }
@@ -473,6 +477,36 @@ export default function CombatReplay({
     combat.turns[0]?.events?.find(e => e.sourceId !== playerId)?.sourceId
     ?? combat.turns[0]?.events?.find(e => e.targetId !== playerId)?.targetId
     ?? 'creature'
+  const initialFrontlineSnapshot = combat.turns[0]?.frontlineBySide
+  const playerSideKey =
+    Object.entries(initialFrontlineSnapshot ?? {}).find(([, id]) => id === playerId)?.[0]
+    ?? '0'
+  const creatureSideKey =
+    Object.entries(initialFrontlineSnapshot ?? {}).find(([, id]) => id === creatureId)?.[0]
+    ?? (playerSideKey === '0' ? '1' : '0')
+  const [playerFrontId, setPlayerFrontId] = useState(playerId)
+  const [creatureFrontId, setCreatureFrontId] = useState(creatureId)
+  const [sideRosterIds, setSideRosterIds] = useState<{ player: string[]; creature: string[] }>({
+    player: [playerId],
+    creature: [creatureId],
+  })
+  const sideByCombatantIdRef = useRef<Record<string, 'player' | 'creature'>>({
+    [playerId]: 'player',
+    [creatureId]: 'creature',
+  })
+  const combatantInfoByIdRef = useRef<Record<string, CombatantInfo>>({
+    [playerId]: player,
+    [creatureId]: creature,
+  })
+  const hpByCombatantIdRef = useRef<Record<string, number>>({
+    [playerId]: player.maxHp,
+    [creatureId]: creature.maxHp,
+  })
+  const resourceByCombatantIdRef = useRef<Record<string, number | null>>({
+    [playerId]: player.resource ? (player.resource.isGenerative ? 0 : player.resource.max) : null,
+    [creatureId]: creature.resource ? (creature.resource.isGenerative ? 0 : creature.resource.max) : null,
+  })
+  const latestStatusByCombatantIdRef = useRef<Record<string, ActiveStatusEffect[]>>({})
 
   const [playerVariant, setPlayerVariant] = useState<string>('idle')
   const [creatureVariant, setCreatureVariant] = useState<string>('idle')
@@ -524,6 +558,86 @@ export default function CombatReplay({
   }, [])
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+  const getReplaySideForCombatantId = useCallback((combatantId: string): 'player' | 'creature' => {
+    const mapped = sideByCombatantIdRef.current[combatantId]
+    if (mapped) return mapped
+    if (combatantId === playerId) return 'player'
+    return 'creature'
+  }, [playerId])
+
+  const getFrontIdForSide = useCallback((side: 'player' | 'creature'): string => {
+    return side === 'player' ? playerFrontId : creatureFrontId
+  }, [playerFrontId, creatureFrontId])
+
+  const getBaseAnimationForAttacker = useCallback((attackerId: string): AttackAnimationConfig => {
+    if (attackerId === playerId) return playerAnim
+    if (attackerId === creatureId) return creatureAnim
+    const attackerInfo = combatantInfoByIdRef.current[attackerId]
+    return getAttackAnimationConfig(attackerInfo?.styleId, attackerInfo?.animationFrames ?? undefined)
+  }, [playerAnim, creatureAnim, playerId, creatureId])
+
+  const setDisplayedFrontline = useCallback((side: 'player' | 'creature', frontId: string) => {
+    if (!frontId) return
+    const info = combatantInfoByIdRef.current[frontId]
+    if (!info) return
+    const hp = hpByCombatantIdRef.current[frontId] ?? info.maxHp
+    const resourceCurrent = resourceByCombatantIdRef.current[frontId] ?? null
+    const statusEffects = latestStatusByCombatantIdRef.current[frontId] ?? []
+    if (side === 'player') {
+      setPlayerFrontId(frontId)
+      setPlayerHp(hp)
+      setPlayerResourceCurrent(resourceCurrent)
+      setPlayerStatusEffects(statusEffects)
+      setPlayerTransformTemplateId(getPreferredTransformTemplateId(statusEffects, statusTransforms))
+      return
+    }
+    setCreatureFrontId(frontId)
+    setCreatureHp(hp)
+    setCreatureResourceCurrent(resourceCurrent)
+    setCreatureStatusEffects(statusEffects)
+    setCreatureTransformTemplateId(getPreferredTransformTemplateId(statusEffects, statusTransforms))
+  }, [statusTransforms])
+
+  const reorderSideRosterForFront = useCallback((side: 'player' | 'creature', frontId: string) => {
+    if (!frontId) return
+    setSideRosterIds((previous) => {
+      const existing = previous[side]
+      const next = [frontId, ...existing.filter((id) => id !== frontId)]
+      return side === 'player'
+        ? { ...previous, player: next }
+        : { ...previous, creature: next }
+    })
+  }, [])
+
+  const registerSummonedCombatant = useCallback((snapshot?: SummonedCombatantSnapshot) => {
+    if (!snapshot?.id) return
+    const sideKey = String(snapshot.side ?? '')
+    const side: 'player' | 'creature' = sideKey === playerSideKey ? 'player' : 'creature'
+    sideByCombatantIdRef.current[snapshot.id] = side
+    combatantInfoByIdRef.current[snapshot.id] = {
+      name: snapshot.name,
+      level: snapshot.level ?? 1,
+      maxHp: snapshot.maxHp,
+      ap: snapshot.ap,
+      arm: snapshot.arm,
+      portraitUrl: snapshot.portraitUrl ?? null,
+      ...(snapshot.animationFrames ? { animationFrames: snapshot.animationFrames } : {}),
+      resource: snapshot.resource
+        ? {
+            name: 'Resource',
+            colorHex: '#60a5fa',
+            max: snapshot.resource.max,
+            isGenerative: false,
+          }
+        : null,
+    }
+    hpByCombatantIdRef.current[snapshot.id] = snapshot.currentHp
+    resourceByCombatantIdRef.current[snapshot.id] = snapshot.resource?.current ?? null
+    latestStatusByCombatantIdRef.current[snapshot.id] = latestStatusByCombatantIdRef.current[snapshot.id] ?? []
+    reorderSideRosterForFront(side, snapshot.id)
+    setDisplayedFrontline(side, snapshot.id)
+  }, [playerSideKey, reorderSideRosterForFront, setDisplayedFrontline])
 
   const clearDamagePopupTimers = useCallback((side: 'player' | 'creature') => {
     const timerRef = side === 'player' ? playerDmgTimerRef : creatureDmgTimerRef
@@ -647,9 +761,10 @@ export default function CombatReplay({
   ): string => {
     const source = imageSource ?? 'url'
     if (source === 'url') return url?.trim() ?? ''
-    const weaponUrl = side === 'player' ? player.weaponUrl : creature.weaponUrl
+    const frontId = side === 'player' ? playerFrontId : creatureFrontId
+    const weaponUrl = combatantInfoByIdRef.current[frontId]?.weaponUrl
     return weaponUrl?.trim() ?? ''
-  }, [player.weaponUrl, creature.weaponUrl])
+  }, [playerFrontId, creatureFrontId])
 
   const buildStatusParticleEntry = useCallback((
     side: 'player' | 'creature',
@@ -766,10 +881,7 @@ export default function CombatReplay({
       ?? playerStatusEffects.find((status) => status.id === event.statusEffectId)?.templateId
       ?? creatureStatusEffects.find((status) => status.id === event.statusEffectId)?.templateId
     if (!statusTemplateId) return 0
-    const side: 'player' | 'creature' | null =
-      event.targetId === playerId ? 'player'
-      : event.targetId === creatureId ? 'creature'
-      : null
+    const side: 'player' | 'creature' | null = getReplaySideForCombatantId(event.targetId)
     if (!side) return 0
     let transformPauseMs = 0
 
@@ -875,9 +987,13 @@ export default function CombatReplay({
     if (hasResourceCost) {
       for (const ev of events) {
         if (ev.type === 'resource_change' && ev.resourceAfter) {
-          const isPlayerSource = ev.sourceId === playerId
-          if (isPlayerSource) setPlayerResourceCurrent(ev.resourceAfter.current)
-          else setCreatureResourceCurrent(ev.resourceAfter.current)
+          resourceByCombatantIdRef.current[ev.sourceId] = ev.resourceAfter.current
+          const sourceSide = getReplaySideForCombatantId(ev.sourceId)
+          if (sourceSide === 'player' && getFrontIdForSide('player') === ev.sourceId) {
+            setPlayerResourceCurrent(ev.resourceAfter.current)
+          } else if (sourceSide === 'creature' && getFrontIdForSide('creature') === ev.sourceId) {
+            setCreatureResourceCurrent(ev.resourceAfter.current)
+          }
         }
       }
       // Brief pause so the bar animation is visible before the ability fires
@@ -941,7 +1057,8 @@ export default function CombatReplay({
       const srcRef = attackerSide === 'player' ? playerPortraitRef : creaturePortraitRef
       const tgtRef = attackerSide === 'player' ? creaturePortraitRef : playerPortraitRef
       const tgtPos = getPortraitPos(tgtRef)
-      const weaponUrlFallback = attackerSide === 'player' ? player.weaponUrl : creature.weaponUrl
+      const attackerFrontId = getFrontIdForSide(attackerSide)
+      const weaponUrlFallback = combatantInfoByIdRef.current[attackerFrontId]?.weaponUrl
       const dir = attackerSide === 'player' ? 'left-to-right' as const : 'right-to-left' as const
       const defaultFlight = (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
       const resolveFlightMs = (f: typeof projFrames[0]) => f.lifetimeMs ?? f.speedMs ?? defaultFlight
@@ -1132,14 +1249,15 @@ export default function CombatReplay({
     if (targetCardAnimation === 'hit') setTargetVariant('hit')
     else setTargetVariant('idle')
     for (const ev of targetEvents) {
-      const isOnPlayer = ev.targetId === playerId
+      hpByCombatantIdRef.current[ev.targetId] = Math.max(0, ev.targetHpAfter)
+      const targetSide = getReplaySideForCombatantId(ev.targetId)
       dmgKeyRef.current++
-      if (isOnPlayer) {
+      if (targetSide === 'player') {
         pushDamagePopup('player', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
-        setPlayerHp(Math.max(0, ev.targetHpAfter))
+        if (getFrontIdForSide('player') === ev.targetId) setPlayerHp(Math.max(0, ev.targetHpAfter))
       } else {
         pushDamagePopup('creature', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
-        setCreatureHp(Math.max(0, ev.targetHpAfter))
+        if (getFrontIdForSide('creature') === ev.targetId) setCreatureHp(Math.max(0, ev.targetHpAfter))
       }
     }
 
@@ -1147,14 +1265,15 @@ export default function CombatReplay({
     if (selfHealEvents.length > 0) {
       sleep(200).then(() => {
         for (const ev of selfHealEvents) {
-          const isOnPlayer = ev.targetId === playerId
+          hpByCombatantIdRef.current[ev.targetId] = Math.max(0, ev.targetHpAfter)
+          const targetSide = getReplaySideForCombatantId(ev.targetId)
           dmgKeyRef.current++
-          if (isOnPlayer) {
+          if (targetSide === 'player') {
             pushDamagePopup('player', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
-            setPlayerHp(Math.max(0, ev.targetHpAfter))
+            if (getFrontIdForSide('player') === ev.targetId) setPlayerHp(Math.max(0, ev.targetHpAfter))
           } else {
             pushDamagePopup('creature', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
-            setCreatureHp(Math.max(0, ev.targetHpAfter))
+            if (getFrontIdForSide('creature') === ev.targetId) setCreatureHp(Math.max(0, ev.targetHpAfter))
           }
         }
       })
@@ -1184,14 +1303,13 @@ export default function CombatReplay({
       await sleep(remainingTransformPauseMs)
     }
   }, [
-    playerId,
-    player.weaponUrl,
-    creature.weaponUrl,
     getPortraitPos,
     pushDamagePopup,
     triggerStatusBurstForEvent,
     getCardLungeDestinationX,
     setCardMotion,
+    getReplaySideForCombatantId,
+    getFrontIdForSide,
   ])
 
   const animateAmbientEvents = useCallback(async (events: CombatTurnEvent[]) => {
@@ -1199,22 +1317,34 @@ export default function CombatReplay({
       if (abortRef.current) return
 
       if (ev.type === 'resource_change' && ev.resourceAfter) {
-        const isPlayerSource = ev.sourceId === playerId
-        if (isPlayerSource) setPlayerResourceCurrent(ev.resourceAfter.current)
-        else setCreatureResourceCurrent(ev.resourceAfter.current)
+        resourceByCombatantIdRef.current[ev.sourceId] = ev.resourceAfter.current
+        const sourceSide = getReplaySideForCombatantId(ev.sourceId)
+        if (sourceSide === 'player' && getFrontIdForSide('player') === ev.sourceId) {
+          setPlayerResourceCurrent(ev.resourceAfter.current)
+        } else if (sourceSide === 'creature' && getFrontIdForSide('creature') === ev.sourceId) {
+          setCreatureResourceCurrent(ev.resourceAfter.current)
+        }
+      }
+
+      if (ev.type === 'summon') {
+        await sleep(SUMMON_SPAWN_DELAY_MS)
+        registerSummonedCombatant(ev.summonedCombatant)
+        await sleep(180)
+        continue
       }
 
       const transformPauseMs = triggerStatusBurstForEvent(ev)
 
       if (DAMAGE_NUMBER_EVENT_TYPES.has(ev.type)) {
-        const isOnPlayer = ev.targetId === playerId
+        hpByCombatantIdRef.current[ev.targetId] = Math.max(0, ev.targetHpAfter)
+        const targetSide = getReplaySideForCombatantId(ev.targetId)
         dmgKeyRef.current++
-        if (isOnPlayer) {
+        if (targetSide === 'player') {
           pushDamagePopup('player', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
-          setPlayerHp(Math.max(0, ev.targetHpAfter))
+          if (getFrontIdForSide('player') === ev.targetId) setPlayerHp(Math.max(0, ev.targetHpAfter))
         } else {
           pushDamagePopup('creature', { value: ev.value, type: ev.type, key: dmgKeyRef.current, abilityName: ev.abilityName, isCritical: ev.isCritical === true })
-          setCreatureHp(Math.max(0, ev.targetHpAfter))
+          if (getFrontIdForSide('creature') === ev.targetId) setCreatureHp(Math.max(0, ev.targetHpAfter))
         }
         await sleep(240)
       } else if (STATUS_BURST_EVENT_TYPES.has(ev.type)) {
@@ -1225,7 +1355,7 @@ export default function CombatReplay({
         await sleep(transformPauseMs)
       }
     }
-  }, [playerId, pushDamagePopup, triggerStatusBurstForEvent])
+  }, [pushDamagePopup, triggerStatusBurstForEvent, getReplaySideForCombatantId, getFrontIdForSide, registerSummonedCombatant])
 
   const playTurn = useCallback(async (turn: CombatResult['turns'][number]) => {
     const groups = groupCombatTurnEvents(turn.events)
@@ -1248,29 +1378,47 @@ export default function CombatReplay({
       let attackerSide: 'player' | 'creature' = 'player'
       if (isBlockedCastGroup) {
         const blockTargetId = nonResourceEvents[0]?.targetId
-        if (blockTargetId === playerId) attackerSide = 'creature'
-        else if (blockTargetId === creatureId) attackerSide = 'player'
-        else attackerSide = (nonResourceEvents[0]?.sourceId === playerId ? 'player' : 'creature')
+        const blockedSide = blockTargetId ? getReplaySideForCombatantId(blockTargetId) : 'creature'
+        attackerSide = blockedSide === 'player' ? 'creature' : 'player'
       } else {
         const attackerEvent =
           nonResourceNonBlockEvents[0]
           ?? group.events.find((event) => event.type === 'resource_change')
           ?? nonResourceEvents[0]
           ?? group.events[0]
-        attackerSide = attackerEvent.sourceId === playerId ? 'player' : 'creature'
+        attackerSide = getReplaySideForCombatantId(attackerEvent.sourceId)
       }
       const groupAbilityId = group.events.find((event) => !!event.abilityId)?.abilityId
       const overrideFrames = groupAbilityId && abilityAnimations?.[groupAbilityId]
-      const baseAnimation = attackerSide === 'player' ? playerAnim : creatureAnim
+      const attackerIdForAnimation = (
+        nonResourceNonBlockEvents[0]
+        ?? nonResourceEvents[0]
+        ?? group.events[0]
+      )?.sourceId ?? (attackerSide === 'player' ? playerFrontId : creatureFrontId)
+      const baseAnimation = getBaseAnimationForAttacker(attackerIdForAnimation)
       const animationConfig = overrideFrames
         ? getAttackAnimationConfig(undefined, overrideFrames)
         : baseAnimation
       await animateAttack(attackerSide, group.events, animationConfig)
+      const summonEvents = group.events.filter((event) => event.type === 'summon' && event.summonedCombatant)
+      if (summonEvents.length > 0) {
+        await sleep(SUMMON_SPAWN_DELAY_MS)
+        for (const summonEvent of summonEvents) {
+          registerSummonedCombatant(summonEvent.summonedCombatant)
+        }
+      }
     }
 
     if (turn.activeStatusEffects) {
-      const nextPlayer = turn.activeStatusEffects[playerId] ?? []
-      const nextCreature = turn.activeStatusEffects[creatureId] ?? []
+      latestStatusByCombatantIdRef.current = { ...turn.activeStatusEffects }
+      const nextPlayerFrontId = turn.frontlineBySide?.[playerSideKey] ?? playerFrontId
+      const nextCreatureFrontId = turn.frontlineBySide?.[creatureSideKey] ?? creatureFrontId
+      reorderSideRosterForFront('player', nextPlayerFrontId)
+      reorderSideRosterForFront('creature', nextCreatureFrontId)
+      setDisplayedFrontline('player', nextPlayerFrontId)
+      setDisplayedFrontline('creature', nextCreatureFrontId)
+      const nextPlayer = turn.activeStatusEffects[nextPlayerFrontId] ?? []
+      const nextCreature = turn.activeStatusEffects[nextCreatureFrontId] ?? []
       setPlayerStatusEffects(nextPlayer)
       setCreatureStatusEffects(nextCreature)
       syncLoopStatusParticles(nextPlayer, nextCreature)
@@ -1298,22 +1446,32 @@ export default function CombatReplay({
       }
     }
     if (turn.resources) {
-      if (turn.resources[playerId]) setPlayerResourceCurrent(turn.resources[playerId].current)
-      if (turn.resources[creatureId]) setCreatureResourceCurrent(turn.resources[creatureId].current)
+      for (const [combatantId, resource] of Object.entries(turn.resources)) {
+        resourceByCombatantIdRef.current[combatantId] = resource.current
+      }
+      const nextPlayerFrontId = turn.frontlineBySide?.[playerSideKey] ?? playerFrontId
+      const nextCreatureFrontId = turn.frontlineBySide?.[creatureSideKey] ?? creatureFrontId
+      if (turn.resources[nextPlayerFrontId]) setPlayerResourceCurrent(turn.resources[nextPlayerFrontId].current)
+      if (turn.resources[nextCreatureFrontId]) setCreatureResourceCurrent(turn.resources[nextCreatureFrontId].current)
     }
   }, [
     abilityAnimations,
     animateAmbientEvents,
     animateAttack,
-    creatureAnim,
-    creatureId,
     clearTransformTimer,
-    playerAnim,
-    playerId,
     playerTransformTemplateId,
     creatureTransformTemplateId,
     statusTransforms,
     syncLoopStatusParticles,
+    getReplaySideForCombatantId,
+    getBaseAnimationForAttacker,
+    registerSummonedCombatant,
+    playerSideKey,
+    creatureSideKey,
+    playerFrontId,
+    creatureFrontId,
+    reorderSideRosterForFront,
+    setDisplayedFrontline,
   ])
 
   const {
@@ -1435,26 +1593,33 @@ export default function CombatReplay({
     setActiveStatusBurstParticles([])
     clearDamagePopups()
 
-    let pHp = player.maxHp
-    let cHp = creature.maxHp
     for (const turn of combat.turns) {
       for (const ev of turn.events) {
-        if (ev.targetId === playerId) pHp = Math.max(0, ev.targetHpAfter)
-        else cHp = Math.max(0, ev.targetHpAfter)
+        if (ev.type === 'summon') registerSummonedCombatant(ev.summonedCombatant)
+        hpByCombatantIdRef.current[ev.targetId] = Math.max(0, ev.targetHpAfter)
       }
     }
-    setPlayerHp(pHp)
-    setCreatureHp(cHp)
-    // Jump resources to final state
     const lastTurn = combat.turns[combat.turns.length - 1]
+    const finalPlayerFrontId = lastTurn?.frontlineBySide?.[playerSideKey] ?? playerFrontId
+    const finalCreatureFrontId = lastTurn?.frontlineBySide?.[creatureSideKey] ?? creatureFrontId
+    reorderSideRosterForFront('player', finalPlayerFrontId)
+    reorderSideRosterForFront('creature', finalCreatureFrontId)
+    setDisplayedFrontline('player', finalPlayerFrontId)
+    setDisplayedFrontline('creature', finalCreatureFrontId)
+    setPlayerHp(hpByCombatantIdRef.current[finalPlayerFrontId] ?? combatantInfoByIdRef.current[finalPlayerFrontId]?.maxHp ?? player.maxHp)
+    setCreatureHp(hpByCombatantIdRef.current[finalCreatureFrontId] ?? combatantInfoByIdRef.current[finalCreatureFrontId]?.maxHp ?? creature.maxHp)
+
+    // Jump resources to final state
     if (lastTurn?.resources) {
-      const creatureId = combat.turns[0]?.events?.find(e => e.sourceId !== playerId)?.sourceId
-        ?? combat.turns[0]?.events?.find(e => e.targetId !== playerId)?.targetId ?? ''
-      if (lastTurn.resources[playerId]) setPlayerResourceCurrent(lastTurn.resources[playerId].current)
-      if (lastTurn.resources[creatureId]) setCreatureResourceCurrent(lastTurn.resources[creatureId].current)
+      for (const [combatantId, resource] of Object.entries(lastTurn.resources)) {
+        resourceByCombatantIdRef.current[combatantId] = resource.current
+      }
+      if (lastTurn.resources[finalPlayerFrontId]) setPlayerResourceCurrent(lastTurn.resources[finalPlayerFrontId].current)
+      if (lastTurn.resources[finalCreatureFrontId]) setCreatureResourceCurrent(lastTurn.resources[finalCreatureFrontId].current)
     }
-    const finalPlayerStatuses = lastTurn?.activeStatusEffects?.[playerId] ?? []
-    const finalCreatureStatuses = lastTurn?.activeStatusEffects?.[creatureId] ?? []
+    latestStatusByCombatantIdRef.current = { ...(lastTurn?.activeStatusEffects ?? {}) }
+    const finalPlayerStatuses = lastTurn?.activeStatusEffects?.[finalPlayerFrontId] ?? []
+    const finalCreatureStatuses = lastTurn?.activeStatusEffects?.[finalCreatureFrontId] ?? []
     setPlayerStatusEffects(finalPlayerStatuses)
     setCreatureStatusEffects(finalCreatureStatuses)
     setPlayerTransformTemplateId(getPreferredTransformTemplateId(finalPlayerStatuses, statusTransforms))
@@ -1470,14 +1635,22 @@ export default function CombatReplay({
     onFinish()
   }
 
+  const playerFrontInfo = combatantInfoByIdRef.current[playerFrontId] ?? player
+  const creatureFrontInfo = combatantInfoByIdRef.current[creatureFrontId] ?? creature
+  const playerBacklineIds = sideRosterIds.player
+    .filter((combatantId) => combatantId !== playerFrontId && (hpByCombatantIdRef.current[combatantId] ?? 0) > 0)
+    .slice(0, 3)
+  const creatureBacklineIds = sideRosterIds.creature
+    .filter((combatantId) => combatantId !== creatureFrontId && (hpByCombatantIdRef.current[combatantId] ?? 0) > 0)
+    .slice(0, 3)
   const playerTransformPortraitUrl = playerTransformTemplateId
     ? statusTransforms?.[playerTransformTemplateId]?.portraitUrl?.trim()
     : ''
   const creatureTransformPortraitUrl = creatureTransformTemplateId
     ? statusTransforms?.[creatureTransformTemplateId]?.portraitUrl?.trim()
     : ''
-  const resolvedPlayerPortraitUrl = playerTransformPortraitUrl || player.portraitUrl
-  const resolvedCreaturePortraitUrl = creatureTransformPortraitUrl || creature.portraitUrl
+  const resolvedPlayerPortraitUrl = playerTransformPortraitUrl || playerFrontInfo.portraitUrl
+  const resolvedCreaturePortraitUrl = creatureTransformPortraitUrl || creatureFrontInfo.portraitUrl
 
   return (
     <Box
@@ -1538,10 +1711,80 @@ export default function CombatReplay({
           transition={playerCardTransition}
           style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
         >
+          {playerBacklineIds.map((combatantId, index) => {
+            const backInfo = combatantInfoByIdRef.current[combatantId]
+            if (!backInfo) return null
+            const scale = Math.max(0.52, 1 - ((index + 1) * BACKLINE_STACK_SCALE_STEP))
+            const cardWidth = Math.round(CARD_MAX_WIDTH * scale)
+            const portraitSize = Math.round(PORTRAIT_SIZE * scale)
+            const hp = hpByCombatantIdRef.current[combatantId] ?? backInfo.maxHp
+            const resourceCurrent = resourceByCombatantIdRef.current[combatantId] ?? null
+            const statusEffects = latestStatusByCombatantIdRef.current[combatantId] ?? []
+            return (
+              <Paper
+                key={`player-backline-${combatantId}`}
+                variant="outlined"
+                sx={{
+                  position: 'absolute',
+                  left: -(BACKLINE_STACK_OFFSET_PX * (index + 1)),
+                  top: BACKLINE_STACK_OFFSET_PX * (index + 1),
+                  width: cardWidth,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: CARD_GAP,
+                  p: CARD_PADDING,
+                  pt: 0,
+                  borderRadius: CARD_RADIUS,
+                  bgcolor: '#14121f',
+                  borderColor: 'rgba(99,102,241,0.45)',
+                  boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(99,102,241,0.12)',
+                  zIndex: index + 1,
+                  pointerEvents: 'none',
+                }}
+              >
+                <ReplayPortrait
+                  url={backInfo.portraitUrl}
+                  weaponUrl={backInfo.weaponUrl}
+                  sizePx={portraitSize}
+                  personIconSizePx={PERSON_ICON_SIZE}
+                  borderRadius={PORTRAIT_BORDER_RADIUS}
+                  borderWidth={PORTRAIT_BORDER}
+                  weaponSizePx={Math.round(WEAPON_SIZE * scale)}
+                  weaponOffsetPx={Math.round(WEAPON_OFFSET * scale)}
+                />
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: NAME_FONT_SIZE }}>{backInfo.name}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {backInfo.level}</Typography>
+                </Box>
+                <ReplayHpBar current={hp} max={backInfo.maxHp} label="HP" fontSizePx={HP_FONT_SIZE} heightPx={HP_BAR_HEIGHT} radius={HP_BAR_RADIUS} />
+                {backInfo.resource && resourceCurrent !== null && (
+                  <ReplayResourceBar
+                    current={resourceCurrent}
+                    max={backInfo.resource.max}
+                    label={backInfo.resource.name}
+                    colorHex={backInfo.resource.colorHex}
+                    fontSizePx={HP_FONT_SIZE}
+                    heightPx={HP_BAR_HEIGHT}
+                    radius={HP_BAR_RADIUS}
+                  />
+                )}
+                <ReplayStatusEffectIcons effects={statusEffects} />
+                <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  {STAT_LABELS.map(({ key, label }) => (
+                    <Box key={`${combatantId}-${label}`} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontSize: STAT_FONT_SIZE }}>{label}</Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ fontSize: STAT_FONT_SIZE }}>{backInfo[key]}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Paper>
+            )
+          })}
           <motion.div
             variants={playerVariants}
             animate={playerVariant}
-            style={{ position: 'relative' }}
+            style={{ position: 'relative', zIndex: 10 }}
           >
             <Paper
               ref={playerCardRef}
@@ -1558,7 +1801,7 @@ export default function CombatReplay({
               <Box ref={playerPortraitRef} sx={{ position: 'relative' }}>
               <ReplayPortrait
                 url={resolvedPlayerPortraitUrl}
-                weaponUrl={player.weaponUrl}
+                weaponUrl={playerFrontInfo.weaponUrl}
                 sizePx={PORTRAIT_SIZE}
                 personIconSizePx={PERSON_ICON_SIZE}
                 borderRadius={PORTRAIT_BORDER_RADIUS}
@@ -1642,16 +1885,16 @@ export default function CombatReplay({
               </AnimatePresence>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: NAME_FONT_SIZE }}>{player.name}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {player.level}</Typography>
+              <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: NAME_FONT_SIZE }}>{playerFrontInfo.name}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {playerFrontInfo.level}</Typography>
             </Box>
-            <ReplayHpBar current={playerHp} max={player.maxHp} label="HP" fontSizePx={HP_FONT_SIZE} heightPx={HP_BAR_HEIGHT} radius={HP_BAR_RADIUS} />
-            {player.resource && playerResourceCurrent !== null && (
+            <ReplayHpBar current={playerHp} max={playerFrontInfo.maxHp} label="HP" fontSizePx={HP_FONT_SIZE} heightPx={HP_BAR_HEIGHT} radius={HP_BAR_RADIUS} />
+            {playerFrontInfo.resource && playerResourceCurrent !== null && (
               <ReplayResourceBar
                 current={playerResourceCurrent}
-                max={player.resource.max}
-                label={player.resource.name}
-                colorHex={player.resource.colorHex}
+                max={playerFrontInfo.resource.max}
+                label={playerFrontInfo.resource.name}
+                colorHex={playerFrontInfo.resource.colorHex}
                 fontSizePx={HP_FONT_SIZE}
                 heightPx={HP_BAR_HEIGHT}
                 radius={HP_BAR_RADIUS}
@@ -1662,7 +1905,7 @@ export default function CombatReplay({
               {STAT_LABELS.map(({ key, label }) => (
                 <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: STAT_FONT_SIZE }}>{label}</Typography>
-                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: STAT_FONT_SIZE }}>{player[key]}</Typography>
+                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: STAT_FONT_SIZE }}>{playerFrontInfo[key]}</Typography>
                 </Box>
               ))}
             </Box>
@@ -1696,10 +1939,80 @@ export default function CombatReplay({
           transition={creatureCardTransition}
           style={{ flex: 1, maxWidth: CARD_MAX_WIDTH, position: 'relative' }}
         >
+          {creatureBacklineIds.map((combatantId, index) => {
+            const backInfo = combatantInfoByIdRef.current[combatantId]
+            if (!backInfo) return null
+            const scale = Math.max(0.52, 1 - ((index + 1) * BACKLINE_STACK_SCALE_STEP))
+            const cardWidth = Math.round(CARD_MAX_WIDTH * scale)
+            const portraitSize = Math.round(PORTRAIT_SIZE * scale)
+            const hp = hpByCombatantIdRef.current[combatantId] ?? backInfo.maxHp
+            const resourceCurrent = resourceByCombatantIdRef.current[combatantId] ?? null
+            const statusEffects = latestStatusByCombatantIdRef.current[combatantId] ?? []
+            return (
+              <Paper
+                key={`creature-backline-${combatantId}`}
+                variant="outlined"
+                sx={{
+                  position: 'absolute',
+                  right: -(BACKLINE_STACK_OFFSET_PX * (index + 1)),
+                  top: BACKLINE_STACK_OFFSET_PX * (index + 1),
+                  width: cardWidth,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: CARD_GAP,
+                  p: CARD_PADDING,
+                  pt: 0,
+                  borderRadius: CARD_RADIUS,
+                  bgcolor: '#1a1414',
+                  borderColor: 'rgba(239,68,68,0.4)',
+                  boxShadow: '0 0 24px rgba(0,0,0,0.4), 0 0 20px rgba(239,68,68,0.1)',
+                  zIndex: index + 1,
+                  pointerEvents: 'none',
+                }}
+              >
+                <ReplayPortrait
+                  url={backInfo.portraitUrl}
+                  weaponUrl={backInfo.weaponUrl}
+                  sizePx={portraitSize}
+                  personIconSizePx={PERSON_ICON_SIZE}
+                  borderRadius={PORTRAIT_BORDER_RADIUS}
+                  borderWidth={PORTRAIT_BORDER}
+                  weaponSizePx={Math.round(WEAPON_SIZE * scale)}
+                  weaponOffsetPx={Math.round(WEAPON_OFFSET * scale)}
+                />
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: NAME_FONT_SIZE }}>{backInfo.name}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {backInfo.level}</Typography>
+                </Box>
+                <ReplayHpBar current={hp} max={backInfo.maxHp} label="HP" fontSizePx={HP_FONT_SIZE} heightPx={HP_BAR_HEIGHT} radius={HP_BAR_RADIUS} />
+                {backInfo.resource && resourceCurrent !== null && (
+                  <ReplayResourceBar
+                    current={resourceCurrent}
+                    max={backInfo.resource.max}
+                    label={backInfo.resource.name}
+                    colorHex={backInfo.resource.colorHex}
+                    fontSizePx={HP_FONT_SIZE}
+                    heightPx={HP_BAR_HEIGHT}
+                    radius={HP_BAR_RADIUS}
+                  />
+                )}
+                <ReplayStatusEffectIcons effects={statusEffects} />
+                <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  {STAT_LABELS.map(({ key, label }) => (
+                    <Box key={`${combatantId}-${label}`} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontSize: STAT_FONT_SIZE }}>{label}</Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ fontSize: STAT_FONT_SIZE }}>{backInfo[key]}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Paper>
+            )
+          })}
           <motion.div
             variants={creatureVariants}
             animate={creatureVariant}
-            style={{ position: 'relative' }}
+            style={{ position: 'relative', zIndex: 10 }}
           >
             <Paper
               ref={creatureCardRef}
@@ -1716,7 +2029,7 @@ export default function CombatReplay({
               <Box ref={creaturePortraitRef} sx={{ position: 'relative' }}>
               <ReplayPortrait
                 url={resolvedCreaturePortraitUrl}
-                weaponUrl={creature.weaponUrl}
+                weaponUrl={creatureFrontInfo.weaponUrl}
                 sizePx={PORTRAIT_SIZE}
                 personIconSizePx={PERSON_ICON_SIZE}
                 borderRadius={PORTRAIT_BORDER_RADIUS}
@@ -1800,16 +2113,16 @@ export default function CombatReplay({
               </AnimatePresence>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: NAME_FONT_SIZE }}>{creature.name}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {creature.level}</Typography>
+              <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: NAME_FONT_SIZE }}>{creatureFrontInfo.name}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: LEVEL_FONT_SIZE }}>Level {creatureFrontInfo.level}</Typography>
             </Box>
-            <ReplayHpBar current={creatureHp} max={creature.maxHp} label="HP" fontSizePx={HP_FONT_SIZE} heightPx={HP_BAR_HEIGHT} radius={HP_BAR_RADIUS} />
-            {creature.resource && creatureResourceCurrent !== null && (
+            <ReplayHpBar current={creatureHp} max={creatureFrontInfo.maxHp} label="HP" fontSizePx={HP_FONT_SIZE} heightPx={HP_BAR_HEIGHT} radius={HP_BAR_RADIUS} />
+            {creatureFrontInfo.resource && creatureResourceCurrent !== null && (
               <ReplayResourceBar
                 current={creatureResourceCurrent}
-                max={creature.resource.max}
-                label={creature.resource.name}
-                colorHex={creature.resource.colorHex}
+                max={creatureFrontInfo.resource.max}
+                label={creatureFrontInfo.resource.name}
+                colorHex={creatureFrontInfo.resource.colorHex}
                 fontSizePx={HP_FONT_SIZE}
                 heightPx={HP_BAR_HEIGHT}
                 radius={HP_BAR_RADIUS}
@@ -1820,7 +2133,7 @@ export default function CombatReplay({
               {STAT_LABELS.map(({ key, label }) => (
                 <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', px: 0.75 }}>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: STAT_FONT_SIZE }}>{label}</Typography>
-                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: STAT_FONT_SIZE }}>{creature[key]}</Typography>
+                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: STAT_FONT_SIZE }}>{creatureFrontInfo[key]}</Typography>
                 </Box>
               ))}
             </Box>

@@ -14,6 +14,7 @@ type EffectKind =
   | 'damage'
   | 'heal'
   | 'apply_status'
+  | 'summon'
   | 'avoid'
   | 'execute'
   | 'lifesteal'
@@ -41,6 +42,7 @@ export type EffectFormRow = {
   durationTurns: string
   lifestealPercent: string
   statusEffectId: string
+  summonCreatureId: string
   dispelFilter: DispelFilter
   statModifiers: string
   derivedStatModifiers: string
@@ -48,11 +50,13 @@ export type EffectFormRow = {
 }
 
 export type StatusEffectOption = { id: string; name: string }
+export type CreatureOption = { id: string; name: string }
 
 const EFFECT_KINDS: EffectKind[] = [
   'damage',
   'heal',
   'apply_status',
+  'summon',
   'avoid',
   'execute',
   'lifesteal',
@@ -89,6 +93,7 @@ export function createEmptyEffectRow(fallbackMainStatId = 'STR'): EffectFormRow 
     durationTurns: '',
     lifestealPercent: '',
     statusEffectId: '',
+    summonCreatureId: '',
     dispelFilter: 'debuff',
     statModifiers: '',
     derivedStatModifiers: '',
@@ -126,6 +131,7 @@ export function hydrateEffectRows(effects: any[] | undefined, fallbackMainStatId
     durationTurns: effect?.durationTurns != null ? String(effect.durationTurns) : '',
     lifestealPercent: effect?.lifestealPercent != null ? String(effect.lifestealPercent) : '',
     statusEffectId: effect?.statusEffectId ?? effect?.statusEffect?.id ?? '',
+    summonCreatureId: effect?.summonCreatureId ?? '',
     dispelFilter: (effect?.dispelFilter ?? 'debuff') as DispelFilter,
     statModifiers: serializeNumberMap(effect?.statModifiers),
     derivedStatModifiers: serializeNumberMap(effect?.derivedStatModifiers),
@@ -150,6 +156,7 @@ export function buildEffectPayload(rows: EffectFormRow[]): any[] {
       if (row.durationTurns.trim() !== '' && !Number.isNaN(Number(row.durationTurns))) out.durationTurns = Number(row.durationTurns)
       if (row.lifestealPercent.trim() !== '' && !Number.isNaN(Number(row.lifestealPercent))) out.lifestealPercent = Number(row.lifestealPercent)
       if (row.statusEffectId.trim()) out.statusEffectId = row.statusEffectId.trim()
+      if (row.summonCreatureId.trim()) out.summonCreatureId = row.summonCreatureId.trim()
       if (row.kind === 'dispel') out.dispelFilter = row.dispelFilter
 
       const scalingTerms = row.scalingTerms
@@ -187,6 +194,7 @@ type Props = {
   mainStatIds: string[]
   fallbackMainStatId: string
   statusEffectOptions?: StatusEffectOption[]
+  creatureOptions?: CreatureOption[]
   allowApplyStatus?: boolean
 }
 
@@ -196,6 +204,7 @@ export default function EffectsEditor({
   mainStatIds,
   fallbackMainStatId,
   statusEffectOptions = [],
+  creatureOptions = [],
   allowApplyStatus = true,
 }: Props) {
   const kinds = allowApplyStatus ? EFFECT_KINDS : EFFECT_KINDS.filter((k) => k !== 'apply_status')
@@ -242,6 +251,22 @@ export default function EffectsEditor({
               >
                 <MenuItem value="">-- Select --</MenuItem>
                 {statusEffectOptions.map((opt) => (
+                  <MenuItem key={opt.id} value={opt.id}>{opt.name || opt.id}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+          {effect.kind === 'summon' && (
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel>Creature</InputLabel>
+              <Select
+                value={effect.summonCreatureId}
+                label="Creature"
+                onChange={(e) => onChange(effects.map((x, j) => j === effectIndex ? { ...x, summonCreatureId: e.target.value } : x))}
+                displayEmpty
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {creatureOptions.map((opt) => (
                   <MenuItem key={opt.id} value={opt.id}>{opt.name || opt.id}</MenuItem>
                 ))}
               </Select>

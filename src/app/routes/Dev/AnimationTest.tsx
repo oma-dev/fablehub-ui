@@ -867,7 +867,7 @@ export default function AnimationTest() {
   const [resourceCostAmount, setResourceCostAmount] = useState(0)
   const [unlockCost, setUnlockCost] = useState(1)
   const [minLevel, setMinLevel] = useState(1)
-  const [effectKind, setEffectKind] = useState<'damage' | 'heal' | 'apply_status' | 'execute' | 'lifesteal'>('damage')
+  const [effectKind, setEffectKind] = useState<'damage' | 'heal' | 'apply_status' | 'execute' | 'lifesteal' | 'summon'>('damage')
   const [effectAmount, setEffectAmount] = useState(0)
   const [effectPercentage, setEffectPercentage] = useState(0)
   const [effectLifestealPct, setEffectLifestealPct] = useState(0)
@@ -876,7 +876,7 @@ export default function AnimationTest() {
   const [reactiveScalingCoeff, setReactiveScalingCoeff] = useState(0)
   const [jsonImportText, setJsonImportText] = useState('')
 
-  const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal'] as const
+  const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal', 'summon'] as const
   const STAT_IDS = ['STR', 'DEX', 'INT', 'LCK', 'HP', 'ARM'] as const
   const ABILITY_TYPES: typeof abilityType[] = ['primary', 'regular', 'passive', 'ultimate', 'reactive']
 

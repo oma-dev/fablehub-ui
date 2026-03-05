@@ -38,6 +38,8 @@ function describeEffect(effect: Effect): string {
       return `Deals ${effect.amount ?? '?'} damage, heals ${effect.lifestealPercent ?? '?'}%`
     case 'apply_status':
       return `Applies ${effect.statusEffect?.name ?? 'status'}`
+    case 'summon':
+      return `Summons ${effect.summonCreatureId ?? 'creature'}`
     default:
       return effect.kind
   }

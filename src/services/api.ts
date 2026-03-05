@@ -335,6 +335,7 @@ export type EffectKind =
   | 'damage'
   | 'heal'
   | 'apply_status'
+  | 'summon'
   | 'avoid'
   | 'execute'
   | 'lifesteal'
@@ -359,6 +360,7 @@ export interface Effect {
   scalingCoeff?: number
   lifestealPercent?: number
   statusEffectId?: string
+  summonCreatureId?: string
   statusEffect?: StatusEffectTemplate
   statModifiers?: Partial<Record<MainStatId, number>>
   derivedStatModifiers?: Partial<Record<DerivedStatId, number>>
@@ -792,8 +794,22 @@ export interface CreateIdleRpgBody {
 
 export type CombatEventType =
   | 'damage' | 'heal' | 'dot_tick' | 'hot_tick'
-  | 'status_applied' | 'status_expired' | 'status_dispelled' | 'stun_skip'
+  | 'summon' | 'status_applied' | 'status_expired' | 'status_dispelled' | 'stun_skip'
   | 'execute' | 'resource_change' | 'block' | 'avoid'
+
+export interface SummonedCombatantSnapshot {
+  id: string
+  name: string
+  level?: number
+  portraitUrl?: string
+  maxHp: number
+  currentHp: number
+  ap: number
+  arm: number
+  side?: number
+  resource?: { current: number; max: number }
+  animationFrames?: AnimationFrames
+}
 
 export interface ActiveStatusEffect {
   id: string
@@ -832,11 +848,14 @@ export interface CombatTurnEvent {
   blockAnimationFrames?: AnimationFrames
   /** Present on damage events when the hit crits. */
   isCritical?: boolean
+  /** Present on summon events. */
+  summonedCombatant?: SummonedCombatantSnapshot
 }
 
 export interface CombatTurn {
   turnIndex: number
   events: CombatTurnEvent[]
+  frontlineBySide?: Record<string, string | null>
   activeStatusEffects?: Record<string, ActiveStatusEffect[]>
   resources?: Record<string, { current: number; max: number }>
 }

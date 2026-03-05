@@ -1580,6 +1580,7 @@ export default function IdleRpgEdit() {
                       mainStatIds={mainStatIds}
                       fallbackMainStatId={fallbackMainStatId}
                       statusEffectOptions={statusEffects.map((s) => ({ id: s.id, name: s.name }))}
+                      creatureOptions={creatures.filter((c) => c.id.trim()).map((c) => ({ id: c.id, name: c.name }))}
                     />
                   </Box>
                   {a.abilityType === 'passive' && (
@@ -1708,6 +1709,7 @@ export default function IdleRpgEdit() {
                       mainStatIds={mainStatIds}
                       fallbackMainStatId={fallbackMainStatId}
                       allowApplyStatus={false}
+                      creatureOptions={creatures.filter((c) => c.id.trim()).map((c) => ({ id: c.id, name: c.name }))}
                     />
                     <StatusAnimationEditor
                       title="Status Particles (loop + tick)"
