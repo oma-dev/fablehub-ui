@@ -722,7 +722,9 @@ export default function IdleRpgCreate() {
           ...(a.resourceCostId.trim() && Number(a.resourceCostAmount) > 0 ? {
             cost: { cooldownTurns: Number(a.cooldownTurns) || 0, resourceCost: { resourceId: a.resourceCostId.trim(), amount: Number(a.resourceCostAmount) } }
           } : {}),
-          ...(Number(a.unlockCost) > 0 ? { unlockCost: Number(a.unlockCost) } : {}),
+          ...(a.unlockCost.trim() !== '' && !Number.isNaN(Number(a.unlockCost)) && Number(a.unlockCost) >= 0
+            ? { unlockCost: Number(a.unlockCost) }
+            : {}),
           ...(Number(a.minLevel) > 1 ? { requirements: { minLevel: Number(a.minLevel) } } : {}),
           ...(abilityEffects.length > 0 ? { effects: abilityEffects } : {}),
           ...(derivedStatModifiers.length > 0 ? { derivedStatModifiers } : {}),
