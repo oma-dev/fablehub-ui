@@ -238,6 +238,33 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
                       Completed
                     </Typography>
                   )}
+                  <Box sx={{ mt: 1.2, display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<ChevronLeftIcon />}
+                      onClick={() => setDungeonIndex((i) => Math.max(0, i - 1))}
+                      disabled={dungeonIndex <= 0}
+                      sx={{ textTransform: 'none', fontWeight: 700 }}
+                    >
+                      Previous Dungeon
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      endIcon={<ChevronRightIcon />}
+                      onClick={() => setDungeonIndex((i) => Math.min(dungeons.length - 1, i + 1))}
+                      disabled={!canGoRight}
+                      sx={{ textTransform: 'none', fontWeight: 700 }}
+                    >
+                      Next Dungeon
+                    </Button>
+                  </Box>
+                  {!canGoRight && currentDungeon && !currentDungeon.completed && (
+                    <Typography variant="caption" sx={{ mt: 0.8, display: 'block', color: 'text.secondary' }}>
+                      Beat this dungeon to unlock the next one.
+                    </Typography>
+                  )}
                 </Paper>
 
                 <Box
