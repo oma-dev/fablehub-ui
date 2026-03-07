@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
+import Divider from '@mui/material/Divider'
 import Paper from '@mui/material/Paper'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -15,6 +16,9 @@ import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi'
+import AccessTimeFilledIcon from '@mui/icons-material/AccessTimeFilled'
+import HistoryIcon from '@mui/icons-material/History'
+import GroupsIcon from '@mui/icons-material/Groups'
 import {
   getRealmRoster,
   getRealmCharacterPlayState,
@@ -40,7 +44,6 @@ interface Props {
   realmId: string
   character: CharacterState
   pack: IdleRpgPackV1
-  /** When set from parent (e.g. Guild Fight), run this fight and show in arena. Parent clears when consumed. */
   pendingPvpFight?: { targetCharacterId: string; targetProfile: PlayStateResponse } | null
   onClearPendingPvpFight?: () => void
 }
@@ -161,7 +164,6 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
     }
   }, [fableId, realmId, character.id, selectedCharacterId])
 
-  // Consume pending fight from parent (e.g. Guild Fight button)
   useEffect(() => {
     if (!pendingPvpFight || fighting || combatResult) return
     const { targetCharacterId, targetProfile } = pendingPvpFight
@@ -172,7 +174,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
       setProfileError(`PvP cooldown active: ${formatCooldownRemaining(pvpCooldownRemainingMs)} remaining.`)
       return
     }
-    onClearPendingPvpFight?.() // Clear immediately to prevent double-invocation (e.g. StrictMode)
+    onClearPendingPvpFight?.()
     let cancelled = false
     setFighting(true)
     pvpFight(fableId, realmId, character.id, targetCharacterId)
@@ -225,7 +227,6 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
   const finalizeCombatReplay = () => {
     setCombatResult(null)
     onClearPendingPvpFight?.()
-    // Refresh history
     getPvpHistory(fableId, realmId, character.id).then(setHistory)
   }
 
@@ -266,18 +267,26 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
   const weaponItemId = character.equipment?.['attack_source']
   const weaponDef = weaponItemId ? pack.items.find((i) => i.id === weaponItemId) : undefined
 
+  const panelSx = {
+    bgcolor: 'rgba(18,16,30,0.9)',
+    border: '1px solid rgba(168,85,247,0.2)',
+    borderRadius: 2,
+    boxShadow: 'inset 0 0 34px rgba(124,58,237,0.08), 0 12px 24px rgba(0,0,0,0.28)',
+  } as const
+
   return (
     <Box
       sx={{
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        overflow: 'auto',
+        minHeight: 0,
+        overflow: 'hidden',
         backgroundImage: inCombat ? `url(${arenaBg})` : undefined,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        p: inCombat ? 0 : 3,
-        gap: inCombat ? 0 : 2,
+        p: inCombat ? 0 : { xs: 1, sm: 1.5 },
+        gap: inCombat ? 0 : 1.5,
       }}
     >
       <Dialog
@@ -303,9 +312,10 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
           </Button>
         </DialogActions>
       </Dialog>
+
       {inCombat && combatResult && targetStats ? (() => {
-        const targetCls = pack.classes.find((c) => c.id === combatResult!.targetProfile.character.classId)
-        const targetWeaponId = combatResult!.targetProfile.character.equipment?.attack_source
+        const targetCls = pack.classes.find((c) => c.id === combatResult.targetProfile.character.classId)
+        const targetWeaponId = combatResult.targetProfile.character.equipment?.attack_source
         const targetWeaponDef = targetWeaponId ? pack.items.find((i) => i.id === targetWeaponId) : undefined
         const playerAbility = pack.abilities?.find((a) => a.id === cls?.primaryAttackId && a.abilityType === 'primary')
         const targetAbility = pack.abilities?.find((a) => a.id === targetCls?.primaryAttackId && a.abilityType === 'primary')
@@ -372,119 +382,153 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
         )
       })() : (
         <>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <SportsKabaddiIcon sx={{ fontSize: 32, color: 'primary.main' }} />
-            <Typography variant="h5" fontWeight={600}>
-              PvP Arena
-            </Typography>
-          </Box>
+          <Paper variant="outlined" sx={{ ...panelSx, p: 1.2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <SportsKabaddiIcon sx={{ fontSize: 30, color: '#c084fc' }} />
+                <Typography variant="h6" fontWeight={800}>PvP Arena</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 0.7, flexWrap: 'wrap' }}>
+                <Chip
+                  icon={<AccessTimeFilledIcon sx={{ color: '#fbbf24 !important' }} />}
+                  label={isPvpCooldownActive ? `Cooldown ${formatCooldownRemaining(pvpCooldownRemainingMs)}` : 'Ready to fight'}
+                  size="small"
+                  sx={{
+                    bgcolor: isPvpCooldownActive ? 'rgba(245,158,11,0.16)' : 'rgba(34,197,94,0.16)',
+                    color: isPvpCooldownActive ? '#fbbf24' : '#4ade80',
+                    fontWeight: 700,
+                  }}
+                />
+                <Chip
+                  icon={<GroupsIcon sx={{ color: '#c084fc !important' }} />}
+                  label={`${otherCharacters.length} Opponents`}
+                  size="small"
+                  sx={{ bgcolor: 'rgba(168,85,247,0.18)', color: '#e9d5ff', fontWeight: 700 }}
+                />
+              </Box>
+            </Box>
+          </Paper>
 
-          {rosterError && (
-            <Typography color="error">{rosterError}</Typography>
-          )}
+          {rosterError && <Typography color="error" sx={{ px: 0.5 }}>{rosterError}</Typography>}
 
-          {rosterLoading ? (
-            <Typography color="text.secondary">Loading arena roster...</Typography>
-          ) : otherCharacters.length === 0 ? (
-            <Typography color="text.secondary">No other players in this realm yet.</Typography>
-          ) : (
-            <Paper variant="outlined" sx={{ overflow: 'hidden', flexShrink: 0 }}>
-              <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
-                <Typography variant="subtitle1" fontWeight={600}>
-                  Realm Champions
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Click a player to view their profile and challenge them to a duel.
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: 'grid',
+              gap: 1.5,
+              gridTemplateColumns: { xs: '1fr', xl: 'minmax(520px,1.2fr) minmax(380px,0.9fr)' },
+            }}
+          >
+            <Paper variant="outlined" sx={{ ...panelSx, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <Box sx={{ px: 1.5, py: 1.1 }}>
+                <Typography sx={{ fontSize: 15, fontWeight: 800, color: '#e8e4f0' }}>Realm Champions</Typography>
+                <Typography sx={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+                  Select a target to inspect and challenge.
                 </Typography>
               </Box>
-              <TableContainer sx={{ maxHeight: { xs: 260, md: 320 } }}>
+              <Divider />
+
+              <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                {rosterLoading ? (
+                  <Box sx={{ p: 2 }}>
+                    <Typography color="text.secondary">Loading arena roster...</Typography>
+                  </Box>
+                ) : otherCharacters.length === 0 ? (
+                  <Box sx={{ p: 2 }}>
+                    <Typography color="text.secondary">No other players in this realm yet.</Typography>
+                  </Box>
+                ) : (
+                  <TableContainer sx={{ maxHeight: '100%' }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Name</TableCell>
+                          <TableCell align="right">Level</TableCell>
+                          <TableCell>Class</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {otherCharacters.map((r) => (
+                          <TableRow
+                            key={r.id}
+                            hover
+                            onClick={() => setSelectedCharacterId(r.id)}
+                            sx={{
+                              cursor: 'pointer',
+                              bgcolor: selectedCharacterId === r.id ? 'rgba(168,85,247,0.16)' : undefined,
+                            }}
+                          >
+                            <TableCell sx={{ fontWeight: 700 }}>{r.name}</TableCell>
+                            <TableCell align="right">{r.level}</TableCell>
+                            <TableCell>{getClassName(r.classId)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ ...panelSx, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <Box sx={{ px: 1.5, py: 1.1, display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                <HistoryIcon sx={{ fontSize: 20, color: '#c084fc' }} />
+                <Typography sx={{ fontSize: 15, fontWeight: 800, color: '#e8e4f0' }}>Fight History</Typography>
+              </Box>
+              <Divider />
+              <TableContainer sx={{ flex: 1, minHeight: 0 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Name</TableCell>
-                      <TableCell align="right">Level</TableCell>
-                      <TableCell>Class</TableCell>
+                      <TableCell>Opponent</TableCell>
+                      <TableCell align="center">Result</TableCell>
+                      <TableCell align="right">When</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {otherCharacters.map((r) => (
-                      <TableRow
-                        key={r.id}
-                        hover
-                        onClick={() => setSelectedCharacterId(r.id)}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        <TableCell>{r.name}</TableCell>
-                        <TableCell align="right">{r.level}</TableCell>
-                        <TableCell>{getClassName(r.classId)}</TableCell>
+                    {historyLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary', py: 3 }}>
+                          Loading...
+                        </TableCell>
                       </TableRow>
-                    ))}
+                    ) : history.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary', py: 3 }}>
+                          No fights yet. Challenge someone above!
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      history.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell>{getHistoryOpponent(entry)}</TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={entry.winnerId ? (getHistoryVictory(entry) ? 'Victory' : 'Defeat') : 'Draw'}
+                              size="small"
+                              sx={{
+                                fontWeight: 700,
+                                fontSize: 11,
+                                ...(entry.winnerId
+                                  ? getHistoryVictory(entry)
+                                    ? { bgcolor: 'rgba(34,197,94,0.2)', color: '#22c55e' }
+                                    : { bgcolor: 'rgba(239,68,68,0.2)', color: '#ef4444' }
+                                  : { bgcolor: 'rgba(156,163,175,0.2)', color: '#9ca3af' }),
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="right" sx={{ color: 'text.secondary', fontSize: 13 }}>
+                            {formatHistoryDate(entry.createdAt)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>
             </Paper>
-          )}
-
-          <Paper variant="outlined" sx={{ overflow: 'hidden', flexShrink: 0 }}>
-            <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
-              <Typography variant="subtitle1" fontWeight={600}>
-                Fight History
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Your recent PvP duels.
-              </Typography>
-            </Box>
-            <TableContainer sx={{ maxHeight: { xs: 300, md: 420 } }}>
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Opponent</TableCell>
-                    <TableCell align="center">Result</TableCell>
-                    <TableCell align="right">When</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {historyLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary', py: 3 }}>
-                        Loading…
-                      </TableCell>
-                    </TableRow>
-                  ) : history.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary', py: 3 }}>
-                        No fights yet. Challenge someone above!
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    history.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{getHistoryOpponent(entry)}</TableCell>
-                        <TableCell align="center">
-                          <Chip
-                            label={entry.winnerId ? (getHistoryVictory(entry) ? 'Victory' : 'Defeat') : 'Draw'}
-                            size="small"
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: 11,
-                              ...(entry.winnerId
-                                ? getHistoryVictory(entry)
-                                  ? { bgcolor: 'rgba(34,197,94,0.2)', color: '#22c55e' }
-                                  : { bgcolor: 'rgba(239,68,68,0.2)', color: '#ef4444' }
-                                : { bgcolor: 'rgba(156,163,175,0.2)', color: '#9ca3af' }),
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell align="right" sx={{ color: 'text.secondary', fontSize: 13 }}>
-                          {formatHistoryDate(entry.createdAt)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+          </Box>
 
           <CharacterCardModal
             open={!!selectedCharacterId}
@@ -505,4 +549,3 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
     </Box>
   )
 }
-

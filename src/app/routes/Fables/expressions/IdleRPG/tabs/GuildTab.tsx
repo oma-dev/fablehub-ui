@@ -1,13 +1,18 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Chip from '@mui/material/Chip'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
+import Divider from '@mui/material/Divider'
+import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
+import GroupsIcon from '@mui/icons-material/Groups'
+import MilitaryTechIcon from '@mui/icons-material/MilitaryTech'
 import { getGroups, getGroup, getGuildChampion, createGroup, joinGroup, getPlayState } from '@features/idle-rpg/api'
 import type { CharacterState, GuildChampion, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '@features/idle-rpg/api'
 import GuildChat from '../components/GuildChat'
@@ -133,119 +138,204 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
     }
   }
 
+  const panelSx = {
+    bgcolor: 'rgba(18,16,30,0.9)',
+    border: '1px solid rgba(168,85,247,0.2)',
+    borderRadius: 2,
+    boxShadow: 'inset 0 0 34px rgba(124,58,237,0.08), 0 12px 24px rgba(0,0,0,0.28)',
+  } as const
+
   if (inGuild) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', p: 3, gap: 2 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', p: { xs: 1, sm: 1.5 }, gap: 1.5 }}>
         {guildLoading ? (
-          <Typography color="text.secondary">Loading guild...</Typography>
+          <Paper variant="outlined" sx={{ ...panelSx, p: 2 }}>
+            <Typography color="text.secondary">Loading guild hall...</Typography>
+          </Paper>
         ) : group ? (
           <>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 2, alignItems: 'start' }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <GuildChat
-                  fableId={fableId}
-                  realmId={realmId}
-                  groupId={group.id}
-                  character={character}
-                />
-                <GuildRoster
-                  fableId={fableId}
-                  realmId={realmId}
-                  group={group}
-                  pack={pack}
-                  viewerCharacter={character}
-                  onRequestPvpFight={onRequestPvpFight}
-                />
+            <Paper variant="outlined" sx={{ ...panelSx, p: 1.25 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <GroupsIcon sx={{ color: '#c084fc' }} />
+                  <Typography variant="h6" fontWeight={800}>{group.name} {group.label}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+                  <Chip
+                    label={`${group.members?.length ?? 0} Members`}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(168,85,247,0.2)', color: '#e9d5ff', fontWeight: 700 }}
+                  />
+                  <Chip
+                    icon={<MilitaryTechIcon sx={{ color: '#fbbf24 !important' }} />}
+                    label={champion?.name ?? 'No Champion'}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(245,158,11,0.18)', color: '#fbbf24', fontWeight: 700 }}
+                  />
+                </Box>
               </Box>
-<Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <GuildManagement
-                  group={group}
-                  champion={champion}
-                  character={character}
-                  pack={pack}
-                  fableId={fableId}
-                  realmId={realmId}
-                  onDonateSuccess={() => {
-                    getGroup(fableId, realmId, group.id).then(setGroup)
-                    getPlayState(fableId, realmId, character.id).then((ps) => onCharacterUpdate(ps.character))
-                  }}
-                />
-                <GuildRaids
-                  fableId={fableId}
-                  realmId={realmId}
-                  groupId={group.id}
-                  group={group}
-                  character={character}
-                  pack={pack}
-                  onUpdate={() => getGroup(fableId, realmId, group.id).then(setGroup)}
-                />
+            </Paper>
+
+            <Box
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                display: 'grid',
+                gap: 1.5,
+                gridTemplateColumns: { xs: '1fr', xl: 'minmax(520px, 1.25fr) minmax(340px, 0.9fr)' },
+              }}
+            >
+              <Box sx={{ minHeight: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <Paper variant="outlined" sx={{ ...panelSx, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <Box sx={{ px: 1.5, py: 1.1 }}>
+                    <Typography sx={{ fontSize: 15, fontWeight: 800, color: '#e8e4f0' }}>Guild Chat</Typography>
+                  </Box>
+                  <Divider />
+                  <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                    <GuildChat fableId={fableId} realmId={realmId} groupId={group.id} character={character} />
+                  </Box>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ ...panelSx, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <Box sx={{ px: 1.5, py: 1.1 }}>
+                    <Typography sx={{ fontSize: 15, fontWeight: 800, color: '#e8e4f0' }}>Roster</Typography>
+                  </Box>
+                  <Divider />
+                  <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                    <GuildRoster
+                      fableId={fableId}
+                      realmId={realmId}
+                      group={group}
+                      pack={pack}
+                      viewerCharacter={character}
+                      onRequestPvpFight={onRequestPvpFight}
+                    />
+                  </Box>
+                </Paper>
+              </Box>
+
+              <Box sx={{ minHeight: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <Paper variant="outlined" sx={{ ...panelSx, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <Box sx={{ px: 1.5, py: 1.1 }}>
+                    <Typography sx={{ fontSize: 15, fontWeight: 800, color: '#e8e4f0' }}>Guild Management</Typography>
+                  </Box>
+                  <Divider />
+                  <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                    <GuildManagement
+                      group={group}
+                      champion={champion}
+                      character={character}
+                      pack={pack}
+                      fableId={fableId}
+                      realmId={realmId}
+                      onDonateSuccess={() => {
+                        getGroup(fableId, realmId, group.id).then(setGroup)
+                        getPlayState(fableId, realmId, character.id).then((ps) => onCharacterUpdate(ps.character))
+                      }}
+                    />
+                  </Box>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ ...panelSx, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <Box sx={{ px: 1.5, py: 1.1 }}>
+                    <Typography sx={{ fontSize: 15, fontWeight: 800, color: '#e8e4f0' }}>Raids</Typography>
+                  </Box>
+                  <Divider />
+                  <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                    <GuildRaids
+                      fableId={fableId}
+                      realmId={realmId}
+                      groupId={group.id}
+                      group={group}
+                      character={character}
+                      pack={pack}
+                      onUpdate={() => getGroup(fableId, realmId, group.id).then(setGroup)}
+                    />
+                  </Box>
+                </Paper>
               </Box>
             </Box>
           </>
         ) : (
-          <Typography color="text.secondary">Could not load guild data.</Typography>
+          <Paper variant="outlined" sx={{ ...panelSx, p: 2 }}>
+            <Typography color="text.secondary">Could not load guild data.</Typography>
+          </Paper>
         )}
       </Box>
     )
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', p: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h5" fontWeight={600}>
-          Guilds
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={handleCreateOpen}>
-          Create guild
-        </Button>
-      </Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', p: { xs: 1, sm: 1.5 }, gap: 1.5 }}>
+      <Paper variant="outlined" sx={{ ...panelSx, p: 1.25 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <GroupsIcon sx={{ color: '#c084fc' }} />
+            <Typography variant="h6" fontWeight={800}>Guild Hall</Typography>
+          </Box>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleCreateOpen} sx={{ textTransform: 'none', fontWeight: 700 }}>
+            Create Guild
+          </Button>
+        </Box>
+      </Paper>
 
       {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
+        <Typography color="error" sx={{ px: 0.5 }}>
           {error}
         </Typography>
       )}
 
-      {loading ? (
-        <Typography color="text.secondary">Loading guilds...</Typography>
-      ) : groups.length === 0 ? (
-        <Typography color="text.secondary">No guilds yet. Create one to get started.</Typography>
-      ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {groups.map((g) => (
-            <Box
-              key={g.id}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                p: 2,
-                borderRadius: 2,
-                bgcolor: 'action.hover',
-                border: '1px solid',
-                borderColor: 'divider',
-              }}
-            >
-              <Box>
-                <Typography fontWeight={600}>
-                  {g.name} {g.label}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {g.members?.length ?? 0} member{(g.members?.length ?? 0) === 1 ? '' : 's'}
-                </Typography>
-              </Box>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => handleJoin(g.id)}
-                disabled={!!joiningId}
-              >
-                {joiningId === g.id ? 'Joining...' : 'Join'}
-              </Button>
-            </Box>
-          ))}
+      <Paper variant="outlined" sx={{ ...panelSx, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Box sx={{ px: 1.5, py: 1.2 }}>
+          <Typography sx={{ fontSize: 15, fontWeight: 800, color: '#e8e4f0' }}>Available Guilds</Typography>
         </Box>
-      )}
+        <Divider />
+
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 1.5 }}>
+          {loading ? (
+            <Typography color="text.secondary">Loading guilds...</Typography>
+          ) : groups.length === 0 ? (
+            <Typography color="text.secondary">No guilds yet. Create one to get started.</Typography>
+          ) : (
+            <Box sx={{ display: 'grid', gap: 1.1, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0,1fr))' } }}>
+              {groups.map((g) => (
+                <Paper
+                  key={g.id}
+                  variant="outlined"
+                  sx={{
+                    p: 1.1,
+                    borderColor: 'rgba(168,85,247,0.3)',
+                    bgcolor: 'rgba(24,21,36,0.88)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.85,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                    <Typography fontWeight={800} sx={{ color: '#f3f4f6' }}>
+                      {g.name} {g.label}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={`${g.members?.length ?? 0} Members`}
+                      sx={{ fontWeight: 700, bgcolor: 'rgba(168,85,247,0.18)', color: '#e9d5ff' }}
+                    />
+                  </Box>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => handleJoin(g.id)}
+                    disabled={!!joiningId}
+                    sx={{ textTransform: 'none', fontWeight: 700 }}
+                  >
+                    {joiningId === g.id ? 'Joining...' : 'Join Guild'}
+                  </Button>
+                </Paper>
+              ))}
+            </Box>
+          )}
+        </Box>
+      </Paper>
 
       <Dialog open={createOpen} onClose={() => !creating && setCreateOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Create guild</DialogTitle>
@@ -267,9 +357,7 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateOpen(false)} disabled={creating}>
-            Cancel
-          </Button>
+          <Button onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</Button>
           <Button variant="contained" onClick={handleCreateSubmit} disabled={creating || !createName.trim()}>
             {creating ? 'Creating...' : 'Create'}
           </Button>
@@ -278,4 +366,3 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
     </Box>
   )
 }
-
