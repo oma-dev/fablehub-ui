@@ -342,6 +342,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
             <CombatReplay
               combat={combatResult.combat}
               leftCharacterId={character.id}
+              arenaBackgroundImageUrl={arenaBg}
               abilityAnimations={abilityAnimations}
               statusAnimations={statusAnimations}
               statusTransforms={statusTransforms}

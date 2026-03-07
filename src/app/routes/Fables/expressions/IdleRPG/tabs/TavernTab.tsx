@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Box from '@mui/material/Box'
 import tavernBg from '../../../../../../assets/backgrounds/tavern.png'
-import arenaBg from '../../../../../../assets/backgrounds/arena.png'
 import questGiverBg from '../../../../../../assets/backgrounds/questGiver.png'
+import questRoadBg from '../../../../../../assets/backgrounds/questRoad.png'
+import questCombatBg from '../../../../../../assets/backgrounds/questBackground.png'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
@@ -199,7 +200,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
     setPhase('idle')
   }
 
-  const bgImage = phase === 'combat' ? arenaBg : tavernBg
+  const bgImage = phase === 'combat' ? questCombatBg : phase === 'questActive' ? questRoadBg : tavernBg
   const showQuestGiver = phase === 'idle' || phase === 'questPicker'
   const showQuestGiverCallout = phase === 'idle'
 
@@ -507,65 +508,78 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
 
       {/* Quest active: timer */}
       {phase === 'questActive' && (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-          {renderQuestIcon(activeQuestDef, 96)}
-          <Typography
-            variant="h5"
-            fontWeight={800}
-            sx={{
-              background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            {activeQuestDef?.name ?? 'Quest in progress'}
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Fighting {creatureForQuest(activeQuestDef)?.name ?? 'unknown creature'}...
-          </Typography>
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            px: { xs: 1.5, sm: 2.5, md: 4 },
+            py: { xs: 1.5, sm: 2.25, md: 3 },
+            background: 'linear-gradient(180deg, rgba(9,8,16,0.18) 0%, rgba(9,8,16,0.56) 100%)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.4 }}>
+            {renderQuestIcon(activeQuestDef, 88)}
+            <Box>
+              <Typography
+                variant="h5"
+                fontWeight={800}
+                sx={{
+                  background: 'linear-gradient(90deg, #ede9fe, #c084fc)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                {activeQuestDef?.name ?? 'Quest in progress'}
+              </Typography>
+              <Typography variant="body1" sx={{ color: 'rgba(243,244,246,0.88)', fontWeight: 600 }}>
+                Fighting {creatureForQuest(activeQuestDef)?.name ?? 'unknown creature'}...
+              </Typography>
+            </Box>
+          </Box>
 
-          <Box sx={{ width: '80%', maxWidth: 450 }}>
+          <Box sx={{ width: 'min(1240px, 97%)', mx: 'auto', display: 'flex', flexDirection: 'column', gap: 1.2 }}>
             <LinearProgress
               variant="determinate"
               value={timerProgress}
               sx={{
-                height: 20,
-                borderRadius: 2.5,
-                bgcolor: 'rgba(168,85,247,0.1)',
-                border: '1px solid rgba(168,85,247,0.15)',
+                height: 22,
+                borderRadius: 3,
+                bgcolor: 'rgba(18,16,30,0.72)',
+                border: '1px solid rgba(168,85,247,0.35)',
                 '& .MuiLinearProgress-bar': {
-                  borderRadius: 2.5,
+                  borderRadius: 3,
                   background: questDone
                     ? 'linear-gradient(90deg, #fbbf24, #f59e0b)'
                     : 'linear-gradient(90deg, #c084fc, #a855f7)',
                   boxShadow: questDone
-                    ? '0 0 12px rgba(251,191,36,0.4)'
-                    : '0 0 12px rgba(168,85,247,0.4)',
+                    ? '0 0 14px rgba(251,191,36,0.45)'
+                    : '0 0 14px rgba(168,85,247,0.45)',
                 },
               }}
             />
             <Typography
               variant="h6"
               textAlign="center"
-              sx={{ mt: 1.5, fontWeight: 700, color: questDone ? '#fbbf24' : 'text.primary' }}
+              sx={{ fontWeight: 800, color: questDone ? '#fbbf24' : '#f3f4f6' }}
             >
               {timerText}
             </Typography>
+            <Button
+              variant="contained"
+              color={questDone ? 'warning' : 'primary'}
+              disabled={!questDone || claiming}
+              onClick={handleClaim}
+              size="large"
+              fullWidth
+              sx={{ py: 1.2, fontSize: '1.02rem', fontWeight: 800 }}
+            >
+              {claiming ? 'Claiming...' : questDone ? 'Claim Reward' : 'Waiting...'}
+            </Button>
           </Box>
-
-          <Button
-            variant="contained"
-            color={questDone ? 'warning' : 'primary'}
-            disabled={!questDone || claiming}
-            onClick={handleClaim}
-            size="large"
-            sx={{ px: 5, py: 1.5, fontSize: '1.1rem' }}
-          >
-            {claiming ? 'Claiming…' : questDone ? 'Claim Reward' : 'Waiting...'}
-          </Button>
         </Box>
       )}
-
       {/* Combat replay */}
       {phase === 'combat' && combatData && (() => {
         const creatureDef = creatureForQuest(combatData.quest)
@@ -601,6 +615,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
             <CombatReplay
               combat={combatData.combat}
               leftCharacterId={character.id}
+              arenaBackgroundImageUrl={questCombatBg}
               abilityAnimations={abilityAnimations}
               statusAnimations={statusAnimations}
               statusTransforms={statusTransforms}
@@ -695,3 +710,4 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
     </Box>
   )
 }
+

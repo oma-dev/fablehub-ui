@@ -34,7 +34,7 @@ import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from './vfx/Projecti
 import StatusParticleEffect from './vfx/StatusParticleEffect'
 import WeaponFrame from './vfx/WeaponFrame'
 
-import dungeonBg from '../../../../../../assets/backgrounds/dungeon.png'
+import raidBg from '../../../../../../assets/backgrounds/questRoad.png'
 
 // Match CombatReplay layout and styling (same scale, card design, HpBar, Portrait)
 const SCALE = 1.2
@@ -1257,7 +1257,7 @@ export default function RaidReplayView({ replay, group, pack, onDone }: Props) {
         flex: 1,
         backgroundImage: bossReplayBackground
           ? `linear-gradient(rgba(12,10,20,0.35), rgba(12,10,20,0.35)), url(${bossReplayBackground})`
-          : `url(${dungeonBg})`,
+          : `url(${raidBg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}

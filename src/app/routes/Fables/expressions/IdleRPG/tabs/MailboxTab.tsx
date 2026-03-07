@@ -33,6 +33,8 @@ import CombatReplay from '../components/CombatReplay'
 import RaidReplayView from '../components/RaidReplayView'
 import { resolveAnimationFrames } from '../components/vfx/animationConfig'
 import { resolveCharacterResource, resolveCreatureResource } from '../utils/combatStats'
+import arenaBg from '../../../../../../assets/backgrounds/arena.png'
+import dungeonBg from '../../../../../../assets/backgrounds/dungeon.png'
 
 interface Props {
   fableId: string
@@ -233,10 +235,11 @@ export default function MailboxTab({
         if (leftResolved || rightResolved) abilityAnimations[ability.id] = leftResolved ?? rightResolved
       }
       return (
-          <CombatReplay
-            key={`mail-replay-${activeReplayMailId ?? replay.kind}`}
-            combat={replay.combat}
-            leftCharacterId={left.id}
+        <CombatReplay
+          key={`mail-replay-${activeReplayMailId ?? replay.kind}`}
+          combat={replay.combat}
+          leftCharacterId={left.id}
+          arenaBackgroundImageUrl={arenaBg}
           abilityAnimations={abilityAnimations}
           statusAnimations={statusAnimations}
           statusTransforms={statusTransforms}
@@ -307,7 +310,7 @@ export default function MailboxTab({
         abilityAnimations={abilityAnimations}
         statusAnimations={statusAnimations}
         statusTransforms={statusTransforms}
-        arenaBackgroundImageUrl={replay.bossBackgroundImageUrl}
+        arenaBackgroundImageUrl={replay.bossBackgroundImageUrl ?? dungeonBg}
         playerIntroSoundUrl={playerClass?.introSoundUrl}
         playerIntroSoundVolumePercent={playerClass?.introSoundVolumePercent}
         playerIntroSoundFadeInMs={playerClass?.introSoundFadeInMs}

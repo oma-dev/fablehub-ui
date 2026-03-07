@@ -135,7 +135,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
     if (status.transform) statusTransforms[status.id] = status.transform
   }
   const boss = currentDungeon?.boss
-  const bossReplayBackground = boss?.backgroundImageUrl?.trim() ? boss.backgroundImageUrl.trim() : undefined
+  const bossReplayBackground = boss?.backgroundImageUrl?.trim() ? boss.backgroundImageUrl.trim() : dungeonBg
 
   return (
     <Box
