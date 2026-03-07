@@ -33,6 +33,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
 import LockIcon from '@mui/icons-material/Lock'
 import MailOutlineIcon from '@mui/icons-material/MailOutline'
 import StarIcon from '@mui/icons-material/Star'
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn'
 import IconButton from '@mui/material/IconButton'
 import {
   getIdleRpgRealms,
@@ -50,7 +51,6 @@ import type {
   IdleRpgRealm,
   PlayStateResponse,
 } from '@features/idle-rpg/api'
-import { RARITY_COLORS as RARITY_COLORS_MAP, RARITY_NAMES } from '@features/idle-rpg/api'
 import TavernTab from './tabs/TavernTab'
 import ShopTab from './tabs/ShopTab'
 import GuildTab from './tabs/GuildTab'
@@ -82,11 +82,11 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
       : Math.min(100, ((character.xp - prevXp) / (nextXp - prevXp)) * 100)
   const atMaxLevel = character.level >= maxLevel || nextXp === null
 
-  const itemMap = new Map(pack.items.map((it) => [it.id, it]))
-  const weapon = character.equipment.attack_source ? itemMap.get(character.equipment.attack_source) : undefined
-  const armor = character.equipment.defense_layer ? itemMap.get(character.equipment.defense_layer) : undefined
-
-  const inventoryCount = character.inventory.reduce((sum, i) => sum + i.qty, 0)
+  const goldAmount = character.balances.gold ?? 0
+  const goldCurrency = (pack.economy?.currencies ?? []).find((currency) => currency.id === 'gold')
+    ?? (pack.economy?.currencies ?? [])[0]
+  const goldIconUrl = goldCurrency?.iconUrl?.trim() ?? ''
+  const goldLabel = goldCurrency?.name ?? 'Gold'
 
   return (
     <Box
@@ -104,8 +104,8 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
       <Box sx={{ position: 'relative' }}>
         <Box
           sx={{
-            width: 130,
-            height: 130,
+            width: 176,
+            height: 176,
             borderRadius: '50%',
             overflow: 'hidden',
             border: '3px solid rgba(168,85,247,0.45)',
@@ -136,12 +136,13 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
           size="small"
           sx={{
             position: 'absolute',
-            bottom: -6,
+            bottom: -10,
             left: '50%',
             transform: 'translateX(-50%)',
             fontWeight: 800,
-            fontSize: 12,
-            height: 26,
+            fontSize: 15,
+            height: 34,
+            px: 1.2,
             background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
             color: '#fff',
             boxShadow: '0 0 12px rgba(168,85,247,0.5)',
@@ -151,9 +152,9 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
       </Box>
 
       {/* Name & Class */}
-      <Box sx={{ textAlign: 'center', mt: 0.5 }}>
+      <Box sx={{ textAlign: 'center', mt: 1 }}>
         <Typography
-          variant="h5"
+          variant="h4"
           fontWeight={800}
           lineHeight={1.2}
           noWrap
@@ -166,14 +167,9 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
         >
           {character.name}
         </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
-          Class: {cls?.name ?? character.classId}
+        <Typography variant="h6" color="text.secondary" sx={{ mt: 0.75, fontWeight: 700 }}>
+          {cls?.name ?? character.classId}
         </Typography>
-        {cls?.description && (
-          <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5, lineHeight: 1.3, maxWidth: 280 }}>
-            {cls.description}
-          </Typography>
-        )}
       </Box>
 
       {/* XP Bar */}
@@ -234,38 +230,42 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
         <StatBadge icon={<ShieldIcon sx={{ fontSize: 16 }} />} label="ARM" value={baseArm} color="#6366f1" tooltip="Armor" />
       </Box>
 
-      {/* Equipment summary */}
-      <Box sx={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        <EquipRow label="Weapon" item={weapon} emptyText="bare-handed" />
-        <EquipRow label="Armor" item={armor} emptyText="unarmored" />
-      </Box>
-
-      {/* Currency & Inventory */}
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
-        {Object.entries(character.balances).map(([currency, amount]) => (
-          <Chip
-            key={currency}
-            label={`${amount} ${currency}`}
-            size="small"
-            variant="outlined"
-            sx={{
-              fontWeight: 700,
-              fontSize: 13,
-              height: 28,
-              borderColor: currency === 'gold' ? 'rgba(251,191,36,0.5)' : 'rgba(168,85,247,0.2)',
-              color: currency === 'gold' ? '#fbbf24' : 'text.secondary',
-              ...(currency === 'gold' && { boxShadow: '0 0 8px rgba(251,191,36,0.15)' }),
-            }}
-          />
-        ))}
-        {inventoryCount > 0 && (
-          <Chip
-            label={`${inventoryCount} item${inventoryCount !== 1 ? 's' : ''}`}
-            size="small"
-            variant="outlined"
-            sx={{ fontWeight: 600, fontSize: 12, height: 28, borderColor: 'rgba(168,85,247,0.2)', color: 'text.secondary' }}
-          />
-        )}
+      {/* Gold */}
+      <Box sx={{ width: '100%', maxWidth: 340, display: 'flex', justifyContent: 'center' }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1.25,
+            py: 1.2,
+            borderRadius: 2.5,
+            borderColor: 'rgba(251,191,36,0.45)',
+            bgcolor: 'rgba(251,191,36,0.08)',
+            boxShadow: '0 0 14px rgba(251,191,36,0.15)',
+          }}
+        >
+          {goldIconUrl ? (
+            <Box
+              component="img"
+              src={goldIconUrl}
+              alt={goldLabel}
+              sx={{ width: 30, height: 30, objectFit: 'contain' }}
+            />
+          ) : (
+            <MonetizationOnIcon sx={{ color: '#fbbf24', fontSize: 30 }} />
+          )}
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.9 }}>
+            <Typography variant="body1" sx={{ color: '#fbbf24', fontWeight: 700 }}>
+              {goldLabel}
+            </Typography>
+            <Typography variant="h5" sx={{ color: '#fbbf24', fontWeight: 900, lineHeight: 1 }}>
+              {goldAmount}
+            </Typography>
+          </Box>
+        </Paper>
       </Box>
     </Box>
   )
@@ -301,38 +301,6 @@ function StatBadge({ icon, label, value, color, tooltip }: { icon: React.ReactNo
         </Typography>
       </Paper>
     </Tooltip>
-  )
-}
-
-function EquipRow({ label, item, emptyText }: { label: string; item?: { name: string; rarity: number } | undefined; emptyText: string }) {
-  const rarityNum = item?.rarity ?? 1
-  const color = item ? (RARITY_COLORS_MAP[rarityNum] ?? '#9e9bab') : undefined
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1,
-        px: 1.5,
-        py: 0.5,
-        borderRadius: 1.5,
-        bgcolor: item ? 'rgba(168,85,247,0.06)' : 'transparent',
-      }}
-    >
-      <Typography variant="caption" color="text.disabled" sx={{ width: 60, flexShrink: 0, textAlign: 'right', fontSize: 11, fontWeight: 600 }}>
-        {label}
-      </Typography>
-      {item ? (
-        <Typography variant="body2" fontWeight={600} sx={{ color, fontSize: 13 }} noWrap>
-          {item.name}
-          <Box component="span" sx={{ ml: 0.5, fontSize: 10, opacity: 0.6 }}>({RARITY_NAMES[rarityNum] ?? 'common'})</Box>
-        </Typography>
-      ) : (
-        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic', fontSize: 12 }}>
-          {emptyText}
-        </Typography>
-      )}
-    </Box>
   )
 }
 

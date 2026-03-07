@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Box from '@mui/material/Box'
 import tavernBg from '../../../../../../assets/backgrounds/tavern.png'
 import arenaBg from '../../../../../../assets/backgrounds/arena.png'
+import questGiverBg from '../../../../../../assets/backgrounds/questGiver.png'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
@@ -13,6 +14,10 @@ import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
+import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium'
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn'
+import ScheduleIcon from '@mui/icons-material/Schedule'
+import BugReportIcon from '@mui/icons-material/BugReport'
 import CombatReplay from '../components/CombatReplay'
 import { resolveAnimationFrames } from '../components/vfx/animationConfig'
 import { computePlayerCombatStats, resolveCharacterResource, resolveCreatureResource } from '../utils/combatStats'
@@ -37,6 +42,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
   const [error, setError] = useState<string | null>(null)
   const [startingQuestId, setStartingQuestId] = useState<string | null>(null)
   const [claiming, setClaiming] = useState(false)
+  const [brokenQuestIcons, setBrokenQuestIcons] = useState<Record<string, true>>({})
   const [combatData, setCombatData] = useState<{ combat: CombatResult; victory: boolean; quest: Quest } | null>(null)
 
   const [now, setNow] = useState(Date.now())
@@ -85,6 +91,63 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
     }
     return quests
   }, [character.questState.offeredQuestIds, pack.quests])
+
+  const currencyMetaById = useMemo(
+    () => new Map((pack.economy?.currencies ?? []).map((currency) => [currency.id, currency])),
+    [pack.economy?.currencies],
+  )
+
+  const markQuestIconBroken = useCallback((questId: string) => {
+    setBrokenQuestIcons((prev) => (prev[questId] ? prev : { ...prev, [questId]: true }))
+  }, [])
+
+  const getQuestIconUrl = useCallback((quest: Quest | undefined) => {
+    if (!quest) return null
+    const iconUrl = quest.iconUrl?.trim()
+    if (!iconUrl || brokenQuestIcons[quest.id]) return null
+    return iconUrl
+  }, [brokenQuestIcons])
+
+  const renderQuestIcon = useCallback((quest: Quest | undefined, size = 68) => {
+    const iconUrl = getQuestIconUrl(quest)
+    return (
+      <Box
+        sx={{
+          width: size,
+          height: size,
+          borderRadius: 2.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'rgba(20,18,31,0.88)',
+          border: '1px solid rgba(168,85,247,0.35)',
+          boxShadow: '0 0 14px rgba(168,85,247,0.15)',
+          flexShrink: 0,
+          overflow: 'hidden',
+        }}
+      >
+        {iconUrl ? (
+          <Box
+            component="img"
+            src={iconUrl}
+            alt={`${quest?.name ?? 'Quest'} icon`}
+            onError={() => {
+              if (quest) markQuestIconBroken(quest.id)
+            }}
+            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <BugReportIcon
+            sx={{
+              fontSize: Math.max(28, Math.round(size * 0.58)),
+              color: '#fbbf24',
+              filter: 'drop-shadow(0 0 8px rgba(251,191,36,0.5))',
+            }}
+          />
+        )}
+      </Box>
+    )
+  }, [getQuestIconUrl, markQuestIconBroken])
 
   const openQuestPicker = useCallback(() => {
     setRandomQuests(questOffersFromBackend)
@@ -137,6 +200,9 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
   }
 
   const bgImage = phase === 'combat' ? arenaBg : tavernBg
+  const showQuestGiver = phase === 'idle' || phase === 'questPicker'
+  const showQuestGiverCallout = phase === 'idle'
+
   return (
     <Box
       sx={{
@@ -151,52 +217,166 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
       {error && <Typography color="error" sx={{ mb: 1.5 }}>{error}</Typography>}
 
       {/* Idle: NPC */}
-      {phase === 'idle' && (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-          <Paper
-            elevation={0}
+      {showQuestGiver && (
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            px: { xs: 2, sm: 3 },
+            pb: { xs: 0.5, sm: 1, md: 1.5 },
+          }}
+        >
+          <Box
             sx={{
-              width: 140,
-              height: 140,
-              borderRadius: '50%',
-              bgcolor: '#1e1d2e',
-              border: '2px solid rgba(168,85,247,0.5)',
-              boxShadow: '0 0 30px rgba(168,85,247,0.25), 0 0 60px rgba(0,0,0,0.3)',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'transform 0.2s, box-shadow 0.2s',
-              '&:hover': {
-                transform: 'scale(1.08)',
-                boxShadow: '0 0 40px rgba(168,85,247,0.4), 0 0 80px rgba(0,0,0,0.35)',
-              },
+              gap: 1.25,
+              textAlign: 'center',
             }}
-            onClick={openQuestPicker}
           >
-            <Typography
-              variant="h2"
+            <Typography variant="h6" fontWeight={800} color="text.primary">Quest Giver</Typography>
+            <Typography variant="body1" color="text.secondary">Tap to hear new contracts</Typography>
+            <Box
+              component="button"
+              type="button"
+              aria-label="Open quest board"
+              onClick={openQuestPicker}
               sx={{
-                fontWeight: 900,
-                background: 'linear-gradient(135deg, #c084fc, #818cf8)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              T
-            </Typography>
-          </Paper>
-          <Typography variant="h6" fontWeight={700} color="text.primary">Tavern Keeper</Typography>
-          <Typography variant="body1" color="text.secondary">Click to view available quests</Typography>
+                position: 'relative',
+                top: { xs: 18, sm: 24, md: 36 },
+                width: { xs: 'min(92vw, 630px)', sm: 'min(88vw, 780px)', md: 'min(74vw, 900px)' },
+                p: 0,
+                border: 0,
+                outline: 0,
+                cursor: 'pointer',
+                bgcolor: 'transparent',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'transform 0.2s ease, filter 0.2s ease',
+                '& img': {
+                  width: '100%',
+                  display: 'block',
+                  userSelect: 'none',
+                  pointerEvents: 'none',
+                  filter: 'drop-shadow(0 0 8px rgba(251,191,36,0.75)) drop-shadow(0 0 24px rgba(168,85,247,0.4))',
+                  animation: 'questGiverFloat 2.7s ease-in-out infinite',
+                },
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  inset: '8% 17% 12%',
+                  borderRadius: '46% 46% 44% 44%',
+                  border: '2px solid rgba(251,191,36,0.72)',
+                  boxShadow: '0 0 14px rgba(251,191,36,0.75), inset 0 0 18px rgba(192,132,252,0.28)',
+                  animation: 'questPulse 1.9s ease-in-out infinite',
+                  opacity: showQuestGiverCallout ? 1 : 0,
+                  transition: 'opacity 0.16s ease',
+                  pointerEvents: 'none',
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  left: '50%',
+                  bottom: '6%',
+                  width: '68%',
+                  height: 16,
+                  borderRadius: '999px',
+                  background: 'radial-gradient(circle, rgba(0,0,0,0.48) 0%, rgba(0,0,0,0) 75%)',
+                  transform: 'translateX(-50%)',
+                  transition: 'transform 0.2s ease, opacity 0.2s ease',
+                  opacity: 0.75,
+                  pointerEvents: 'none',
+                },
+                '&:hover': {
+                  transform: 'translateY(-6px) scale(1.04)',
+                  filter: 'brightness(1.08)',
+                },
+                '&:hover::before': {
+                  boxShadow: showQuestGiverCallout
+                    ? '0 0 22px rgba(251,191,36,0.95), inset 0 0 24px rgba(192,132,252,0.42)'
+                    : '0 0 14px rgba(251,191,36,0.75), inset 0 0 18px rgba(192,132,252,0.28)',
+                  borderColor: showQuestGiverCallout ? 'rgba(251,191,36,0.94)' : 'rgba(251,191,36,0.72)',
+                },
+                '&:hover::after': {
+                  transform: 'translateX(-50%) scale(1.16)',
+                  opacity: 0.95,
+                },
+                '&:active': {
+                  transform: 'translateY(-1px) scale(0.97)',
+                  filter: 'brightness(1.18)',
+                },
+                '&:active::before': {
+                  transform: showQuestGiverCallout ? 'scale(0.96)' : 'scale(0.985)',
+                  boxShadow: showQuestGiverCallout
+                    ? '0 0 28px rgba(251,191,36,1), inset 0 0 26px rgba(192,132,252,0.55)'
+                    : '0 0 14px rgba(251,191,36,0.75), inset 0 0 18px rgba(192,132,252,0.28)',
+                },
+                '&:focus-visible::before': {
+                  borderColor: showQuestGiverCallout ? 'rgba(196,181,253,1)' : 'rgba(251,191,36,0.72)',
+                  boxShadow: showQuestGiverCallout
+                    ? '0 0 0 3px rgba(129,140,248,0.45), 0 0 24px rgba(251,191,36,0.85)'
+                    : '0 0 14px rgba(251,191,36,0.75), inset 0 0 18px rgba(192,132,252,0.28)',
+                },
+                '@keyframes questPulse': {
+                  '0%, 100%': { transform: 'scale(0.985)', opacity: 0.82 },
+                  '50%': { transform: 'scale(1.03)', opacity: 1 },
+                },
+                '@keyframes questGiverFloat': {
+                  '0%, 100%': { transform: 'translateY(0px)' },
+                  '50%': { transform: 'translateY(-7px)' },
+                },
+                }}
+              >
+                <Box component="img" src={questGiverBg} alt="Quest giver in the tavern" />
+                <Box
+                  aria-hidden
+                  sx={{
+                    position: 'absolute',
+                    top: { xs: 12, sm: 14 },
+                    right: { xs: 10, sm: 16 },
+                    width: { xs: 30, sm: 34 },
+                    height: { xs: 30, sm: 34 },
+                    borderRadius: '50%',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontWeight: 900,
+                    fontSize: { xs: '1rem', sm: '1.05rem' },
+                    color: '#1f2937',
+                    background: 'radial-gradient(circle at 35% 35%, #fde68a 5%, #f59e0b 70%)',
+                    boxShadow: '0 0 20px rgba(251,191,36,0.85), 0 0 34px rgba(251,191,36,0.55)',
+                    animation: showQuestGiverCallout ? 'questBadgePulse 1.4s ease-in-out infinite' : 'none',
+                    opacity: showQuestGiverCallout ? 1 : 0,
+                    transform: showQuestGiverCallout ? 'scale(1)' : 'scale(0.92)',
+                    transition: 'opacity 0.16s ease, transform 0.16s ease',
+                    pointerEvents: 'none',
+                    '@keyframes questBadgePulse': {
+                      '0%, 100%': { transform: 'scale(0.95)', opacity: 0.9 },
+                      '50%': { transform: 'scale(1.12)', opacity: 1 },
+                    },
+                  }}
+                >
+                  !
+                </Box>
+              </Box>
+          </Box>
         </Box>
       )}
 
-      {/* Quest picker modal */}
-      <Dialog open={phase === 'questPicker'} onClose={() => setPhase('idle')} maxWidth="sm" fullWidth>
+            {/* Quest picker modal */}
+      <Dialog
+        open={phase === 'questPicker'}
+        onClose={() => setPhase('idle')}
+        disableScrollLock
+        maxWidth={false}
+        fullWidth
+        PaperProps={{ sx: { width: 'min(1120px, 96vw)' } }}
+      >
         <DialogTitle
           sx={{
             fontWeight: 800,
-            fontSize: '1.3rem',
+            fontSize: '1.45rem',
             background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
@@ -205,7 +385,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
           Choose a Quest
         </DialogTitle>
         <DialogContent>
-          <List sx={{ display: 'flex', flexDirection: 'column', gap: 1, pt: 1 }}>
+          <List sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, pt: 1 }}>
             {randomQuests.length === 0 && (
               <Typography variant="body2" color="text.secondary" sx={{ px: 1, py: 1 }}>
                 No quest offers available right now.
@@ -221,8 +401,8 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                   sx={{
                     borderRadius: 2,
                     border: '1px solid rgba(168,85,247,0.2)',
-                    py: 1.5,
-                    px: 2,
+                    py: 2,
+                    px: 2.5,
                     transition: 'all 0.2s',
                     '&:hover': {
                       borderColor: 'rgba(168,85,247,0.4)',
@@ -232,11 +412,85 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                   }}
                 >
                   <ListItemText
-                    primary={<Typography variant="body1" fontWeight={700} sx={{ fontSize: '1.05rem' }}>{startingQuestId === q.id ? `${q.name} …` : q.name}</Typography>}
-                    secondary={
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Creature: {creature?.name ?? q.creatureId} (Lv {creature?.level ?? '?'}) · Duration: {q.durationSec}s · XP: {q.rewards.xp} · Gold: {q.rewards.currency.gold ?? 0}
-                      </Typography>
+                    disableTypography
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.6 }}>
+                        {renderQuestIcon(q, 74)}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.4, minWidth: 0, flex: 1 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                            <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 1.1 }}>
+                              {startingQuestId === q.id ? `${q.name}...` : q.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                              Creature: {creature?.name ?? q.creatureId} (Lv {creature?.level ?? '?'})
+                            </Typography>
+                          </Box>
+
+                          {/* Row 1: Rewards */}
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.1 }}>
+                            <Box
+                              sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.75,
+                                px: 1.5,
+                                py: 0.85,
+                                borderRadius: 2,
+                                bgcolor: 'rgba(168,85,247,0.14)',
+                                border: '1px solid rgba(168,85,247,0.35)',
+                              }}
+                            >
+                              <WorkspacePremiumIcon sx={{ color: '#c084fc', fontSize: 22 }} />
+                              <Typography variant="body1" fontWeight={800} sx={{ color: '#e8e4f0' }}>
+                                +{q.rewards.xp} XP
+                              </Typography>
+                            </Box>
+
+                            {Object.entries(q.rewards.currency ?? {}).map(([currencyId, amount]) => {
+                              const currencyMeta = currencyMetaById.get(currencyId)
+                              const currencyName = currencyMeta?.name ?? currencyId
+                              const iconUrl = currencyMeta?.iconUrl?.trim()
+                              return (
+                                <Box
+                                  key={`${q.id}-reward-${currencyId}`}
+                                  sx={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 0.75,
+                                    px: 1.5,
+                                    py: 0.85,
+                                    borderRadius: 2,
+                                    bgcolor: 'rgba(251,191,36,0.14)',
+                                    border: '1px solid rgba(251,191,36,0.35)',
+                                  }}
+                                >
+                                  {iconUrl ? (
+                                    <Box
+                                      component="img"
+                                      src={iconUrl}
+                                      alt={currencyName}
+                                      sx={{ width: 22, height: 22, objectFit: 'contain' }}
+                                    />
+                                  ) : (
+                                    <MonetizationOnIcon sx={{ color: '#fbbf24', fontSize: 22 }} />
+                                  )}
+                                  <Typography variant="body1" fontWeight={800} sx={{ color: '#fbbf24' }}>
+                                    +{amount} {currencyName}
+                                  </Typography>
+                                </Box>
+                              )
+                            })}
+                          </Box>
+
+                          {/* Row 2: Duration */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                            <ScheduleIcon sx={{ color: 'rgba(255,255,255,0.72)', fontSize: 18 }} />
+                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                              Duration: {q.durationSec}s
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
                     }
                   />
                 </ListItemButton>
@@ -245,13 +499,16 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
           </List>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPhase('idle')} variant="outlined" color="primary" disabled={startingQuestId !== null}>Cancel</Button>
+          <Button onClick={() => setPhase('idle')} variant="outlined" color="primary" disabled={startingQuestId !== null}>
+            Cancel
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Quest active: timer */}
       {phase === 'questActive' && (
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+          {renderQuestIcon(activeQuestDef, 96)}
           <Typography
             variant="h5"
             fontWeight={800}
@@ -412,6 +669,12 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                 boxShadow: '0 0 20px rgba(168,85,247,0.1)',
               }}
             >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.2, mb: 1.1 }}>
+                {renderQuestIcon(combatData.quest, 54)}
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#e8e4f0' }}>
+                  {combatData.quest.name}
+                </Typography>
+              </Box>
               <Typography variant="h6" sx={{ color: '#c084fc', fontWeight: 700 }}>+{combatData.quest.rewards.xp} XP</Typography>
               {Object.entries(combatData.quest.rewards.currency).map(([cur, amt]) => (
                 <Typography key={cur} variant="h6" sx={{ color: '#fbbf24', fontWeight: 700 }}>+{amt} {cur}</Typography>
@@ -432,4 +695,3 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
     </Box>
   )
 }
-

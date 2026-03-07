@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import Box from '@mui/material/Box'
 import merchantBg from '../../../../../../assets/backgrounds/merchant.png'
 import Button from '@mui/material/Button'
@@ -83,8 +83,8 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
   const INVENTORY_COLS = 6
   const INVENTORY_ROWS = 4
   const INVENTORY_SLOTS = INVENTORY_COLS * INVENTORY_ROWS
-  const ITEM_SIZE = 52
-  const SLOT_GAP = 6
+  const ITEM_SIZE = 60
+  const SLOT_GAP = 8
 
   const inventoryItems = character.inventory
     .map((inv) => ({ inv, item: itemMap.get(inv.itemId) }))
@@ -99,151 +99,112 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
     <Box
       sx={{
         display: 'flex',
-        gap: 3,
+        flexDirection: 'column',
         flex: 1,
         minHeight: 0,
         overflow: 'hidden',
         backgroundImage: `url(${merchantBg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
+        p: { xs: 1, sm: 1.5 },
       }}
     >
+      {error && (
+        <Typography color="error" variant="body2" sx={{ px: 1, pb: 1 }}>
+          {error}
+        </Typography>
+      )}
 
-      {/* LEFT: Character Panel */}
-      <Paper
-        variant="outlined"
+      <Box
         sx={{
-          width: 600,
-          flexShrink: 0,
-          p: 2.5,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          overflow: 'auto',
-          bgcolor: '#14121f',
-          borderColor: 'rgba(168,85,247,0.35)',
-          boxShadow: '0 0 24px rgba(0,0,0,0.4)',
+          flex: 1,
+          minHeight: 0,
+          display: 'grid',
+          gap: 1.5,
+          gridTemplateColumns: {
+            xs: '1fr',
+            lg: 'minmax(320px, 0.85fr) minmax(420px, 1fr) minmax(560px, 1.2fr)',
+          },
         }}
       >
-        <CharacterPanel
-          fableId={fableId}
-          realmId={realmId}
-          character={character}
-          pack={pack}
-          onCharacterUpdate={onCharacterUpdate}
-        />
-      </Paper>
-
-      {/* RIGHT: Shop + Inventory */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, overflow: 'hidden', minWidth: 0 }}>
-
-        {error && (
-          <Typography color="error" variant="body2" sx={{ px: 1.5, pt: 1.5 }}>{error}</Typography>
-        )}
-
-        {/* Merchant Shop */}
-        <Box
+        <Paper
+          variant="outlined"
           sx={{
-            flex: 1,
             minHeight: 0,
+            p: 1.25,
             display: 'flex',
             flexDirection: 'column',
-            bgcolor: 'rgba(20,18,31,0.82)',
-            borderRadius: 2,
-            border: '1px solid rgba(168,85,247,0.15)',
-            m: 1.5,
-            overflow: 'hidden',
+            overflow: 'auto',
+            bgcolor: 'rgba(20,18,31,0.9)',
+            borderColor: 'rgba(168,85,247,0.28)',
+            boxShadow: '0 16px 28px rgba(0,0,0,0.34)',
           }}
         >
           <Typography
             variant="h6"
-            fontWeight={700}
+            fontWeight={800}
             sx={{
-              px: 1.5,
-              pt: 1.5,
+              px: 1,
               pb: 1,
-              flexShrink: 0,
-              background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
+              background: 'linear-gradient(90deg, #f8f5ff, #c084fc)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
-              fontSize: '1.2rem',
             }}
           >
-            Merchant
+            Adventurer
           </Typography>
-          <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 1.5, pb: 1.5 }}>
-            {merchantListings.length === 0 ? (
-              <Typography color="text.secondary" variant="body2">No items for sale.</Typography>
-            ) : (
-              <Box sx={{ display: 'inline-grid', gridTemplateColumns: 'repeat(3, auto)', gap: 10, justifyContent: 'center', width: '100%' }}>
-                {merchantListings.map((listing) => {
-                  const item = itemMap.get(listing.itemId)
-                  if (!item) return null
-                  const canAfford = gold >= listing.price
-                  return (
-                    <Box key={listing.itemId} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                      <ItemView
-                        item={item}
-                        currency={primaryCurrency}
-                        price={listing.price}
-                        size={120}
-                      />
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="warning"
-                        disabled={!canAfford || buyingId !== null}
-                        onClick={() => handleBuy(listing.itemId)}
-                        sx={{ minWidth: 68, fontSize: 11, py: 0.25, textTransform: 'none' }}
-                      >
-                        {buyingId === listing.itemId ? '…' : `${listing.price}g`}
-                      </Button>
-                    </Box>
-                  )
-                })}
-              </Box>
-            )}
+          <CharacterPanel
+            fableId={fableId}
+            realmId={realmId}
+            character={character}
+            pack={pack}
+            onCharacterUpdate={onCharacterUpdate}
+          />
+        </Paper>
+
+        <Paper
+          variant="outlined"
+          sx={{
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            bgcolor: 'rgba(16,14,25,0.9)',
+            borderColor: 'rgba(192,132,252,0.25)',
+            boxShadow: 'inset 0 0 40px rgba(124,58,237,0.09), 0 16px 28px rgba(0,0,0,0.3)',
+          }}
+        >
+          <Box sx={{ px: 1.5, py: 1.25, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography
+              variant="h6"
+              fontWeight={800}
+              sx={{
+                background: 'linear-gradient(90deg, #f1ecff, #c084fc)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              Inventory
+            </Typography>
+            <Chip
+              label={`${inventoryItems.length}/${INVENTORY_SLOTS}`}
+              size="small"
+              sx={{
+                fontWeight: 700,
+                color: '#e9d5ff',
+                bgcolor: 'rgba(88,28,135,0.35)',
+                border: '1px solid rgba(192,132,252,0.3)',
+              }}
+            />
           </Box>
-        </Box>
+          <Divider />
 
-        <Divider sx={{ mx: 1.5 }} />
-
-        {/* Inventory */}
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            bgcolor: 'rgba(20,18,31,0.82)',
-            borderRadius: 2,
-            border: '1px solid rgba(168,85,247,0.15)',
-            m: 1.5,
-            overflow: 'hidden',
-          }}
-        >
-          <Typography
-            variant="h6"
-            fontWeight={700}
-            sx={{
-              px: 1.5,
-              pt: 1.5,
-              pb: 1,
-              flexShrink: 0,
-              background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              fontSize: '1.2rem',
-            }}
-          >
-            Inventory
-          </Typography>
-          <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 1.5, pb: 1.5, display: 'flex', justifyContent: 'center' }}>
+          <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 1.5 }}>
             <Box
               sx={{
                 display: 'grid',
-                gridTemplateColumns: `repeat(${INVENTORY_COLS}, ${ITEM_SIZE}px)`,
-                gap: SLOT_GAP,
+                gridTemplateColumns: `repeat(${INVENTORY_COLS}, minmax(110px, 1fr))`,
+                gap: `${SLOT_GAP}px`,
                 alignContent: 'start',
               }}
             >
@@ -253,103 +214,232 @@ export default function ShopTab({ fableId, realmId, character, pack, onCharacter
                     <Box
                       key={`empty-${index}`}
                       sx={{
-                        width: ITEM_SIZE,
-                        height: ITEM_SIZE,
-                        borderRadius: 1,
-                        border: '2px dashed rgba(168,85,247,0.2)',
-                        bgcolor: 'rgba(20,18,31,0.6)',
-                        flexShrink: 0,
+                        minHeight: 132,
+                        borderRadius: 2,
+                        border: '1px dashed rgba(168,85,247,0.3)',
+                        background: 'linear-gradient(180deg, rgba(26,23,38,0.7), rgba(18,16,28,0.75))',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'rgba(203,213,225,0.36)',
+                        fontSize: 11,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
                       }}
-                    />
+                    >
+                      Empty
+                    </Box>
                   )
                 }
+
                 const { inv, item } = slot
                 const isEquipped = Object.values(character.equipment).includes(inv.itemId)
                 const equippedInSlot = character.equipment[item.slot] === inv.itemId
                 const classCanEquip = canClassEquipItem(pack, character.classId, item)
+
                 return (
-                  <Box key={`${inv.itemId}-${index}`} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
-                    <ItemView
-                      item={item}
-                      currency={primaryCurrency}
-                      size={ITEM_SIZE}
-                      badge={inv.qty > 1 ? (
-                        <Typography variant="caption" sx={{ fontSize: 9, fontWeight: 700, color: '#fff', lineHeight: 1 }}>
-                          ×{inv.qty}
-                        </Typography>
-                      ) : undefined}
-                    >
-                      {isEquipped && (
-                        <Box
-                          sx={{
-                            position: 'absolute',
-                            top: 1,
-                            left: 1,
-                            bgcolor: 'rgba(168,85,247,0.9)',
-                            borderRadius: 0.5,
-                            px: 0.35,
-                            lineHeight: 1,
-                          }}
-                        >
-                          <Typography variant="caption" sx={{ fontSize: 7, fontWeight: 800, color: '#fff' }}>
-                            EQ
-                          </Typography>
-                        </Box>
-                      )}
-                    </ItemView>
-                    {equippedInSlot ? (
+                  <Box
+                    key={`${inv.itemId}-${index}`}
+                    sx={{
+                      minHeight: 132,
+                      borderRadius: 2,
+                      p: 0.85,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 0.6,
+                      border: isEquipped
+                        ? '1px solid rgba(192,132,252,0.72)'
+                        : '1px solid rgba(148,163,184,0.22)',
+                      bgcolor: 'rgba(20,18,31,0.9)',
+                      boxShadow: isEquipped
+                        ? '0 0 16px rgba(168,85,247,0.28)'
+                        : '0 8px 16px rgba(0,0,0,0.22)',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Chip
-                        label="EQ"
+                        label={equippedInSlot ? 'EQ' : item.slot.replace('_', ' ')}
                         size="small"
                         sx={{
-                          fontSize: 9,
                           height: 18,
+                          fontSize: 9,
+                          textTransform: 'uppercase',
                           fontWeight: 700,
-                          bgcolor: 'rgba(168,85,247,0.25)',
-                          color: '#c084fc',
-                          border: '1px solid rgba(168,85,247,0.4)',
+                          color: equippedInSlot ? '#f5d0fe' : '#cbd5e1',
+                          bgcolor: equippedInSlot ? 'rgba(168,85,247,0.35)' : 'rgba(71,85,105,0.35)',
+                          border: equippedInSlot
+                            ? '1px solid rgba(192,132,252,0.5)'
+                            : '1px solid rgba(148,163,184,0.3)',
                         }}
                       />
-                    ) : classCanEquip ? (
-                      <Tooltip title={`Equip to ${item.slot.replace('_', ' ')}`} arrow>
+                      {inv.qty > 1 && (
+                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#f8fafc', opacity: 0.9 }}>
+                          x{inv.qty}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                      <ItemView item={item} currency={primaryCurrency} size={ITEM_SIZE} />
+                    </Box>
+
+                    <Box sx={{ mt: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5 }}>
+                      {classCanEquip ? (
+                        <Tooltip title={`Equip to ${item.slot.replace('_', ' ')}`} arrow>
+                          <Button
+                            size="small"
+                            variant={equippedInSlot ? 'contained' : 'outlined'}
+                            color="primary"
+                            disabled={equippingId !== null || sellingId !== null || equippedInSlot}
+                            onClick={() => handleEquip(inv.itemId, item.slot)}
+                            sx={{ fontSize: 10, py: 0.2, minWidth: 0, textTransform: 'none' }}
+                          >
+                            {equippingId === inv.itemId ? '...' : equippedInSlot ? 'Equipped' : 'Equip'}
+                          </Button>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip title="Your class cannot equip this item" arrow>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            disabled
+                            sx={{ fontSize: 10, py: 0.2, minWidth: 0, textTransform: 'none' }}
+                          >
+                            Locked
+                          </Button>
+                        </Tooltip>
+                      )}
+
+                      <Tooltip title={`Sell for ${Math.max(0, item.sellValue ?? 0)} ${primaryCurrency?.name ?? 'Gold'}`} arrow>
                         <Button
                           size="small"
-                          variant="outlined"
-                          color="primary"
-                          disabled={equippingId !== null || sellingId !== null}
-                          onClick={() => handleEquip(inv.itemId, item.slot)}
-                          sx={{ minWidth: ITEM_SIZE, fontSize: 9, py: 0.1, textTransform: 'none' }}
+                          variant="text"
+                          color="warning"
+                          disabled={sellingId !== null || equippingId !== null}
+                          onClick={() => handleSell(inv.itemId)}
+                          sx={{ fontSize: 10, py: 0.2, minWidth: 0, textTransform: 'none' }}
                         >
-                          {equippingId === inv.itemId ? '…' : 'Equip'}
+                          {sellingId === inv.itemId ? '...' : `Sell ${Math.max(0, item.sellValue ?? 0)}`}
                         </Button>
                       </Tooltip>
-                    ) : (
-                      <Tooltip title="Your class cannot equip this item" arrow>
-                        <Button size="small" variant="outlined" disabled sx={{ minWidth: ITEM_SIZE, fontSize: 8, py: 0.1, textTransform: 'none' }}>
-                          —
-                        </Button>
-                      </Tooltip>
-                    )}
-                    <Tooltip title={`Sell for ${Math.max(0, item.sellValue ?? 0)} ${primaryCurrency?.name ?? 'Gold'}`} arrow>
-                      <Button
-                        size="small"
-                        variant="text"
-                        color="warning"
-                        disabled={sellingId !== null || equippingId !== null}
-                        onClick={() => handleSell(inv.itemId)}
-                        sx={{ minWidth: ITEM_SIZE, fontSize: 9, py: 0.1, textTransform: 'none' }}
-                      >
-                        {sellingId === inv.itemId ? '…' : `Sell ${Math.max(0, item.sellValue ?? 0)}`}
-                      </Button>
-                    </Tooltip>
+                    </Box>
                   </Box>
                 )
               })}
             </Box>
           </Box>
-        </Box>
+        </Paper>
+
+        <Paper
+          variant="outlined"
+          sx={{
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            bgcolor: 'rgba(16,14,24,0.92)',
+            borderColor: 'rgba(251,191,36,0.24)',
+            boxShadow: 'inset 0 0 44px rgba(251,191,36,0.06), 0 16px 28px rgba(0,0,0,0.35)',
+          }}
+        >
+          <Box sx={{ px: 1.5, py: 1.25, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography
+              variant="h6"
+              fontWeight={800}
+              sx={{
+                background: 'linear-gradient(90deg, #fff7d6, #fbbf24)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              Merchant Wares
+            </Typography>
+            <Chip
+              label={`${gold} ${primaryCurrency?.name ?? 'Gold'}`}
+              size="small"
+              sx={{
+                fontWeight: 700,
+                color: '#fde68a',
+                bgcolor: 'rgba(180,83,9,0.25)',
+                border: '1px solid rgba(251,191,36,0.35)',
+              }}
+            />
+          </Box>
+          <Divider />
+
+          <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 1.5 }}>
+            {merchantListings.length === 0 ? (
+              <Typography color="text.secondary" variant="body2">
+                No items for sale.
+              </Typography>
+            ) : (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' },
+                  gap: 1.1,
+                }}
+              >
+                {merchantListings.map((listing) => {
+                  const item = itemMap.get(listing.itemId)
+                  if (!item) return null
+                  const canAfford = gold >= listing.price
+
+                  return (
+                    <Box
+                      key={listing.itemId}
+                      sx={{
+                        borderRadius: 2,
+                        p: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 0.75,
+                        border: canAfford
+                          ? '1px solid rgba(251,191,36,0.28)'
+                          : '1px solid rgba(148,163,184,0.2)',
+                        bgcolor: canAfford
+                          ? 'rgba(44,31,10,0.38)'
+                          : 'rgba(30,27,40,0.55)',
+                        boxShadow: canAfford
+                          ? '0 0 16px rgba(251,191,36,0.09)'
+                          : '0 8px 14px rgba(0,0,0,0.22)',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                        <ItemView item={item} currency={primaryCurrency} price={listing.price} size={96} />
+                      </Box>
+
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 700,
+                          color: '#f8fafc',
+                          textAlign: 'center',
+                          lineHeight: 1.2,
+                          minHeight: 32,
+                        }}
+                      >
+                        {item.name}
+                      </Typography>
+
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="warning"
+                        disabled={!canAfford || buyingId !== null}
+                        onClick={() => handleBuy(listing.itemId)}
+                        sx={{ fontSize: 11, py: 0.35, textTransform: 'none' }}
+                      >
+                        {buyingId === listing.itemId ? '...' : `Buy • ${listing.price}g`}
+                      </Button>
+                    </Box>
+                  )
+                })}
+              </Box>
+            )}
+          </Box>
+        </Paper>
       </Box>
     </Box>
   )
 }
-
