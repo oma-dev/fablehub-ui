@@ -14,6 +14,14 @@ interface Props {
   character: CharacterState
 }
 
+const MAX_UI_MESSAGES = 30
+
+function keepLatestMessages(messages: GroupMessage[]): GroupMessage[] {
+  return [...messages]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, MAX_UI_MESSAGES)
+}
+
 function formatTime(iso: string) {
   const d = new Date(iso)
   const now = new Date()
@@ -27,11 +35,11 @@ export default function GuildChat({ fableId, realmId, groupId, character }: Prop
   const [error, setError] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const listEndRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   const fetchMessages = useCallback(() => {
     return getGroupMessages(fableId, realmId, groupId)
-      .then(setMessages)
+      .then((incoming) => setMessages(keepLatestMessages(incoming)))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load messages'))
   }, [fableId, realmId, groupId])
 
@@ -52,7 +60,9 @@ export default function GuildChat({ fableId, realmId, groupId, character }: Prop
   }, [fetchMessages])
 
   useEffect(() => {
-    listEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = listRef.current
+    if (!container) return
+    container.scrollTop = container.scrollHeight
   }, [messages])
 
   const handleSend = async () => {
@@ -65,7 +75,7 @@ export default function GuildChat({ fableId, realmId, groupId, character }: Prop
         characterId: character.id,
         content,
       })
-      setMessages((prev) => [msg, ...prev])
+      setMessages((prev) => keepLatestMessages([msg, ...prev]))
       setInput('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send')
@@ -77,7 +87,16 @@ export default function GuildChat({ fableId, realmId, groupId, character }: Prop
   const ordered = [...messages].reverse()
 
   return (
-    <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', minHeight: 280, overflow: 'hidden' }}>
+    <Paper
+      variant="outlined"
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: { xs: 360, md: 420 },
+        maxHeight: { xs: 360, md: 420 },
+        overflow: 'hidden',
+      }}
+    >
       <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
         <Typography variant="subtitle1" fontWeight={600}>
           Guild chat
@@ -89,6 +108,7 @@ export default function GuildChat({ fableId, realmId, groupId, character }: Prop
         </Typography>
       )}
       <Box
+        ref={listRef}
         sx={{
           flex: 1,
           overflow: 'auto',
@@ -138,7 +158,6 @@ export default function GuildChat({ fableId, realmId, groupId, character }: Prop
             )
           })
         )}
-        <div ref={listEndRef} />
       </Box>
       <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, alignItems: 'flex-end' }}>
         <TextField

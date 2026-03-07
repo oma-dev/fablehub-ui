@@ -388,7 +388,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
           ) : otherCharacters.length === 0 ? (
             <Typography color="text.secondary">No other players in this realm yet.</Typography>
           ) : (
-            <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+            <Paper variant="outlined" sx={{ overflow: 'hidden', flexShrink: 0 }}>
               <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
                 <Typography variant="subtitle1" fontWeight={600}>
                   Realm Champions
@@ -397,7 +397,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
                   Click a player to view their profile and challenge them to a duel.
                 </Typography>
               </Box>
-              <TableContainer>
+              <TableContainer sx={{ maxHeight: { xs: 260, md: 320 } }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
@@ -425,7 +425,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
             </Paper>
           )}
 
-          <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+          <Paper variant="outlined" sx={{ overflow: 'hidden', flexShrink: 0 }}>
             <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
               <Typography variant="subtitle1" fontWeight={600}>
                 Fight History
@@ -434,7 +434,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
                 Your recent PvP duels.
               </Typography>
             </Box>
-            <TableContainer>
+            <TableContainer sx={{ maxHeight: { xs: 300, md: 420 } }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>

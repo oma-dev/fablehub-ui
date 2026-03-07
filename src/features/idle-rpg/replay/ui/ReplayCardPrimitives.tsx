@@ -34,13 +34,13 @@ const STATUS_EFFECT_COLORS: Record<string, string> = {
 
 export function ReplayPortrait({
   url,
-  weaponUrl,
+  weaponUrl: _weaponUrl,
   sizePx,
   personIconSizePx,
   borderRadius,
   borderWidth,
-  weaponSizePx = 56,
-  weaponOffsetPx = -24,
+  weaponSizePx: _weaponSizePx = 56,
+  weaponOffsetPx: _weaponOffsetPx = -24,
 }: ReplayPortraitProps) {
   return (
     <Box sx={{ position: 'relative', width: sizePx, height: sizePx, flexShrink: 0 }}>
@@ -77,26 +77,6 @@ export function ReplayPortrait({
           <PersonIcon sx={{ fontSize: personIconSizePx, color: 'rgba(168,85,247,0.25)' }} />
         )}
       </Box>
-      {weaponUrl && (
-        <Box
-          component="img"
-          src={weaponUrl}
-          alt="weapon"
-          sx={{
-            position: 'absolute',
-            bottom: weaponOffsetPx,
-            right: weaponOffsetPx,
-            width: weaponSizePx,
-            height: weaponSizePx,
-            objectFit: 'contain',
-            borderRadius: '50%',
-            border: '2px solid rgba(245,158,11,0.5)',
-            bgcolor: '#14121f',
-            boxShadow: '0 0 12px rgba(245,158,11,0.2)',
-            zIndex: 5,
-          }}
-        />
-      )}
     </Box>
   )
 }
@@ -245,4 +225,3 @@ export function ReplayStatusEffectIcons({
     </Box>
   )
 }
-
