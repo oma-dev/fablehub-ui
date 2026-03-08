@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
 import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
@@ -120,9 +121,9 @@ export default function GuildChat({ fableId, realmId, groupId, character }: Prop
         }}
       >
         {loading ? (
-          <Typography color="text.secondary" variant="body2">
-            Loading...
-          </Typography>
+          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CircularProgress size={28} />
+          </Box>
         ) : ordered.length === 0 ? (
           <Typography color="text.disabled" variant="body2">
             No messages yet. Say hello!

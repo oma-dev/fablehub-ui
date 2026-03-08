@@ -494,7 +494,7 @@ export default function MailboxTab({
           {nextCursor && (
             <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
               <Button variant="outlined" onClick={() => void handleLoadMore()} disabled={loadingMore}>
-                {loadingMore ? 'Loading…' : 'Load more'}
+                {loadingMore ? <CircularProgress size={18} color="inherit" /> : 'Load more'}
               </Button>
             </Box>
           )}

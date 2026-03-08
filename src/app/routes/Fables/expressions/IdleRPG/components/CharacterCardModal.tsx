@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi'
@@ -61,9 +62,11 @@ export default function CharacterCardModal({
           overflow: 'auto',
           p: 3,
         }}
-      >
+        >
         {loading && (
-          <Typography color="text.secondary">Loading...</Typography>
+          <Box sx={{ minHeight: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CircularProgress size={28} />
+          </Box>
         )}
         {error && (
           <Typography color="error">{error}</Typography>

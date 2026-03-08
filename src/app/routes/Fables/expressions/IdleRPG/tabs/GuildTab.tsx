@@ -2,6 +2,7 @@
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
+import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
@@ -225,9 +226,9 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
     return (
       <Box sx={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', p: { xs: 1, sm: 1.5 }, gap: 1.5 }}>
         {guildLoading ? (
-          <Paper variant="outlined" sx={{ ...panelSx, p: 2 }}>
-            <Typography color="text.secondary">Loading guild hall...</Typography>
-          </Paper>
+          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CircularProgress size={28} />
+          </Box>
         ) : group ? (
           <>
             <Paper variant="outlined" sx={{ ...panelSx, p: 1.25 }}>
@@ -380,7 +381,9 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
 
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 1.5 }}>
           {loading ? (
-            <Typography color="text.secondary">Loading guilds...</Typography>
+            <Box sx={{ minHeight: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress size={28} />
+            </Box>
           ) : groups.length === 0 ? (
             <Typography color="text.secondary">No guilds yet. Create one to get started.</Typography>
           ) : (

@@ -1,6 +1,7 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
+import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
@@ -433,8 +434,8 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
 
               <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
                 {rosterLoading ? (
-                  <Box sx={{ p: 2 }}>
-                    <Typography color="text.secondary">Loading arena roster...</Typography>
+                  <Box sx={{ minHeight: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CircularProgress size={28} />
                   </Box>
                 ) : otherCharacters.length === 0 ? (
                   <Box sx={{ p: 2 }}>
@@ -491,8 +492,8 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
                   <TableBody>
                     {historyLoading ? (
                       <TableRow>
-                        <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary', py: 3 }}>
-                          Loading...
+                        <TableCell colSpan={3} align="center" sx={{ py: 3 }}>
+                          <CircularProgress size={24} />
                         </TableCell>
                       </TableRow>
                     ) : history.length === 0 ? (

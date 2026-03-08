@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
 import IconButton from '@mui/material/IconButton'
 import Paper from '@mui/material/Paper'
 import Tooltip from '@mui/material/Tooltip'
@@ -158,7 +159,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
         <>
           {loading && (
             <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Typography color="text.secondary">Loading dungeons...</Typography>
+              <CircularProgress size={28} />
             </Box>
           )}
           {!loading && dungeons.length === 0 && (

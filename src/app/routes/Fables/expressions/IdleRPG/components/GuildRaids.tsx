@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import { getRaidCall, setRaidReady } from '@features/idle-rpg/api'
@@ -90,8 +91,8 @@ export default function GuildRaids({ fableId, realmId, groupId, group, character
 
   if (loading) {
     return (
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography color="text.secondary">Loading raid call...</Typography>
+      <Paper variant="outlined" sx={{ p: 2, minHeight: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress size={28} />
       </Paper>
     )
   }
