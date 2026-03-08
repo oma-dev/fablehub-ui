@@ -280,6 +280,7 @@ type ClassForm = {
   name: string
   description: string
   iconUrl: string
+  portraitUrls: string
   introSoundUrl: string
   introSoundVolumePercent: string
   introSoundFadeInMs: string
@@ -365,7 +366,7 @@ const emptyStatusEffect = (): StatusEffectForm => ({
   transformPreParticles: [],
 })
 const emptyClass = (): ClassForm => ({
-  id: '', name: '', description: '', iconUrl: '', introSoundUrl: '', introSoundVolumePercent: '100', introSoundFadeInMs: '0', introSoundFadeOutMs: '0', isHeroClass: false,
+  id: '', name: '', description: '', iconUrl: '', portraitUrls: '', introSoundUrl: '', introSoundVolumePercent: '100', introSoundFadeInMs: '0', introSoundFadeOutMs: '0', isHeroClass: false,
   primaryAttackAbilityId: '',
   attackTags: '', attackRequired: true, attackAllowEmpty: false,
   defenseTags: '', defenseRequired: false, defenseAllowEmpty: true,
@@ -554,7 +555,7 @@ export default function IdleRpgCreate() {
     })))
     setClasses(pack.classes.map((c) => {
       return {
-        id: c.id, name: c.name, description: c.description ?? '', iconUrl: c.iconUrl ?? '', introSoundUrl: c.introSoundUrl ?? '', introSoundVolumePercent: String((c as any).introSoundVolumePercent ?? 100), introSoundFadeInMs: String((c as any).introSoundFadeInMs ?? 0), introSoundFadeOutMs: String((c as any).introSoundFadeOutMs ?? 0),
+        id: c.id, name: c.name, description: c.description ?? '', iconUrl: c.iconUrl ?? '', portraitUrls: (c.portraitUrls ?? []).join(', '), introSoundUrl: c.introSoundUrl ?? '', introSoundVolumePercent: String((c as any).introSoundVolumePercent ?? 100), introSoundFadeInMs: String((c as any).introSoundFadeInMs ?? 0), introSoundFadeOutMs: String((c as any).introSoundFadeOutMs ?? 0),
         isHeroClass: c.isHeroClass ?? false,
         primaryAttackAbilityId: c.primaryAttackId ?? '',
         attackTags: c.slots?.attack_source?.allowedTagsAny?.join(', ') ?? '',
@@ -703,6 +704,9 @@ export default function IdleRpgCreate() {
     setStatusEffects([])
     setClasses(ex.classes.map((c) => ({
       ...c,
+      portraitUrls: Array.isArray((c as any).portraitUrls)
+        ? (c as any).portraitUrls.join(', ')
+        : ((c as any).portraitUrls ?? ''),
       isHeroClass: c.isHeroClass ?? false,
       introSoundUrl: (c as any).introSoundUrl ?? '',
       introSoundVolumePercent: String((c as any).introSoundVolumePercent ?? 100),
@@ -861,6 +865,7 @@ export default function IdleRpgCreate() {
           name: c.name.trim(),
           ...(c.description.trim() ? { description: c.description.trim() } : {}),
           ...(c.iconUrl.trim() ? { iconUrl: c.iconUrl.trim() } : {}),
+          ...(parseTags(c.portraitUrls).length > 0 ? { portraitUrls: parseTags(c.portraitUrls) } : {}),
           ...(c.introSoundUrl.trim() ? { introSoundUrl: c.introSoundUrl.trim() } : {}),
           ...(c.introSoundUrl.trim() ? { introSoundVolumePercent: parseSoundVolumePercent(c.introSoundVolumePercent) } : {}),
           ...(c.introSoundUrl.trim() && parseNonNegativeMilliseconds(c.introSoundFadeInMs) > 0 ? { introSoundFadeInMs: parseNonNegativeMilliseconds(c.introSoundFadeInMs) } : {}),
@@ -1790,6 +1795,7 @@ export default function IdleRpgCreate() {
                     <TextField size="small" label="Name" value={c.name} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} sx={{ width: 120 }} />
                     <TextField size="small" label="Description" value={c.description} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} sx={{ flex: 1 }} />
                     <TextField size="small" label="Icon URL" value={c.iconUrl} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 180 }} />
+                    <TextField size="small" label="Portrait URLs (comma)" value={c.portraitUrls} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, portraitUrls: e.target.value } : x))} sx={{ minWidth: 220, flex: 1 }} />
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', minWidth: 280, flex: 1 }}>
                       <TextField size="small" label="Intro Sound URL" value={c.introSoundUrl} onChange={(e) => setClasses((p) => p.map((x, j) => j === i ? { ...x, introSoundUrl: e.target.value } : x))} sx={{ minWidth: 180, flex: 1 }} />
                       <SoundUploadButton onUploaded={(url) => setClasses((p) => p.map((x, j) => j === i ? { ...x, introSoundUrl: url } : x))} />

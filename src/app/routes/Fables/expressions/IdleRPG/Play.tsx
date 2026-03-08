@@ -342,6 +342,7 @@ export default function FableIdleRPG() {
   const [showCreateChar, setShowCreateChar] = useState(false)
   const [charName, setCharName] = useState('')
   const [charClassIndex, setCharClassIndex] = useState(0)
+  const [charPortraitIndex, setCharPortraitIndex] = useState(0)
   const [creating, setCreating] = useState(false)
   const [takenHeroClassIds, setTakenHeroClassIds] = useState<Set<string>>(new Set())
 
@@ -408,12 +409,36 @@ export default function FableIdleRPG() {
   const classes = realm?.classCatalog ?? []
   const selectedClass = classes[charClassIndex]
   const selectedClassId = selectedClass?.id ?? ''
+  const selectedClassPortraitUrls = useMemo(() => {
+    if (!selectedClass) return []
+    const fromPool = (selectedClass.portraitUrls ?? []).map((url) => url.trim()).filter(Boolean)
+    if (fromPool.length > 0) return Array.from(new Set(fromPool))
+    const icon = selectedClass.iconUrl?.trim()
+    return icon ? [icon] : []
+  }, [selectedClass])
+  const selectedClassPortraitUrl = selectedClassPortraitUrls[charPortraitIndex] ?? ''
+  const selectedClassPreviewUrl = selectedClass?.iconUrl?.trim() || selectedClassPortraitUrl || ''
+
+  useEffect(() => {
+    setCharPortraitIndex(0)
+  }, [selectedClassId])
+
+  useEffect(() => {
+    if (charPortraitIndex < selectedClassPortraitUrls.length) return
+    setCharPortraitIndex(0)
+  }, [charPortraitIndex, selectedClassPortraitUrls.length])
+
   const handleCreateCharacter = async () => {
     if (!fableId || !realm || !charName.trim() || !selectedClassId) return
     setCreating(true)
     setError(null)
     try {
-      const c = await createCharacter(fableId, realm.id, { name: charName.trim(), classId: selectedClassId })
+      const createBody: { name: string; classId: string; portraitUrl?: string } = {
+        name: charName.trim(),
+        classId: selectedClassId,
+      }
+      if (selectedClassPortraitUrl) createBody.portraitUrl = selectedClassPortraitUrl
+      const c = await createCharacter(fableId, realm.id, createBody)
       setCharacter(c)
       setShowCreateChar(false)
     } catch (err: unknown) {
@@ -582,10 +607,10 @@ export default function FableIdleRPG() {
                             ...(isTaken ? { opacity: 0.45, filter: 'grayscale(0.5)' } : {}),
                           }}
                         >
-                          {selectedClass.iconUrl ? (
+                          {selectedClassPreviewUrl ? (
                             <Box
                               component="img"
-                              src={selectedClass.iconUrl}
+                              src={selectedClassPreviewUrl}
                               alt={selectedClass.name}
                               sx={{ width: '100%', height: '100%', objectFit: 'cover', filter: dropShadow }}
                             />
@@ -647,13 +672,59 @@ export default function FableIdleRPG() {
               <ChevronRightIcon />
             </IconButton>
           </Box>
+          {selectedClassPortraitUrls.length > 0 && (
+            <Box sx={{ width: '100%', maxWidth: 360 }}>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ textAlign: 'center', mb: 1 }}>
+                Choose portrait
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.25 }}>
+                <Box
+                  component="img"
+                  src={selectedClassPortraitUrl}
+                  alt={`${selectedClass?.name ?? 'Class'} portrait`}
+                  sx={{
+                    width: 140,
+                    height: 140,
+                    borderRadius: 2,
+                    objectFit: 'cover',
+                    border: '2px solid rgba(168,85,247,0.55)',
+                    boxShadow: '0 0 18px rgba(168,85,247,0.35)',
+                  }}
+                />
+              </Box>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 1 }}>
+                {selectedClassPortraitUrls.map((url, index) => {
+                  const isActive = index === charPortraitIndex
+                  return (
+                    <Box
+                      key={`${selectedClassId}-portrait-${index}`}
+                      component="button"
+                      type="button"
+                      onClick={() => setCharPortraitIndex(index)}
+                      sx={{
+                        p: 0,
+                        border: isActive ? '2px solid rgba(192,132,252,0.95)' : '1px solid rgba(168,85,247,0.35)',
+                        borderRadius: 1.5,
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        bgcolor: 'rgba(12,10,20,0.85)',
+                        boxShadow: isActive ? '0 0 12px rgba(192,132,252,0.45)' : 'none',
+                      }}
+                    >
+                      <Box component="img" src={url} alt={`Portrait ${index + 1}`} sx={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block' }} />
+                    </Box>
+                  )
+                })}
+              </Box>
+            </Box>
+          )}
           {error && <Typography color="error">{error}</Typography>}
         </DialogContent>
         <DialogActions>
           <Button component={Link} to={`/fables/${fableId}`} disabled={creating}>Cancel</Button>
           <Tooltip title={selectedClass?.isHeroClass && takenHeroClassIds.has(selectedClassId) ? 'This Hero Class is already taken by another player' : ''}>
             <span>
-              <Button variant="contained" onClick={handleCreateCharacter} disabled={creating || !charName.trim() || !selectedClassId || (selectedClass?.isHeroClass === true && takenHeroClassIds.has(selectedClassId))}>
+              <Button variant="contained" onClick={handleCreateCharacter} disabled={creating || !charName.trim() || !selectedClassId || (selectedClass?.isHeroClass === true && takenHeroClassIds.has(selectedClassId)) || (selectedClassPortraitUrls.length > 0 && !selectedClassPortraitUrl)}>
                 {creating ? 'Creating...' : 'Create'}
               </Button>
             </span>

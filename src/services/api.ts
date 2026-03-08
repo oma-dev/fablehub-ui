@@ -45,6 +45,7 @@ export interface IdleRpgClassCatalogEntry {
   name: string
   description?: string
   iconUrl?: string
+  portraitUrls?: string[]
   isHeroClass?: boolean
 }
 
@@ -506,6 +507,8 @@ export interface ClassBlock {
   name: string
   description?: string
   iconUrl?: string
+  /** Selectable portrait pool for character creation. */
+  portraitUrls?: string[]
   /** Optional intro sound played when this class enters combat replay. */
   introSoundUrl?: string
   /** Optional intro sound volume in percent (0-100). Default 100. */
