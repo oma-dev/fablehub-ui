@@ -184,8 +184,29 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
     }
   }
 
-  const creatureForQuest = (quest: Quest | undefined) =>
-    quest ? pack.creatures.find((c) => c.id === quest.creatureId) : undefined
+  const creatureForQuest = (quest: Quest | undefined) => {
+    if (!quest) return undefined
+    const baseCreature = pack.creatures.find((c) => c.id === quest.creatureId)
+    if (!baseCreature) return undefined
+    const overrides = quest.creatureOverrides
+    if (!overrides) return baseCreature
+    const mergedMainStats = overrides.mainStats
+      ? { ...(baseCreature.mainStats ?? {}), ...overrides.mainStats }
+      : baseCreature.mainStats
+    const mergedDerivedStatModifiers = overrides.derivedStatModifiers?.length
+      ? [...(baseCreature.derivedStatModifiers ?? []), ...overrides.derivedStatModifiers]
+      : baseCreature.derivedStatModifiers
+    return {
+      ...baseCreature,
+      ...(overrides.hp != null ? { hp: overrides.hp } : {}),
+      ...(overrides.ap != null ? { ap: overrides.ap } : {}),
+      ...(overrides.arm != null ? { arm: overrides.arm } : {}),
+      ...(overrides.weaponDamage != null ? { weaponDamage: overrides.weaponDamage } : {}),
+      ...(overrides.protectiveArmor != null ? { protectiveArmor: overrides.protectiveArmor } : {}),
+      ...(mergedMainStats ? { mainStats: mergedMainStats } : {}),
+      ...(mergedDerivedStatModifiers ? { derivedStatModifiers: mergedDerivedStatModifiers } : {}),
+    }
+  }
 
   const handleCombatFinish = () => {
     setPhase('result')

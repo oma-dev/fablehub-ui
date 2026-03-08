@@ -641,6 +641,15 @@ export interface Quest {
   creatureId: string
   durationSec: number
   iconUrl?: string
+  creatureOverrides?: {
+    hp?: number
+    ap?: number
+    arm?: number
+    mainStats?: Record<string, number>
+    derivedStatModifiers?: DerivedStatModifier[]
+    weaponDamage?: number
+    protectiveArmor?: number
+  }
   rewards: { xp: number; currency: Record<string, number>; lootTableId?: string }
 }
 

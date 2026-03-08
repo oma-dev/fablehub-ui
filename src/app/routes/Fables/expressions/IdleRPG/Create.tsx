@@ -309,7 +309,20 @@ type ItemForm = {
   mainStatBonuses: MainStatValueForm[]; weaponDamage: string; protectiveArmor: string; derivedStatModifiers: DerivedModifierForm[]
   iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string; sellValue: string
 }
-type QuestForm = { id: string; name: string; creatureId: string; durationSec: string; iconUrl: string; rewardXp: string; rewardCurrency: string; lootTableId: string }
+type QuestForm = {
+  id: string
+  name: string
+  creatureId: string
+  durationSec: string
+  iconUrl: string
+  rewardXp: string
+  rewardCurrency: string
+  lootTableId: string
+  creatureOverrideHp: string
+  creatureOverrideAp: string
+  creatureOverrideArm: string
+  creatureOverrideMainStats: string
+}
 type DungeonForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string }
 type RaidForm = { id: string; name: string; description: string; imageUrl: string; requiredLevel: string; bossCreatureId: string; currencyId: string; costAmount: string }
 type LootEntryForm = { itemId: string; weight: string; classId: string }
@@ -369,7 +382,20 @@ const emptyItem = (): ItemForm => ({
   mainStatBonuses: [], weaponDamage: '', protectiveArmor: '', derivedStatModifiers: [],
   iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '', sellValue: '',
 })
-const emptyQuest = (): QuestForm => ({ id: '', name: '', creatureId: '', durationSec: '60', iconUrl: '', rewardXp: '10', rewardCurrency: '', lootTableId: '' })
+const emptyQuest = (): QuestForm => ({
+  id: '',
+  name: '',
+  creatureId: '',
+  durationSec: '60',
+  iconUrl: '',
+  rewardXp: '10',
+  rewardCurrency: '',
+  lootTableId: '',
+  creatureOverrideHp: '',
+  creatureOverrideAp: '',
+  creatureOverrideArm: '',
+  creatureOverrideMainStats: '',
+})
 const emptyDungeon = (): DungeonForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '' })
 const emptyRaid = (): RaidForm => ({ id: '', name: '', description: '', imageUrl: '', requiredLevel: '1', bossCreatureId: '', currencyId: '', costAmount: '0' })
 const emptyLootEntry = (): LootEntryForm => ({ itemId: '', weight: '1', classId: '' })
@@ -576,6 +602,10 @@ export default function IdleRpgCreate() {
       iconUrl: q.iconUrl ?? '', rewardXp: String(q.rewards.xp),
       rewardCurrency: serializeKeyValueNumber(q.rewards.currency),
       lootTableId: q.rewards.lootTableId ?? '',
+      creatureOverrideHp: (q as any).creatureOverrides?.hp != null ? String((q as any).creatureOverrides.hp) : '',
+      creatureOverrideAp: (q as any).creatureOverrides?.ap != null ? String((q as any).creatureOverrides.ap) : '',
+      creatureOverrideArm: (q as any).creatureOverrides?.arm != null ? String((q as any).creatureOverrides.arm) : '',
+      creatureOverrideMainStats: serializeKeyValueNumber((q as any).creatureOverrides?.mainStats),
     })))
     setDungeons((pack.dungeons ?? []).map((d) => ({
       id: d.id, name: d.name, description: d.description ?? '', imageUrl: d.imageUrl ?? '',
@@ -712,7 +742,13 @@ export default function IdleRpgCreate() {
       derivedStatModifiers: [],
       sellValue: (i as any).sellValue != null ? String((i as any).sellValue) : '',
     })))
-    setQuests(ex.quests)
+    setQuests(ex.quests.map((q) => ({
+      ...q,
+      creatureOverrideHp: '',
+      creatureOverrideAp: '',
+      creatureOverrideArm: '',
+      creatureOverrideMainStats: '',
+    })))
     setDungeons((ex.dungeons ?? []).map((d) => ({
       id: d.id,
       name: d.name,
@@ -931,18 +967,42 @@ export default function IdleRpgCreate() {
 
     const questList: Quest[] = quests
       .filter((q) => q.id.trim() && q.name.trim() && q.creatureId.trim())
-      .map((q) => ({
-        id: q.id.trim(),
-        name: q.name.trim(),
-        creatureId: q.creatureId.trim(),
-        durationSec: Number(q.durationSec) || 60,
-        ...(q.iconUrl.trim() ? { iconUrl: q.iconUrl.trim() } : {}),
-        rewards: {
-          xp: Number(q.rewardXp) || 0,
-          currency: parseKeyValueNumber(q.rewardCurrency),
-          ...(q.lootTableId.trim() ? { lootTableId: q.lootTableId.trim() } : {}),
-        },
-      }))
+      .map((q) => {
+        const overrideMainStats = Object.entries(parseKeyValueNumber(q.creatureOverrideMainStats))
+          .filter(([statId, value]) => mainStatIdList.includes(statId) && Number.isFinite(value))
+          .reduce<Record<string, number>>((acc, [statId, value]) => {
+            acc[statId] = value
+            return acc
+          }, {})
+        const overrideHp = q.creatureOverrideHp.trim() !== '' && !Number.isNaN(Number(q.creatureOverrideHp))
+          ? Number(q.creatureOverrideHp)
+          : undefined
+        const overrideAp = q.creatureOverrideAp.trim() !== '' && !Number.isNaN(Number(q.creatureOverrideAp))
+          ? Number(q.creatureOverrideAp)
+          : undefined
+        const overrideArm = q.creatureOverrideArm.trim() !== '' && !Number.isNaN(Number(q.creatureOverrideArm))
+          ? Number(q.creatureOverrideArm)
+          : undefined
+        const creatureOverrides = {
+          ...(overrideHp != null ? { hp: overrideHp } : {}),
+          ...(overrideAp != null ? { ap: overrideAp } : {}),
+          ...(overrideArm != null ? { arm: overrideArm } : {}),
+          ...(Object.keys(overrideMainStats).length > 0 ? { mainStats: overrideMainStats } : {}),
+        }
+        return {
+          id: q.id.trim(),
+          name: q.name.trim(),
+          creatureId: q.creatureId.trim(),
+          durationSec: Number(q.durationSec) || 60,
+          ...(q.iconUrl.trim() ? { iconUrl: q.iconUrl.trim() } : {}),
+          ...(Object.keys(creatureOverrides).length > 0 ? { creatureOverrides } : {}),
+          rewards: {
+            xp: Number(q.rewardXp) || 0,
+            currency: parseKeyValueNumber(q.rewardCurrency),
+            ...(q.lootTableId.trim() ? { lootTableId: q.lootTableId.trim() } : {}),
+          },
+        }
+      })
 
     const dungeonList: Dungeon[] = dungeons
       .filter((d) => d.id.trim() && d.name.trim() && d.bossCreatureId.trim())
@@ -2086,6 +2146,10 @@ export default function IdleRpgCreate() {
                   <TextField size="small" label="Reward XP" type="number" value={q.rewardXp} onChange={(e) => setQuests((p) => p.map((x, j) => j === i ? { ...x, rewardXp: e.target.value } : x))} sx={{ width: 90 }} />
                   <TextField size="small" label="Reward currency (gold:25)" value={q.rewardCurrency} onChange={(e) => setQuests((p) => p.map((x, j) => j === i ? { ...x, rewardCurrency: e.target.value } : x))} sx={{ width: 140 }} />
                   <TextField size="small" label="Loot table ID" value={q.lootTableId} onChange={(e) => setQuests((p) => p.map((x, j) => j === i ? { ...x, lootTableId: e.target.value } : x))} sx={{ width: 100 }} />
+                  <TextField size="small" label="Override HP" type="number" value={q.creatureOverrideHp} onChange={(e) => setQuests((p) => p.map((x, j) => j === i ? { ...x, creatureOverrideHp: e.target.value } : x))} sx={{ width: 100 }} />
+                  <TextField size="small" label="Override AP" type="number" value={q.creatureOverrideAp} onChange={(e) => setQuests((p) => p.map((x, j) => j === i ? { ...x, creatureOverrideAp: e.target.value } : x))} sx={{ width: 100 }} />
+                  <TextField size="small" label="Override ARM" type="number" value={q.creatureOverrideArm} onChange={(e) => setQuests((p) => p.map((x, j) => j === i ? { ...x, creatureOverrideArm: e.target.value } : x))} sx={{ width: 110 }} />
+                  <TextField size="small" label="Override main stats (STR:8,DEX:5)" value={q.creatureOverrideMainStats} onChange={(e) => setQuests((p) => p.map((x, j) => j === i ? { ...x, creatureOverrideMainStats: e.target.value } : x))} sx={{ width: 220 }} />
                   <TextField size="small" label="Icon URL" value={q.iconUrl} onChange={(e) => setQuests((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 120 }} />
                   <IconButton size="small" color="error" onClick={() => setQuests((p) => p.filter((_, j) => j !== i))}>−</IconButton>
                 </Box>
