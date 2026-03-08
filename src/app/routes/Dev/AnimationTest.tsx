@@ -37,10 +37,13 @@ import StatusAnimationEditor, {
   createEmptyStatusParticle,
 } from '../../routes/Fables/expressions/IdleRPG/components/StatusAnimationEditor'
 import SoundUploadButton from '../../routes/Fables/expressions/IdleRPG/components/SoundUploadButton'
+import { getFables, getIdleRpgRealm, getIdleRpgRealms, updateIdleRpgRealm } from '@features/idle-rpg/api'
+import type { Ability, Fable, IdleRpgRealm } from '@features/idle-rpg/api'
 import charBackground from '../../../assets/backgrounds/charBackground.png'
 
 const styleIds = [...STYLE_IDS]
 const ALL_IMPACT_STYLES: ImpactStyle[] = ['slash', 'punch', 'flail', 'arrow', 'bolt', 'generic']
+const REACTIVE_TRIGGER_TIMINGS = ['on_incoming_cast', 'on_hit_taken'] as const
 
 // --- Mirror CombatReplay layout constants for accurate previewing ---
 const SCALE = 1.2
@@ -871,13 +874,18 @@ export default function AnimationTest() {
   const [effectAmount, setEffectAmount] = useState(0)
   const [effectPercentage, setEffectPercentage] = useState(0)
   const [effectLifestealPct, setEffectLifestealPct] = useState(0)
-  const [reactiveBaseChance, setReactiveBaseChance] = useState(0.2)
-  const [reactiveScalingStat, setReactiveScalingStat] = useState('')
-  const [reactiveScalingCoeff, setReactiveScalingCoeff] = useState(0)
+  const [reactiveTriggerTiming, setReactiveTriggerTiming] = useState<(typeof REACTIVE_TRIGGER_TIMINGS)[number]>('on_incoming_cast')
+  const [reactivePriority, setReactivePriority] = useState(0)
+  const [reactiveMaxTriggersPerTurn, setReactiveMaxTriggersPerTurn] = useState(0)
   const [jsonImportText, setJsonImportText] = useState('')
+  const [fables, setFables] = useState<Fable[]>([])
+  const [selectedFableId, setSelectedFableId] = useState('')
+  const [realms, setRealms] = useState<IdleRpgRealm[]>([])
+  const [selectedRealmId, setSelectedRealmId] = useState('')
+  const [publishingAbility, setPublishingAbility] = useState(false)
+  const [publishMessage, setPublishMessage] = useState<string>('')
 
   const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal', 'summon'] as const
-  const STAT_IDS = ['STR', 'DEX', 'INT', 'LCK', 'HP', 'ARM'] as const
   const ABILITY_TYPES: typeof abilityType[] = ['primary', 'regular', 'passive', 'ultimate', 'reactive']
 
   const buildAbilityJson = useCallback(() => {
@@ -970,7 +978,7 @@ export default function AnimationTest() {
         ...(hasDefaultCard ? {} : { card }),
       }
     }
-    const ability: Record<string, unknown> = {
+    const ability: Ability = {
       id: abilityId.trim() || 'my_ability',
       name: abilityName.trim() || 'My Ability',
       abilityType,
@@ -991,9 +999,9 @@ export default function AnimationTest() {
     }
     if (abilityType === 'reactive') {
       ability.reactiveConfig = {
-        baseChance: reactiveBaseChance,
-        ...(reactiveScalingStat ? { scalingStat: reactiveScalingStat } : {}),
-        ...(reactiveScalingCoeff > 0 ? { scalingCoeff: reactiveScalingCoeff } : {}),
+        triggerTiming: reactiveTriggerTiming,
+        ...(reactivePriority !== 0 ? { priority: reactivePriority } : {}),
+        ...(reactiveMaxTriggersPerTurn > 0 ? { maxTriggersPerTurn: reactiveMaxTriggersPerTurn } : {}),
       }
     }
     const frames = buildFrames()
@@ -1001,7 +1009,7 @@ export default function AnimationTest() {
     return ability
   }, [abilityId, abilityName, abilityType, abilityDescription, abilityIconUrl, cooldownTurns,
     resourceCostId, resourceCostAmount, unlockCost, minLevel, effectKind, effectAmount,
-    effectPercentage, effectLifestealPct, reactiveBaseChance, reactiveScalingStat, reactiveScalingCoeff,
+    effectPercentage, effectLifestealPct, reactiveTriggerTiming, reactivePriority, reactiveMaxTriggersPerTurn,
     weaponFrames,
     projectileFrames,
     impactFrames,
@@ -1042,9 +1050,9 @@ export default function AnimationTest() {
         setEffectLifestealPct(eff.lifestealPercent ?? 0)
       }
       if (data.reactiveConfig) {
-        setReactiveBaseChance(data.reactiveConfig.baseChance ?? 0.2)
-        setReactiveScalingStat(data.reactiveConfig.scalingStat ?? '')
-        setReactiveScalingCoeff(data.reactiveConfig.scalingCoeff ?? 0)
+        setReactiveTriggerTiming((data.reactiveConfig.triggerTiming ?? 'on_incoming_cast') as (typeof REACTIVE_TRIGGER_TIMINGS)[number])
+        setReactivePriority(data.reactiveConfig.priority ?? 0)
+        setReactiveMaxTriggersPerTurn(data.reactiveConfig.maxTriggersPerTurn ?? 0)
       }
       const af = data.animationFrames
       if (af) {
@@ -1105,6 +1113,70 @@ export default function AnimationTest() {
       alert('Invalid JSON')
     }
   }, [jsonImportText])
+
+  useEffect(() => {
+    let cancelled = false
+    getFables()
+      .then((rows) => {
+        if (cancelled) return
+        setFables(rows)
+        if (!selectedFableId && rows.length > 0) {
+          setSelectedFableId(rows[0].id)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPublishMessage('Failed to load fables. You may need to sign in.')
+      })
+    return () => { cancelled = true }
+  }, [selectedFableId])
+
+  useEffect(() => {
+    if (!selectedFableId) {
+      setRealms([])
+      setSelectedRealmId('')
+      return
+    }
+    let cancelled = false
+    getIdleRpgRealms(selectedFableId)
+      .then((rows) => {
+        if (cancelled) return
+        setRealms(rows)
+        setSelectedRealmId((current) => {
+          if (current && rows.some((row) => row.id === current)) return current
+          return rows[0]?.id ?? ''
+        })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRealms([])
+          setSelectedRealmId('')
+        }
+      })
+    return () => { cancelled = true }
+  }, [selectedFableId])
+
+  const handleAddAbilityToRealm = useCallback(async () => {
+    if (!selectedFableId || !selectedRealmId || publishingAbility) return
+    setPublishingAbility(true)
+    setPublishMessage('')
+    try {
+      const realm = await getIdleRpgRealm(selectedFableId, selectedRealmId, { includePack: true })
+      if (!realm.pack) throw new Error('Realm pack not found')
+      const ability = buildAbilityJson()
+      const currentAbilities = realm.pack.abilities ?? []
+      const existingIndex = currentAbilities.findIndex((entry) => entry.id === ability.id)
+      const nextAbilities = existingIndex >= 0
+        ? currentAbilities.map((entry, index) => (index === existingIndex ? ability : entry))
+        : [...currentAbilities, ability]
+      const nextPack = { ...realm.pack, abilities: nextAbilities }
+      await updateIdleRpgRealm(selectedFableId, selectedRealmId, { pack: nextPack })
+      setPublishMessage(existingIndex >= 0 ? `Updated ability "${ability.id}" in realm.` : `Added ability "${ability.id}" to realm.`)
+    } catch (err: unknown) {
+      setPublishMessage(err instanceof Error ? err.message : 'Failed to publish ability to realm')
+    } finally {
+      setPublishingAbility(false)
+    }
+  }, [buildAbilityJson, publishingAbility, selectedFableId, selectedRealmId])
 
   const attackerAnim = getAttackAnimationConfig(attackerStyle)
   const defenderAnim = getAttackAnimationConfig(defenderStyle)
@@ -1810,15 +1882,36 @@ export default function AnimationTest() {
             <Divider />
             <Typography variant="subtitle2" fontWeight={600} color="text.secondary">Reactive Config</Typography>
             <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-              <NumField label="Base chance (0-1)" value={reactiveBaseChance} onChange={(v) => setReactiveBaseChance(Math.max(0, Math.min(1, v)))} min={0} max={1} step={0.05} width={140} />
-              <FormControl size="small" sx={{ minWidth: 110 }}>
-                <InputLabel>Scaling stat</InputLabel>
-                <Select value={reactiveScalingStat} label="Scaling stat" onChange={(e) => setReactiveScalingStat(e.target.value)} displayEmpty>
-                  <MenuItem value="">— None —</MenuItem>
-                  {STAT_IDS.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+              <FormControl size="small" sx={{ minWidth: 220 }}>
+                <InputLabel>Trigger timing</InputLabel>
+                <Select
+                  value={reactiveTriggerTiming}
+                  label="Trigger timing"
+                  onChange={(e) => setReactiveTriggerTiming(e.target.value as (typeof REACTIVE_TRIGGER_TIMINGS)[number])}
+                >
+                  {REACTIVE_TRIGGER_TIMINGS.map((timing) => <MenuItem key={timing} value={timing}>{timing}</MenuItem>)}
                 </Select>
               </FormControl>
-              <NumField label="Scaling coeff" value={reactiveScalingCoeff} onChange={(v) => setReactiveScalingCoeff(v)} min={0} max={1} step={0.001} width={120} />
+              <NumField
+                label="Priority"
+                value={reactivePriority}
+                onChange={(v) => setReactivePriority(v)}
+                min={-100}
+                max={100}
+                step={1}
+                width={120}
+                helperText="higher resolves first"
+              />
+              <NumField
+                label="Max triggers / turn"
+                value={reactiveMaxTriggersPerTurn}
+                onChange={(v) => setReactiveMaxTriggersPerTurn(Math.max(0, v))}
+                min={0}
+                max={20}
+                step={1}
+                width={160}
+                helperText="0 = unlimited"
+              />
             </Box>
           </>
         )}
@@ -1834,6 +1927,38 @@ export default function AnimationTest() {
             setJsonImportText(json)
           }}>Preview JSON</Button>
         </Box>
+        <Divider />
+        <Typography variant="subtitle2" fontWeight={600} color="text.secondary">Add / Update In Realm</Typography>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 220 }}>
+            <InputLabel>Fable</InputLabel>
+            <Select value={selectedFableId} label="Fable" onChange={(e) => setSelectedFableId(e.target.value)}>
+              {fables.map((fable) => <MenuItem key={fable.id} value={fable.id}>{fable.name || fable.id}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 240 }} disabled={!selectedFableId || realms.length === 0}>
+            <InputLabel>Realm</InputLabel>
+            <Select value={selectedRealmId} label="Realm" onChange={(e) => setSelectedRealmId(e.target.value)}>
+              {realms.map((realm) => <MenuItem key={realm.id} value={realm.id}>{realm.id}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={handleAddAbilityToRealm}
+            disabled={!selectedFableId || !selectedRealmId || publishingAbility}
+          >
+            {publishingAbility ? 'Saving...' : 'Add / Update Ability'}
+          </Button>
+        </Box>
+        {publishMessage && (
+          <Typography
+            variant="body2"
+            color={publishMessage.startsWith('Failed') ? 'error.main' : 'success.main'}
+          >
+            {publishMessage}
+          </Typography>
+        )}
         <TextField
           multiline
           minRows={3}
