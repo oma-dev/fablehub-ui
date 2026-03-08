@@ -1,7 +1,6 @@
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import Dialog from '@mui/material/Dialog'
-import DialogContent from '@mui/material/DialogContent'
+import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi'
 import type { PlayStateResponse } from '@features/idle-rpg/api'
@@ -37,9 +36,32 @@ export default function CharacterCardModal({
   fightButtonLabel,
   fightButtonDisabled = false,
 }: Props) {
+  if (!open) return null
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogContent sx={{ pt: 3, pb: 3 }}>
+    <Box
+      onClick={onClose}
+      sx={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 20,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        p: { xs: 1.25, sm: 2 },
+        bgcolor: 'rgba(8,7,14,0.6)',
+        backdropFilter: 'blur(2px)',
+      }}
+    >
+      <Paper
+        onClick={(event) => event.stopPropagation()}
+        sx={{
+          width: 'min(640px, 96vw)',
+          maxHeight: '92%',
+          overflow: 'auto',
+          p: 3,
+        }}
+      >
         {loading && (
           <Typography color="text.secondary">Loading...</Typography>
         )}
@@ -71,8 +93,8 @@ export default function CharacterCardModal({
             )}
           </Box>
         )}
-      </DialogContent>
-    </Dialog>
+      </Paper>
+    </Box>
   )
 }
 

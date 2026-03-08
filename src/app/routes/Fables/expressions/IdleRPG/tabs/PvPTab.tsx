@@ -281,6 +281,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
         flexDirection: 'column',
         height: '100%',
         minHeight: 0,
+        position: 'relative',
         overflow: 'hidden',
         backgroundImage: inCombat ? `url(${arenaBg})` : undefined,
         backgroundSize: 'cover',

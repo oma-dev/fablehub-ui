@@ -5,10 +5,6 @@ import questGiverBg from '../../../../../../assets/backgrounds/questGiver.png'
 import questRoadBg from '../../../../../../assets/backgrounds/questRoad.png'
 import questCombatBg from '../../../../../../assets/backgrounds/questBackground.png'
 import Button from '@mui/material/Button'
-import Dialog from '@mui/material/Dialog'
-import DialogActions from '@mui/material/DialogActions'
-import DialogContent from '@mui/material/DialogContent'
-import DialogTitle from '@mui/material/DialogTitle'
 import LinearProgress from '@mui/material/LinearProgress'
 import List from '@mui/material/List'
 import ListItemButton from '@mui/material/ListItemButton'
@@ -210,6 +206,7 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
+        position: 'relative',
         backgroundImage: `url(${bgImage})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
@@ -247,6 +244,9 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
               onClick={openQuestPicker}
               sx={{
                 position: 'relative',
+                display: 'block',
+                lineHeight: 0,
+                fontSize: 0,
                 top: { xs: 18, sm: 24, md: 36 },
                 width: { xs: 'min(92vw, 630px)', sm: 'min(88vw, 780px)', md: 'min(74vw, 900px)' },
                 p: 0,
@@ -276,20 +276,6 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                   transition: 'opacity 0.16s ease',
                   pointerEvents: 'none',
                 },
-                '&::after': {
-                  content: '""',
-                  position: 'absolute',
-                  left: '50%',
-                  bottom: '6%',
-                  width: '68%',
-                  height: 16,
-                  borderRadius: '999px',
-                  background: 'radial-gradient(circle, rgba(0,0,0,0.48) 0%, rgba(0,0,0,0) 75%)',
-                  transform: 'translateX(-50%)',
-                  transition: 'transform 0.2s ease, opacity 0.2s ease',
-                  opacity: 0.75,
-                  pointerEvents: 'none',
-                },
                 '&:hover': {
                   transform: 'translateY(-6px) scale(1.04)',
                   filter: 'brightness(1.08)',
@@ -299,10 +285,6 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                     ? '0 0 22px rgba(251,191,36,0.95), inset 0 0 24px rgba(192,132,252,0.42)'
                     : '0 0 14px rgba(251,191,36,0.75), inset 0 0 18px rgba(192,132,252,0.28)',
                   borderColor: showQuestGiverCallout ? 'rgba(251,191,36,0.94)' : 'rgba(251,191,36,0.72)',
-                },
-                '&:hover::after': {
-                  transform: 'translateX(-50%) scale(1.16)',
-                  opacity: 0.95,
                 },
                 '&:active': {
                   transform: 'translateY(-1px) scale(0.97)',
@@ -365,146 +347,165 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
         </Box>
       )}
 
-            {/* Quest picker modal */}
-      <Dialog
-        open={phase === 'questPicker'}
-        onClose={() => setPhase('idle')}
-        disableScrollLock
-        maxWidth={false}
-        fullWidth
-        PaperProps={{ sx: { width: 'min(1120px, 96vw)' } }}
-      >
-        <DialogTitle
+      {/* Quest picker modal */}
+      {phase === 'questPicker' && (
+        <Box
+          onClick={() => setPhase('idle')}
           sx={{
-            fontWeight: 800,
-            fontSize: '1.45rem',
-            background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            position: 'absolute',
+            inset: 0,
+            zIndex: 18,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: { xs: 1.25, sm: 2 },
+            bgcolor: 'rgba(8,7,14,0.62)',
+            backdropFilter: 'blur(2px)',
           }}
         >
-          Choose a Quest
-        </DialogTitle>
-        <DialogContent>
-          <List sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, pt: 1 }}>
-            {randomQuests.length === 0 && (
-              <Typography variant="body2" color="text.secondary" sx={{ px: 1, py: 1 }}>
-                No quest offers available right now.
-              </Typography>
-            )}
-            {randomQuests.map((q) => {
-              const creature = creatureForQuest(q)
-              return (
-                <ListItemButton
-                  key={q.id}
-                  disabled={startingQuestId !== null}
-                  onClick={() => handleSelectQuest(q)}
-                  sx={{
-                    borderRadius: 2,
-                    border: '1px solid rgba(168,85,247,0.2)',
-                    py: 2,
-                    px: 2.5,
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      borderColor: 'rgba(168,85,247,0.4)',
-                      boxShadow: '0 0 16px rgba(168,85,247,0.15)',
-                      bgcolor: 'rgba(168,85,247,0.08)',
-                    },
-                  }}
-                >
-                  <ListItemText
-                    disableTypography
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.6 }}>
-                        {renderQuestIcon(q, 74)}
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.4, minWidth: 0, flex: 1 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', alignItems: 'baseline' }}>
-                            <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 1.1 }}>
-                              {startingQuestId === q.id ? `${q.name}...` : q.name}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                              Creature: {creature?.name ?? q.creatureId} (Lv {creature?.level ?? '?'})
-                            </Typography>
-                          </Box>
+          <Paper
+            onClick={(event) => event.stopPropagation()}
+            sx={{
+              width: 'min(1120px, 96vw)',
+              maxHeight: '92%',
+              overflow: 'auto',
+              p: { xs: 1.5, sm: 2 },
+              bgcolor: 'rgba(20,18,31,0.96)',
+              border: '1px solid rgba(168,85,247,0.26)',
+            }}
+          >
+            <Typography
+              sx={{
+                fontWeight: 800,
+                fontSize: '1.45rem',
+                background: 'linear-gradient(90deg, #e8e4f0, #c084fc)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 1,
+              }}
+            >
+              Choose a Quest
+            </Typography>
 
-                          {/* Row 1: Rewards */}
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.1 }}>
-                            <Box
-                              sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 0.75,
-                                px: 1.5,
-                                py: 0.85,
-                                borderRadius: 2,
-                                bgcolor: 'rgba(168,85,247,0.14)',
-                                border: '1px solid rgba(168,85,247,0.35)',
-                              }}
-                            >
-                              <WorkspacePremiumIcon sx={{ color: '#c084fc', fontSize: 22 }} />
-                              <Typography variant="body1" fontWeight={800} sx={{ color: '#e8e4f0' }}>
-                                +{q.rewards.xp} XP
+            <List sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, pt: 1 }}>
+              {randomQuests.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ px: 1, py: 1 }}>
+                  No quest offers available right now.
+                </Typography>
+              )}
+              {randomQuests.map((q) => {
+                const creature = creatureForQuest(q)
+                return (
+                  <ListItemButton
+                    key={q.id}
+                    disabled={startingQuestId !== null}
+                    onClick={() => handleSelectQuest(q)}
+                    sx={{
+                      borderRadius: 2,
+                      border: '1px solid rgba(168,85,247,0.2)',
+                      py: 2,
+                      px: 2.5,
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        borderColor: 'rgba(168,85,247,0.4)',
+                        boxShadow: '0 0 16px rgba(168,85,247,0.15)',
+                        bgcolor: 'rgba(168,85,247,0.08)',
+                      },
+                    }}
+                  >
+                    <ListItemText
+                      disableTypography
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.6 }}>
+                          {renderQuestIcon(q, 74)}
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.4, minWidth: 0, flex: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                              <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 1.1 }}>
+                                {startingQuestId === q.id ? `${q.name}...` : q.name}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                Creature: {creature?.name ?? q.creatureId} (Lv {creature?.level ?? '?'})
                               </Typography>
                             </Box>
 
-                            {Object.entries(q.rewards.currency ?? {}).map(([currencyId, amount]) => {
-                              const currencyMeta = currencyMetaById.get(currencyId)
-                              const currencyName = currencyMeta?.name ?? currencyId
-                              const iconUrl = currencyMeta?.iconUrl?.trim()
-                              return (
-                                <Box
-                                  key={`${q.id}-reward-${currencyId}`}
-                                  sx={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 0.75,
-                                    px: 1.5,
-                                    py: 0.85,
-                                    borderRadius: 2,
-                                    bgcolor: 'rgba(251,191,36,0.14)',
-                                    border: '1px solid rgba(251,191,36,0.35)',
-                                  }}
-                                >
-                                  {iconUrl ? (
-                                    <Box
-                                      component="img"
-                                      src={iconUrl}
-                                      alt={currencyName}
-                                      sx={{ width: 22, height: 22, objectFit: 'contain' }}
-                                    />
-                                  ) : (
-                                    <MonetizationOnIcon sx={{ color: '#fbbf24', fontSize: 22 }} />
-                                  )}
-                                  <Typography variant="body1" fontWeight={800} sx={{ color: '#fbbf24' }}>
-                                    +{amount} {currencyName}
-                                  </Typography>
-                                </Box>
-                              )
-                            })}
-                          </Box>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.1 }}>
+                              <Box
+                                sx={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 0.75,
+                                  px: 1.5,
+                                  py: 0.85,
+                                  borderRadius: 2,
+                                  bgcolor: 'rgba(168,85,247,0.14)',
+                                  border: '1px solid rgba(168,85,247,0.35)',
+                                }}
+                              >
+                                <WorkspacePremiumIcon sx={{ color: '#c084fc', fontSize: 22 }} />
+                                <Typography variant="body1" fontWeight={800} sx={{ color: '#e8e4f0' }}>
+                                  +{q.rewards.xp} XP
+                                </Typography>
+                              </Box>
 
-                          {/* Row 2: Duration */}
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                            <ScheduleIcon sx={{ color: 'rgba(255,255,255,0.72)', fontSize: 18 }} />
-                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                              Duration: {q.durationSec}s
-                            </Typography>
+                              {Object.entries(q.rewards.currency ?? {}).map(([currencyId, amount]) => {
+                                const currencyMeta = currencyMetaById.get(currencyId)
+                                const currencyName = currencyMeta?.name ?? currencyId
+                                const iconUrl = currencyMeta?.iconUrl?.trim()
+                                return (
+                                  <Box
+                                    key={`${q.id}-reward-${currencyId}`}
+                                    sx={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 0.75,
+                                      px: 1.5,
+                                      py: 0.85,
+                                      borderRadius: 2,
+                                      bgcolor: 'rgba(251,191,36,0.14)',
+                                      border: '1px solid rgba(251,191,36,0.35)',
+                                    }}
+                                  >
+                                    {iconUrl ? (
+                                      <Box
+                                        component="img"
+                                        src={iconUrl}
+                                        alt={currencyName}
+                                        sx={{ width: 22, height: 22, objectFit: 'contain' }}
+                                      />
+                                    ) : (
+                                      <MonetizationOnIcon sx={{ color: '#fbbf24', fontSize: 22 }} />
+                                    )}
+                                    <Typography variant="body1" fontWeight={800} sx={{ color: '#fbbf24' }}>
+                                      +{amount} {currencyName}
+                                    </Typography>
+                                  </Box>
+                                )
+                              })}
+                            </Box>
+
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                              <ScheduleIcon sx={{ color: 'rgba(255,255,255,0.72)', fontSize: 18 }} />
+                              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                Duration: {q.durationSec}s
+                              </Typography>
+                            </Box>
                           </Box>
                         </Box>
-                      </Box>
-                    }
-                  />
-                </ListItemButton>
-              )
-            })}
-          </List>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPhase('idle')} variant="outlined" color="primary" disabled={startingQuestId !== null}>
-            Cancel
-          </Button>
-        </DialogActions>
-      </Dialog>
+                      }
+                    />
+                  </ListItemButton>
+                )
+              })}
+            </List>
+
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1.5 }}>
+              <Button onClick={() => setPhase('idle')} variant="outlined" color="primary" disabled={startingQuestId !== null}>
+                Cancel
+              </Button>
+            </Box>
+          </Paper>
+        </Box>
+      )}
 
       {/* Quest active: timer */}
       {phase === 'questActive' && (

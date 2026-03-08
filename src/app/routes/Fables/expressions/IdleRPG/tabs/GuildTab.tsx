@@ -13,14 +13,25 @@ import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
 import GroupsIcon from '@mui/icons-material/Groups'
 import MilitaryTechIcon from '@mui/icons-material/MilitaryTech'
-import { getGroups, getGroup, getGuildChampion, createGroup, joinGroup, getPlayState } from '@features/idle-rpg/api'
+import { getGroups, getGroup, getGuildChampion, createGroup, joinGroup, getPlayState, getGuildMemberPlayState } from '@features/idle-rpg/api'
 import type { CharacterState, GuildChampion, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '@features/idle-rpg/api'
 import GuildChat from '../components/GuildChat'
 import GuildRoster from '../components/GuildRoster'
 import GuildManagement from '../components/GuildManagement'
 import GuildRaids from '../components/GuildRaids'
+import CharacterCardModal from '../components/CharacterCardModal'
 
 const GUILD_LABEL = 'Guild'
+
+function formatCooldownRemaining(durationMs: number): string {
+  const remainingSeconds = Math.max(1, Math.ceil(durationMs / 1000))
+  const hours = Math.floor(remainingSeconds / 3600)
+  const minutes = Math.floor((remainingSeconds % 3600) / 60)
+  const seconds = remainingSeconds % 60
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+}
 
 interface Props {
   fableId: string
@@ -43,8 +54,19 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [champion, setChampion] = useState<GuildChampion | null>(null)
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+  const [selectedMemberProfile, setSelectedMemberProfile] = useState<PlayStateResponse | null>(null)
+  const [selectedMemberLoading, setSelectedMemberLoading] = useState(false)
+  const [selectedMemberError, setSelectedMemberError] = useState<string | null>(null)
+  const [cooldownNowMs, setCooldownNowMs] = useState(() => Date.now())
 
   const inGuild = !!character.groupId
+  const pvpCooldownUntil = Number(character.progression?.pvpAttackCooldownUntil ?? 0)
+  const pvpCooldownRemainingMs = Math.max(0, pvpCooldownUntil - cooldownNowMs)
+  const isPvpCooldownActive = pvpCooldownRemainingMs > 0
+  const fightButtonLabel = isPvpCooldownActive
+    ? `Cooldown: ${formatCooldownRemaining(pvpCooldownRemainingMs)}`
+    : 'Fight'
 
   useEffect(() => {
     if (inGuild && character.groupId) {
@@ -75,6 +97,45 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
       cancelled = true
     }
   }, [fableId, realmId, group?.id])
+
+  useEffect(() => {
+    if (!selectedMemberId && !isPvpCooldownActive) return
+    setCooldownNowMs(Date.now())
+    const intervalId = window.setInterval(() => setCooldownNowMs(Date.now()), 1000)
+    return () => window.clearInterval(intervalId)
+  }, [selectedMemberId, isPvpCooldownActive])
+
+  useEffect(() => {
+    if (!inGuild || !selectedMemberId) {
+      setSelectedMemberProfile(null)
+      setSelectedMemberError(null)
+      setSelectedMemberLoading(false)
+      return
+    }
+    let cancelled = false
+    setSelectedMemberLoading(true)
+    setSelectedMemberError(null)
+    getGuildMemberPlayState(fableId, realmId, character.id, selectedMemberId)
+      .then((data) => {
+        if (!cancelled) setSelectedMemberProfile(data)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setSelectedMemberError(err instanceof Error ? err.message : 'Failed to load profile')
+      })
+      .finally(() => {
+        if (!cancelled) setSelectedMemberLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [character.id, fableId, inGuild, realmId, selectedMemberId])
+
+  useEffect(() => {
+    setSelectedMemberId(null)
+    setSelectedMemberProfile(null)
+    setSelectedMemberError(null)
+    setSelectedMemberLoading(false)
+  }, [character.id, character.groupId])
 
   useEffect(() => {
     if (inGuild) {
@@ -138,6 +199,21 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
     }
   }
 
+  const handleCloseSelectedMember = () => {
+    setSelectedMemberId(null)
+  }
+
+  const handleFightSelectedMember = () => {
+    if (!selectedMemberId || !selectedMemberProfile) return
+    onRequestPvpFight?.(selectedMemberId, selectedMemberProfile)
+    setSelectedMemberId(null)
+  }
+
+  const canFightSelectedMember = !!selectedMemberId
+    && selectedMemberId !== character.id
+    && !!selectedMemberProfile
+    && !!onRequestPvpFight
+
   const panelSx = {
     bgcolor: 'rgba(18,16,30,0.9)',
     border: '1px solid rgba(168,85,247,0.2)',
@@ -147,7 +223,7 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
 
   if (inGuild) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', p: { xs: 1, sm: 1.5 }, gap: 1.5 }}>
+      <Box sx={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', p: { xs: 1, sm: 1.5 }, gap: 1.5 }}>
         {guildLoading ? (
           <Paper variant="outlined" sx={{ ...panelSx, p: 2 }}>
             <Typography color="text.secondary">Loading guild hall...</Typography>
@@ -203,12 +279,10 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
                   <Divider />
                   <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
                     <GuildRoster
-                      fableId={fableId}
-                      realmId={realmId}
                       group={group}
                       pack={pack}
-                      viewerCharacter={character}
-                      onRequestPvpFight={onRequestPvpFight}
+                      selectedMemberId={selectedMemberId}
+                      onSelectMember={setSelectedMemberId}
                     />
                   </Box>
                 </Paper>
@@ -255,6 +329,19 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
                 </Paper>
               </Box>
             </Box>
+            <CharacterCardModal
+              open={!!selectedMemberId}
+              onClose={handleCloseSelectedMember}
+              profile={selectedMemberProfile}
+              loading={selectedMemberLoading}
+              error={selectedMemberError}
+              fableId={fableId}
+              realmId={realmId}
+              showFightButton={canFightSelectedMember}
+              onFight={handleFightSelectedMember}
+              fightButtonLabel={fightButtonLabel}
+              fightButtonDisabled={isPvpCooldownActive}
+            />
           </>
         ) : (
           <Paper variant="outlined" sx={{ ...panelSx, p: 2 }}>
