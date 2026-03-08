@@ -1,5 +1,5 @@
-/** Backend base URL — change when running locally vs on server. Set VITE_API_URL in .env to override. */
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+/** Backend URL + app environment are resolved from src/config/appEnvironment.ts. */
+import { API_BASE_URL, APP_ENV } from '../config/appEnvironment'
 
 export type RequestConfig = {
   headers?: Record<string, string>
@@ -13,6 +13,7 @@ export type RequestConfigWithBody = RequestConfig & {
 function getHeaders(token?: string | null, custom?: Record<string, string>): HeadersInit {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-App-Env': APP_ENV,
     ...custom,
   }
   if (token) {
@@ -49,7 +50,7 @@ export async function get<T = unknown>(
   config?: RequestConfig & { token?: string | null }
 ): Promise<T> {
   const token = config?.token ?? getToken()
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
     headers: getHeaders(token, config?.headers),
     signal: config?.signal,
@@ -62,7 +63,7 @@ export async function post<T = unknown>(
   config?: RequestConfigWithBody & { token?: string | null }
 ): Promise<T> {
   const token = config?.token ?? getToken()
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: getHeaders(token, config?.headers),
     body: config?.body !== undefined ? JSON.stringify(config.body) : undefined,
@@ -76,7 +77,7 @@ export async function put<T = unknown>(
   config?: RequestConfigWithBody & { token?: string | null }
 ): Promise<T> {
   const token = config?.token ?? getToken()
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PUT',
     headers: getHeaders(token, config?.headers),
     body: config?.body !== undefined ? JSON.stringify(config.body) : undefined,
@@ -90,7 +91,7 @@ export async function patch<T = unknown>(
   config?: RequestConfigWithBody & { token?: string | null }
 ): Promise<T> {
   const token = config?.token ?? getToken()
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PATCH',
     headers: getHeaders(token, config?.headers),
     body: config?.body !== undefined ? JSON.stringify(config.body) : undefined,
@@ -104,7 +105,7 @@ export async function del<T = unknown>(
   config?: RequestConfig & { token?: string | null }
 ): Promise<T> {
   const token = config?.token ?? getToken()
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'DELETE',
     headers: getHeaders(token, config?.headers),
     signal: config?.signal,
@@ -119,3 +120,4 @@ export const webclient = {
   patch,
   delete: del,
 }
+
