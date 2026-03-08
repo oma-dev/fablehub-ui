@@ -1,0 +1,3409 @@
+{
+    "version": 1,
+    "mainStats": [
+    {
+    "id": "STR",
+    "name": "Strength",
+    "description": "Physical power that boosts martial damage and durability."
+    },
+    {
+    "id": "DEX",
+    "name": "Dexterity",
+    "description": "Agility and precision that improve finesse damage and evasion."
+    },
+    {
+    "id": "INT",
+    "name": "Intelligence",
+    "description": "Arcane power and control that improve spell damage and resource use."
+    },
+    {
+    "id": "LCK",
+    "name": "Luck",
+    "description": "Fortune that improves critical performance and opportunistic outcomes."
+    }
+    ],
+    "derivedStats": {
+    "max_resource_amount": {
+    "base": 0,
+    "scaling": [
+    {
+    "percent": 25,
+    "source": {
+    "kind": "main_stat",
+    "statId": "INT"
+    }
+    }
+    ],
+    "cap": 120
+    },
+    "resource_regeneration": {
+    "base": 0,
+    "scaling": [
+    {
+    "percent": 8,
+    "source": {
+    "kind": "main_stat",
+    "statId": "INT"
+    }
+    },
+    {
+    "percent": 4,
+    "source": {
+    "kind": "main_stat",
+    "statId": "LCK"
+    }
+    }
+    ],
+    "cap": 20
+    },
+    "max_hp": {
+    "base": 0,
+    "perLevel": 4,
+    "scaling": [
+    {
+    "percent": 28,
+    "source": {
+    "kind": "main_stat",
+    "statId": "STR"
+    }
+    },
+    {
+    "percent": 10,
+    "source": {
+    "kind": "equipped_protective_armor"
+    }
+    }
+    ]
+    },
+    "hp_regeneration": {
+    "base": 0,
+    "scaling": [
+    {
+    "percent": 10,
+    "source": {
+    "kind": "main_stat",
+    "statId": "STR"
+    }
+    }
+    ],
+    "cap": 25
+    },
+    "avoid_chance": {
+    "base": 0,
+    "scaling": [
+    {
+    "percent": 16,
+    "source": {
+    "kind": "main_stat",
+    "statId": "DEX"
+    }
+    }
+    ],
+    "cap": 45
+    },
+    "damage_resistance": {
+    "base": 0,
+    "scaling": [
+    {
+    "percent": 12,
+    "source": {
+    "kind": "equipped_protective_armor"
+    }
+    }
+    ],
+    "cap": 60
+    },
+    "critical_hit_chance": {
+    "base": 0,
+    "scaling": [
+    {
+    "percent": 12,
+    "source": {
+    "kind": "main_stat",
+    "statId": "LCK"
+    }
+    },
+    {
+    "percent": 6,
+    "source": {
+    "kind": "main_stat",
+    "statId": "DEX"
+    }
+    }
+    ],
+    "cap": 50
+    },
+    "critical_hit_damage": {
+    "base": 150,
+    "scaling": [
+    {
+    "percent": 16,
+    "source": {
+    "kind": "main_stat",
+    "statId": "LCK"
+    }
+    }
+    ],
+    "cap": 260
+    },
+    "cooldown_reduction": {
+    "base": 0,
+    "scaling": [
+    {
+    "percent": 5,
+    "source": {
+    "kind": "main_stat",
+    "statId": "DEX"
+    }
+    },
+    {
+    "percent": 5,
+    "source": {
+    "kind": "main_stat",
+    "statId": "INT"
+    }
+    }
+    ],
+    "cap": 25
+    }
+    },
+    "rules": {
+    "maxLevel": 30,
+    "xpTable": {
+    "1": 0,
+    "2": 100,
+    "3": 371,
+    "4": 821,
+    "5": 1452,
+    "6": 2268,
+    "7": 3270,
+    "8": 4461,
+    "9": 5841,
+    "10": 7412,
+    "11": 9176,
+    "12": 11133,
+    "13": 13284,
+    "14": 15630,
+    "15": 18172,
+    "16": 20910,
+    "17": 23845,
+    "18": 26979,
+    "19": 30310,
+    "20": 33841,
+    "21": 37571,
+    "22": 41501,
+    "23": 45631,
+    "24": 49963,
+    "25": 54496,
+    "26": 59231,
+    "27": 64168,
+    "28": 69308,
+    "29": 74651,
+    "30": 80197
+    },
+    "combatPresetId": "combat_v1_simple",
+    "statPointsPerLevel": 3,
+    "abilityPointsPerLevel": 1,
+    "abilitySlotsByLevel": {
+    "1": 1,
+    "5": 2,
+    "10": 3,
+    "20": 4
+    },
+    "baseMaxHp": 50,
+    "baseMaxHpPerLevel": 10,
+    "pvp": {
+    "attackerCooldownMs": 600000,
+    "transferCurrencyId": "gold",
+    "transferByLevelGap": [
+    {
+    "minGap": 0,
+    "maxGap": 2,
+    "percentOfLoserBalance": 8
+    },
+    {
+    "minGap": 3,
+    "maxGap": 6,
+    "percentOfLoserBalance": 5
+    },
+    {
+    "minGap": 7,
+    "percentOfLoserBalance": 2
+    }
+    ]
+    },
+    "raidSchedule": {
+    "startHourUtc": 19,
+    "startMinuteUtc": 0,
+    "intervalDays": 1,
+    "anchorDateUtc": "2026-01-01"
+    }
+    },
+    "economy": {
+    "currencies": [
+    {
+    "id": "gold",
+    "name": "Gold",
+    "iconUrl": ""
+    }
+    ]
+    },
+    "resources": [
+    {
+    "id": "rage",
+    "name": "Rage",
+    "description": "A generative combat resource built by aggression.",
+    "colorHex": "#dc2626",
+    "isGenerative": true,
+    "iconUrl": "",
+    "max": 100,
+    "regenPerTurn": 4,
+    "gainOnHit": 18
+    },
+    {
+    "id": "energy",
+    "name": "Energy",
+    "description": "A fast-restoring combat resource for agile techniques.",
+    "colorHex": "#16a34a",
+    "isGenerative": false,
+    "iconUrl": "",
+    "max": 70,
+    "regenPerTurn": 10,
+    "gainOnHit": 0
+    },
+    {
+    "id": "mana",
+    "name": "Mana",
+    "description": "A spellcasting resource spent on arcane abilities.",
+    "colorHex": "#2563eb",
+    "isGenerative": false,
+    "iconUrl": "",
+    "max": 100,
+    "regenPerTurn": 8,
+    "gainOnHit": 0
+    }
+    ],
+    "abilities": [
+    {
+    "id": "warrior_strike",
+    "name": "Warrior Strike",
+    "description": "A reliable martial attack.",
+    "abilityType": "primary",
+    "cooldownTurns": 0,
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 0,
+    "scalingTerms": [
+    {
+    "percent": 100,
+    "source": {
+    "kind": "equipped_weapon_damage"
+    }
+    },
+    {
+    "percent": 45,
+    "source": {
+    "kind": "main_stat",
+    "statId": "STR"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "power_strike",
+    "name": "Power Strike",
+    "description": "A heavy blow fueled by rage.",
+    "abilityType": "regular",
+    "cooldownTurns": 2,
+    "cost": {
+    "cooldownTurns": 2,
+    "resourceCost": {
+    "resourceId": "rage",
+    "amount": 20
+    }
+    },
+    "unlockCost": 1,
+    "requirements": {
+    "minLevel": 2
+    },
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 10,
+    "scalingTerms": [
+    {
+    "percent": 120,
+    "source": {
+    "kind": "equipped_weapon_damage"
+    }
+    },
+    {
+    "percent": 60,
+    "source": {
+    "kind": "main_stat",
+    "statId": "STR"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "shield_bash",
+    "name": "Shield Bash",
+    "description": "A stunning defensive slam.",
+    "abilityType": "regular",
+    "cooldownTurns": 3,
+    "cost": {
+    "cooldownTurns": 3,
+    "resourceCost": {
+    "resourceId": "rage",
+    "amount": 25
+    }
+    },
+    "unlockCost": 1,
+    "requirements": {
+    "minLevel": 4
+    },
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 8,
+    "scalingTerms": [
+    {
+    "percent": 35,
+    "source": {
+    "kind": "main_stat",
+    "statId": "STR"
+    }
+    },
+    {
+    "percent": 40,
+    "source": {
+    "kind": "equipped_protective_armor"
+    }
+    }
+    ]
+    },
+    {
+    "kind": "stun",
+    "target": "enemy",
+    "amount": 1
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "executioner_swing",
+    "name": "Executioner Swing",
+    "description": "A high-impact finishing attack.",
+    "abilityType": "ultimate",
+    "cooldownTurns": 5,
+    "cost": {
+    "cooldownTurns": 5,
+    "resourceCost": {
+    "resourceId": "rage",
+    "amount": 50
+    }
+    },
+    "unlockCost": 3,
+    "requirements": {
+    "minLevel": 10
+    },
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 25,
+    "scalingTerms": [
+    {
+    "percent": 130,
+    "source": {
+    "kind": "equipped_weapon_damage"
+    }
+    },
+    {
+    "percent": 90,
+    "source": {
+    "kind": "main_stat",
+    "statId": "STR"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "rogue_stab",
+    "name": "Rogue Stab",
+    "description": "A fast precision attack.",
+    "abilityType": "primary",
+    "cooldownTurns": 0,
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 0,
+    "scalingTerms": [
+    {
+    "percent": 100,
+    "source": {
+    "kind": "equipped_weapon_damage"
+    }
+    },
+    {
+    "percent": 40,
+    "source": {
+    "kind": "main_stat",
+    "statId": "DEX"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "poison_cut",
+    "name": "Poison Cut",
+    "description": "A venom-laced strike.",
+    "abilityType": "regular",
+    "cooldownTurns": 2,
+    "cost": {
+    "cooldownTurns": 2,
+    "resourceCost": {
+    "resourceId": "energy",
+    "amount": 18
+    }
+    },
+    "unlockCost": 1,
+    "requirements": {
+    "minLevel": 2
+    },
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 6,
+    "scalingTerms": [
+    {
+    "percent": 105,
+    "source": {
+    "kind": "equipped_weapon_damage"
+    }
+    },
+    {
+    "percent": 30,
+    "source": {
+    "kind": "main_stat",
+    "statId": "DEX"
+    }
+    }
+    ]
+    },
+    {
+    "kind": "apply_status",
+    "target": "enemy",
+    "statusEffectId": "poisoned"
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "quickstep",
+    "name": "Quickstep",
+    "description": "A brief evasive burst.",
+    "abilityType": "regular",
+    "cooldownTurns": 3,
+    "cost": {
+    "cooldownTurns": 3,
+    "resourceCost": {
+    "resourceId": "energy",
+    "amount": 15
+    }
+    },
+    "unlockCost": 1,
+    "requirements": {
+    "minLevel": 4
+    },
+    "effects": [
+    {
+    "kind": "avoid",
+    "target": "self",
+    "amount": 20
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "shadow_flurry",
+    "name": "Shadow Flurry",
+    "description": "A lethal chain of rapid strikes.",
+    "abilityType": "ultimate",
+    "cooldownTurns": 5,
+    "cost": {
+    "cooldownTurns": 5,
+    "resourceCost": {
+    "resourceId": "energy",
+    "amount": 45
+    }
+    },
+    "unlockCost": 3,
+    "requirements": {
+    "minLevel": 10
+    },
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 18,
+    "scalingTerms": [
+    {
+    "percent": 80,
+    "source": {
+    "kind": "equipped_weapon_damage"
+    }
+    },
+    {
+    "percent": 70,
+    "source": {
+    "kind": "main_stat",
+    "statId": "DEX"
+    }
+    },
+    {
+    "percent": 25,
+    "source": {
+    "kind": "main_stat",
+    "statId": "LCK"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "mage_bolt",
+    "name": "Arcane Bolt",
+    "description": "A reliable spell attack.",
+    "abilityType": "primary",
+    "cooldownTurns": 0,
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 0,
+    "scalingTerms": [
+    {
+    "percent": 100,
+    "source": {
+    "kind": "equipped_weapon_damage"
+    }
+    },
+    {
+    "percent": 45,
+    "source": {
+    "kind": "main_stat",
+    "statId": "INT"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "fireball",
+    "name": "Fireball",
+    "description": "A burst of flame.",
+    "abilityType": "regular",
+    "cooldownTurns": 2,
+    "cost": {
+    "cooldownTurns": 2,
+    "resourceCost": {
+    "resourceId": "mana",
+    "amount": 20
+    }
+    },
+    "unlockCost": 1,
+    "requirements": {
+    "minLevel": 2
+    },
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 16,
+    "scalingTerms": [
+    {
+    "percent": 55,
+    "source": {
+    "kind": "main_stat",
+    "statId": "INT"
+    }
+    }
+    ]
+    },
+    {
+    "kind": "apply_status",
+    "target": "enemy",
+    "statusEffectId": "burning"
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "ice_barrier",
+    "name": "Ice Barrier",
+    "description": "A protective magical shield.",
+    "abilityType": "regular",
+    "cooldownTurns": 3,
+    "cost": {
+    "cooldownTurns": 3,
+    "resourceCost": {
+    "resourceId": "mana",
+    "amount": 18
+    }
+    },
+    "unlockCost": 1,
+    "requirements": {
+    "minLevel": 4
+    },
+    "effects": [
+    {
+    "kind": "barrier",
+    "target": "self",
+    "amount": 25,
+    "scalingTerms": [
+    {
+    "percent": 25,
+    "source": {
+    "kind": "main_stat",
+    "statId": "INT"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "meteor",
+    "name": "Meteor",
+    "description": "A devastating ultimate spell.",
+    "abilityType": "ultimate",
+    "cooldownTurns": 5,
+    "cost": {
+    "cooldownTurns": 5,
+    "resourceCost": {
+    "resourceId": "mana",
+    "amount": 50
+    }
+    },
+    "unlockCost": 3,
+    "requirements": {
+    "minLevel": 10
+    },
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 40,
+    "scalingTerms": [
+    {
+    "percent": 90,
+    "source": {
+    "kind": "main_stat",
+    "statId": "INT"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "beast_bite",
+    "name": "Beast Bite",
+    "description": "A savage bite.",
+    "abilityType": "regular",
+    "cooldownTurns": 0,
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 5,
+    "scalingTerms": [
+    {
+    "percent": 90,
+    "source": {
+    "kind": "equipped_weapon_damage"
+    }
+    },
+    {
+    "percent": 35,
+    "source": {
+    "kind": "main_stat",
+    "statId": "DEX"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "venom_spit",
+    "name": "Venom Spit",
+    "description": "A toxic ranged spit.",
+    "abilityType": "regular",
+    "cooldownTurns": 2,
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 4,
+    "scalingTerms": [
+    {
+    "percent": 25,
+    "source": {
+    "kind": "main_stat",
+    "statId": "DEX"
+    }
+    },
+    {
+    "percent": 20,
+    "source": {
+    "kind": "main_stat",
+    "statId": "INT"
+    }
+    }
+    ]
+    },
+    {
+    "kind": "apply_status",
+    "target": "enemy",
+    "statusEffectId": "poisoned"
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "dark_blast",
+    "name": "Dark Blast",
+    "description": "A pulse of corrupted power.",
+    "abilityType": "regular",
+    "cooldownTurns": 2,
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 12,
+    "scalingTerms": [
+    {
+    "percent": 50,
+    "source": {
+    "kind": "main_stat",
+    "statId": "INT"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    },
+    {
+    "id": "crushing_blow",
+    "name": "Crushing Blow",
+    "description": "A brutal slam from a heavy foe.",
+    "abilityType": "regular",
+    "cooldownTurns": 2,
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "enemy",
+    "amount": 10,
+    "scalingTerms": [
+    {
+    "percent": 55,
+    "source": {
+    "kind": "main_stat",
+    "statId": "STR"
+    }
+    }
+    ]
+    }
+    ],
+    "iconUrl": ""
+    }
+    ],
+    "statusEffects": [
+    {
+    "id": "burning",
+    "name": "Burning",
+    "description": "Searing flames deal damage each turn.",
+    "iconUrl": "",
+    "category": "debuff",
+    "maxStacks": 3,
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "self",
+    "amount": 6
+    }
+    ]
+    },
+    {
+    "id": "poisoned",
+    "name": "Poisoned",
+    "description": "Venom deals damage over time.",
+    "iconUrl": "",
+    "category": "debuff",
+    "maxStacks": 3,
+    "effects": [
+    {
+    "kind": "damage",
+    "target": "self",
+    "amount": 4
+    }
+    ]
+    }
+    ],
+    "classes": [
+    {
+    "id": "warrior",
+    "name": "Warrior",
+    "description": "A tough frontliner who builds rage and overwhelms foes with raw force.",
+    "iconUrl": "",
+    "primaryAttackId": "warrior_strike",
+    "slots": {
+    "attack_source": {
+    "required": true,
+    "allowEmpty": false,
+    "allowedTagsAny": [
+    "weapon:sword",
+    "weapon:axe"
+    ]
+    },
+    "defense_layer": {
+    "required": true,
+    "allowEmpty": false,
+    "allowedTagsAny": [
+    "armor:heavy"
+    ]
+    }
+    },
+    "resourceId": "rage",
+    "abilities": {
+    "regular": [
+    "power_strike",
+    "shield_bash"
+    ],
+    "ultimate": "executioner_swing"
+    },
+    "defaultAbilityIds": [
+    "power_strike"
+    ],
+    "starting": {
+    "mainStats": {
+    "STR": 6,
+    "DEX": 2,
+    "LCK": 2
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "damage_resistance",
+    "flat": 3
+    }
+    ]
+    }
+    },
+    {
+    "id": "rogue",
+    "name": "Rogue",
+    "description": "A nimble fighter who wins through precision, poison, and evasion.",
+    "iconUrl": "",
+    "primaryAttackId": "rogue_stab",
+    "slots": {
+    "attack_source": {
+    "required": true,
+    "allowEmpty": false,
+    "allowedTagsAny": [
+    "weapon:dagger",
+    "weapon:bow"
+    ]
+    },
+    "defense_layer": {
+    "required": true,
+    "allowEmpty": false,
+    "allowedTagsAny": [
+    "armor:leather"
+    ]
+    }
+    },
+    "resourceId": "energy",
+    "abilities": {
+    "regular": [
+    "poison_cut",
+    "quickstep"
+    ],
+    "ultimate": "shadow_flurry"
+    },
+    "defaultAbilityIds": [
+    "poison_cut"
+    ],
+    "starting": {
+    "mainStats": {
+    "DEX": 6,
+    "LCK": 3,
+    "STR": 1
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "avoid_chance",
+    "flat": 2
+    }
+    ]
+    }
+    },
+    {
+    "id": "mage",
+    "name": "Mage",
+    "description": "A ranged spellcaster with strong burst damage and magical barriers.",
+    "iconUrl": "",
+    "primaryAttackId": "mage_bolt",
+    "slots": {
+    "attack_source": {
+    "required": true,
+    "allowEmpty": false,
+    "allowedTagsAny": [
+    "weapon:staff",
+    "weapon:wand"
+    ]
+    },
+    "defense_layer": {
+    "required": true,
+    "allowEmpty": false,
+    "allowedTagsAny": [
+    "armor:robe"
+    ]
+    }
+    },
+    "resourceId": "mana",
+    "abilities": {
+    "regular": [
+    "fireball",
+    "ice_barrier"
+    ],
+    "ultimate": "meteor"
+    },
+    "defaultAbilityIds": [
+    "fireball"
+    ],
+    "starting": {
+    "mainStats": {
+    "INT": 6,
+    "LCK": 2,
+    "DEX": 2
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "max_resource_amount",
+    "flat": 10
+    }
+    ]
+    }
+    }
+    ],
+    "creatures": [
+    {
+    "id": "sewer_rat",
+    "name": "Sewer Rat",
+    "role": "quest",
+    "level": 1,
+    "hp": 58,
+    "ap": 7,
+    "arm": 1,
+    "mainStats": {
+    "DEX": 3
+    },
+    "weaponDamage": 4,
+    "protectiveArmor": 1,
+    "iconUrl": "",
+    "tags": [
+    "beast"
+    ],
+    "abilityIds": [
+    "beast_bite"
+    ]
+    },
+    {
+    "id": "field_wolf",
+    "name": "Field Wolf",
+    "role": "quest",
+    "level": 3,
+    "hp": 72,
+    "ap": 9,
+    "arm": 2,
+    "mainStats": {
+    "DEX": 5
+    },
+    "weaponDamage": 6,
+    "protectiveArmor": 2,
+    "iconUrl": "",
+    "tags": [
+    "beast"
+    ],
+    "abilityIds": [
+    "beast_bite"
+    ]
+    },
+    {
+    "id": "cave_spider",
+    "name": "Cave Spider",
+    "role": "quest",
+    "level": 5,
+    "hp": 84,
+    "ap": 11,
+    "arm": 2,
+    "mainStats": {
+    "DEX": 6,
+    "INT": 2
+    },
+    "weaponDamage": 7,
+    "protectiveArmor": 2,
+    "iconUrl": "",
+    "tags": [
+    "beast",
+    "poison"
+    ],
+    "abilityIds": [
+    "beast_bite",
+    "venom_spit"
+    ]
+    },
+    {
+    "id": "bandit_thug",
+    "name": "Bandit Thug",
+    "role": "quest",
+    "level": 7,
+    "hp": 98,
+    "ap": 13,
+    "arm": 3,
+    "mainStats": {
+    "STR": 6,
+    "DEX": 4
+    },
+    "weaponDamage": 9,
+    "protectiveArmor": 3,
+    "iconUrl": "",
+    "tags": [
+    "humanoid"
+    ],
+    "abilityIds": [
+    "crushing_blow"
+    ]
+    },
+    {
+    "id": "skeleton_guard",
+    "name": "Skeleton Guard",
+    "role": "quest",
+    "level": 10,
+    "hp": 118,
+    "ap": 15,
+    "arm": 4,
+    "mainStats": {
+    "STR": 7,
+    "DEX": 3
+    },
+    "weaponDamage": 11,
+    "protectiveArmor": 4,
+    "iconUrl": "",
+    "tags": [
+    "undead"
+    ],
+    "abilityIds": [
+    "crushing_blow"
+    ]
+    },
+    {
+    "id": "swamp_serpent",
+    "name": "Swamp Serpent",
+    "role": "quest",
+    "level": 13,
+    "hp": 136,
+    "ap": 18,
+    "arm": 5,
+    "mainStats": {
+    "DEX": 8,
+    "INT": 3
+    },
+    "weaponDamage": 13,
+    "protectiveArmor": 5,
+    "iconUrl": "",
+    "tags": [
+    "beast",
+    "poison"
+    ],
+    "abilityIds": [
+    "venom_spit",
+    "beast_bite"
+    ]
+    },
+    {
+    "id": "orc_brute",
+    "name": "Orc Brute",
+    "role": "quest",
+    "level": 16,
+    "hp": 160,
+    "ap": 21,
+    "arm": 6,
+    "mainStats": {
+    "STR": 10
+    },
+    "weaponDamage": 15,
+    "protectiveArmor": 6,
+    "iconUrl": "",
+    "tags": [
+    "orc"
+    ],
+    "abilityIds": [
+    "crushing_blow"
+    ]
+    },
+    {
+    "id": "cult_adept",
+    "name": "Cult Adept",
+    "role": "quest",
+    "level": 19,
+    "hp": 150,
+    "ap": 22,
+    "arm": 5,
+    "mainStats": {
+    "INT": 10,
+    "LCK": 4
+    },
+    "weaponDamage": 14,
+    "protectiveArmor": 5,
+    "iconUrl": "",
+    "tags": [
+    "humanoid",
+    "caster"
+    ],
+    "abilityIds": [
+    "dark_blast"
+    ]
+    },
+    {
+    "id": "shadow_hound",
+    "name": "Shadow Hound",
+    "role": "quest",
+    "level": 22,
+    "hp": 176,
+    "ap": 25,
+    "arm": 6,
+    "mainStats": {
+    "DEX": 12,
+    "LCK": 5
+    },
+    "weaponDamage": 17,
+    "protectiveArmor": 6,
+    "iconUrl": "",
+    "tags": [
+    "beast",
+    "shadow"
+    ],
+    "abilityIds": [
+    "beast_bite"
+    ]
+    },
+    {
+    "id": "fire_drake",
+    "name": "Fire Drake",
+    "role": "quest",
+    "level": 25,
+    "hp": 220,
+    "ap": 29,
+    "arm": 8,
+    "mainStats": {
+    "STR": 12,
+    "INT": 8
+    },
+    "weaponDamage": 20,
+    "protectiveArmor": 8,
+    "iconUrl": "",
+    "tags": [
+    "dragon"
+    ],
+    "abilityIds": [
+    "dark_blast",
+    "crushing_blow"
+    ]
+    },
+    {
+    "id": "bandit_captain",
+    "name": "Bandit Captain",
+    "role": "boss",
+    "level": 12,
+    "hp": 260,
+    "ap": 24,
+    "arm": 7,
+    "mainStats": {
+    "STR": 10,
+    "DEX": 6
+    },
+    "weaponDamage": 16,
+    "protectiveArmor": 7,
+    "iconUrl": "",
+    "tags": [
+    "humanoid",
+    "boss"
+    ],
+    "abilityIds": [
+    "crushing_blow",
+    "beast_bite"
+    ]
+    },
+    {
+    "id": "iron_ogre",
+    "name": "Iron Ogre",
+    "role": "boss",
+    "level": 20,
+    "hp": 380,
+    "ap": 30,
+    "arm": 10,
+    "mainStats": {
+    "STR": 14
+    },
+    "weaponDamage": 22,
+    "protectiveArmor": 10,
+    "iconUrl": "",
+    "tags": [
+    "ogre",
+    "boss"
+    ],
+    "abilityIds": [
+    "crushing_blow"
+    ]
+    },
+    {
+    "id": "ancient_dragon",
+    "name": "Ancient Dragon",
+    "role": "boss",
+    "level": 30,
+    "hp": 620,
+    "ap": 40,
+    "arm": 14,
+    "mainStats": {
+    "STR": 18,
+    "INT": 12
+    },
+    "weaponDamage": 28,
+    "protectiveArmor": 14,
+    "iconUrl": "",
+    "tags": [
+    "dragon",
+    "boss"
+    ],
+    "abilityIds": [
+    "dark_blast",
+    "crushing_blow"
+    ]
+    }
+    ],
+    "items": [
+    {
+    "id": "rusty_sword",
+    "name": "Rusty Sword",
+    "rarity": 1,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:sword"
+    ],
+    "mainStatBonuses": {
+    "STR": 1
+    },
+    "derivedStatModifiers": [],
+    "weaponDamage": 6,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 45
+    },
+    "sellValue": 14
+    },
+    {
+    "id": "iron_sword",
+    "name": "Iron Sword",
+    "rarity": 2,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:sword"
+    ],
+    "mainStatBonuses": {
+    "STR": 2
+    },
+    "derivedStatModifiers": [],
+    "weaponDamage": 10,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 130
+    },
+    "sellValue": 42
+    },
+    {
+    "id": "steel_axe",
+    "name": "Steel Axe",
+    "rarity": 3,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:axe"
+    ],
+    "mainStatBonuses": {
+    "STR": 4
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "critical_hit_chance",
+    "flat": 1
+    }
+    ],
+    "weaponDamage": 15,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 340
+    },
+    "sellValue": 110
+    },
+    {
+    "id": "knight_blade",
+    "name": "Knight Blade",
+    "rarity": 4,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:sword"
+    ],
+    "mainStatBonuses": {
+    "STR": 6
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "damage_resistance",
+    "flat": 2
+    }
+    ],
+    "weaponDamage": 22,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 900
+    },
+    "sellValue": 300
+    },
+    {
+    "id": "kingbreaker_axe",
+    "name": "Kingbreaker Axe",
+    "rarity": 5,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:axe"
+    ],
+    "mainStatBonuses": {
+    "STR": 8,
+    "LCK": 3
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "critical_hit_damage",
+    "flat": 12
+    }
+    ],
+    "weaponDamage": 30,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 1900
+    },
+    "sellValue": 650
+    },
+    {
+    "id": "chipped_dagger",
+    "name": "Chipped Dagger",
+    "rarity": 1,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:dagger"
+    ],
+    "mainStatBonuses": {
+    "DEX": 1
+    },
+    "derivedStatModifiers": [],
+    "weaponDamage": 5,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 40
+    },
+    "sellValue": 13
+    },
+    {
+    "id": "balanced_dagger",
+    "name": "Balanced Dagger",
+    "rarity": 2,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:dagger"
+    ],
+    "mainStatBonuses": {
+    "DEX": 3
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "critical_hit_chance",
+    "flat": 1
+    }
+    ],
+    "weaponDamage": 9,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 125
+    },
+    "sellValue": 40
+    },
+    {
+    "id": "hunter_bow",
+    "name": "Hunter Bow",
+    "rarity": 3,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:bow"
+    ],
+    "mainStatBonuses": {
+    "DEX": 5,
+    "LCK": 2
+    },
+    "derivedStatModifiers": [],
+    "weaponDamage": 14,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 320
+    },
+    "sellValue": 104
+    },
+    {
+    "id": "shadow_dagger",
+    "name": "Shadow Dagger",
+    "rarity": 4,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:dagger"
+    ],
+    "mainStatBonuses": {
+    "DEX": 7,
+    "LCK": 3
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "avoid_chance",
+    "flat": 3
+    }
+    ],
+    "weaponDamage": 20,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 860
+    },
+    "sellValue": 285
+    },
+    {
+    "id": "windrunner_bow",
+    "name": "Windrunner Bow",
+    "rarity": 5,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:bow"
+    ],
+    "mainStatBonuses": {
+    "DEX": 9,
+    "LCK": 4
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "critical_hit_chance",
+    "flat": 3
+    },
+    {
+    "statId": "avoid_chance",
+    "flat": 4
+    }
+    ],
+    "weaponDamage": 28,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 1800
+    },
+    "sellValue": 610
+    },
+    {
+    "id": "apprentice_staff",
+    "name": "Apprentice Staff",
+    "rarity": 1,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:staff"
+    ],
+    "mainStatBonuses": {
+    "INT": 1
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "max_resource_amount",
+    "flat": 4
+    }
+    ],
+    "weaponDamage": 6,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 45
+    },
+    "sellValue": 14
+    },
+    {
+    "id": "oak_wand",
+    "name": "Oak Wand",
+    "rarity": 2,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:wand"
+    ],
+    "mainStatBonuses": {
+    "INT": 3
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "resource_regeneration",
+    "flat": 1
+    }
+    ],
+    "weaponDamage": 10,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 135
+    },
+    "sellValue": 44
+    },
+    {
+    "id": "runed_staff",
+    "name": "Runed Staff",
+    "rarity": 3,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:staff"
+    ],
+    "mainStatBonuses": {
+    "INT": 5
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "critical_hit_chance",
+    "flat": 1
+    }
+    ],
+    "weaponDamage": 15,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 350
+    },
+    "sellValue": 114
+    },
+    {
+    "id": "ember_rod",
+    "name": "Ember Rod",
+    "rarity": 4,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:wand"
+    ],
+    "mainStatBonuses": {
+    "INT": 7
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "resource_regeneration",
+    "flat": 2
+    }
+    ],
+    "weaponDamage": 21,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 920
+    },
+    "sellValue": 305
+    },
+    {
+    "id": "archmage_staff",
+    "name": "Archmage Staff",
+    "rarity": 5,
+    "slot": "attack_source",
+    "tags": [
+    "weapon:staff"
+    ],
+    "mainStatBonuses": {
+    "INT": 9,
+    "LCK": 3
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "max_resource_amount",
+    "flat": 12
+    },
+    {
+    "statId": "critical_hit_damage",
+    "flat": 10
+    }
+    ],
+    "weaponDamage": 29,
+    "protectiveArmor": 0,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 1950
+    },
+    "sellValue": 670
+    },
+    {
+    "id": "padded_mail",
+    "name": "Padded Mail",
+    "rarity": 1,
+    "slot": "defense_layer",
+    "tags": [
+    "armor:heavy"
+    ],
+    "mainStatBonuses": {
+    "STR": 1
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "damage_resistance",
+    "flat": 1
+    }
+    ],
+    "weaponDamage": 0,
+    "protectiveArmor": 4,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 60
+    },
+    "sellValue": 20
+    },
+    {
+    "id": "scale_mail",
+    "name": "Scale Mail",
+    "rarity": 2,
+    "slot": "defense_layer",
+    "tags": [
+    "armor:heavy"
+    ],
+    "mainStatBonuses": {
+    "STR": 2
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "damage_resistance",
+    "flat": 2
+    }
+    ],
+    "weaponDamage": 0,
+    "protectiveArmor": 7,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 185
+    },
+    "sellValue": 60
+    },
+    {
+    "id": "bastion_plate",
+    "name": "Bastion Plate",
+    "rarity": 4,
+    "slot": "defense_layer",
+    "tags": [
+    "armor:heavy"
+    ],
+    "mainStatBonuses": {
+    "STR": 4
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "damage_resistance",
+    "flat": 4
+    }
+    ],
+    "weaponDamage": 0,
+    "protectiveArmor": 12,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 980
+    },
+    "sellValue": 330
+    },
+    {
+    "id": "leather_jerkin",
+    "name": "Leather Jerkin",
+    "rarity": 1,
+    "slot": "defense_layer",
+    "tags": [
+    "armor:leather"
+    ],
+    "mainStatBonuses": {
+    "DEX": 1
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "avoid_chance",
+    "flat": 1
+    }
+    ],
+    "weaponDamage": 0,
+    "protectiveArmor": 3,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 55
+    },
+    "sellValue": 18
+    },
+    {
+    "id": "shadow_leathers",
+    "name": "Shadow Leathers",
+    "rarity": 3,
+    "slot": "defense_layer",
+    "tags": [
+    "armor:leather"
+    ],
+    "mainStatBonuses": {
+    "DEX": 3,
+    "LCK": 2
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "avoid_chance",
+    "flat": 3
+    }
+    ],
+    "weaponDamage": 0,
+    "protectiveArmor": 7,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 360
+    },
+    "sellValue": 118
+    },
+    {
+    "id": "ranger_cloak",
+    "name": "Ranger Cloak",
+    "rarity": 5,
+    "slot": "defense_layer",
+    "tags": [
+    "armor:leather"
+    ],
+    "mainStatBonuses": {
+    "DEX": 5,
+    "LCK": 3
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "avoid_chance",
+    "flat": 5
+    },
+    {
+    "statId": "critical_hit_chance",
+    "flat": 2
+    }
+    ],
+    "weaponDamage": 0,
+    "protectiveArmor": 11,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 1520
+    },
+    "sellValue": 520
+    },
+    {
+    "id": "novice_robe",
+    "name": "Novice Robe",
+    "rarity": 1,
+    "slot": "defense_layer",
+    "tags": [
+    "armor:robe"
+    ],
+    "mainStatBonuses": {
+    "INT": 1
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "max_resource_amount",
+    "flat": 5
+    }
+    ],
+    "weaponDamage": 0,
+    "protectiveArmor": 2,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 50
+    },
+    "sellValue": 16
+    },
+    {
+    "id": "sage_wraps",
+    "name": "Sage Wraps",
+    "rarity": 2,
+    "slot": "defense_layer",
+    "tags": [
+    "armor:robe"
+    ],
+    "mainStatBonuses": {
+    "INT": 2
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "max_resource_amount",
+    "flat": 8
+    },
+    {
+    "statId": "resource_regeneration",
+    "flat": 1
+    }
+    ],
+    "weaponDamage": 0,
+    "protectiveArmor": 5,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 170
+    },
+    "sellValue": 55
+    },
+    {
+    "id": "mystic_robe",
+    "name": "Mystic Robe",
+    "rarity": 4,
+    "slot": "defense_layer",
+    "tags": [
+    "armor:robe"
+    ],
+    "mainStatBonuses": {
+    "INT": 4
+    },
+    "derivedStatModifiers": [
+    {
+    "statId": "max_resource_amount",
+    "flat": 15
+    },
+    {
+    "statId": "resource_regeneration",
+    "flat": 2
+    }
+    ],
+    "weaponDamage": 0,
+    "protectiveArmor": 9,
+    "stats": {},
+    "iconUrl": "",
+    "animationUrl": "",
+    "projectileUrl": "",
+    "impactUrl": "",
+    "price": {
+    "currencyId": "gold",
+    "amount": 800
+    },
+    "sellValue": 270
+    }
+    ],
+    "quests": [
+    {
+    "id": "q01_rat_hunt_1",
+    "name": "Rat Hunt 1",
+    "creatureId": "sewer_rat",
+    "durationSec": 45,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 58,
+    "ap": 7,
+    "arm": 1,
+    "weaponDamage": 4,
+    "protectiveArmor": 1
+    },
+    "rewards": {
+    "xp": 5,
+    "currency": {
+    "gold": 9
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q02_rat_hunt_2",
+    "name": "Rat Hunt 2",
+    "creatureId": "sewer_rat",
+    "durationSec": 55,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 66,
+    "ap": 9,
+    "arm": 2,
+    "weaponDamage": 5,
+    "protectiveArmor": 2
+    },
+    "rewards": {
+    "xp": 16,
+    "currency": {
+    "gold": 18
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q03_rat_hunt_3",
+    "name": "Rat Hunt 3",
+    "creatureId": "sewer_rat",
+    "durationSec": 65,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 74,
+    "ap": 11,
+    "arm": 2,
+    "weaponDamage": 6,
+    "protectiveArmor": 2
+    },
+    "rewards": {
+    "xp": 27,
+    "currency": {
+    "gold": 27
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q04_rat_hunt_4",
+    "name": "Rat Hunt 4",
+    "creatureId": "sewer_rat",
+    "durationSec": 75,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 82,
+    "ap": 13,
+    "arm": 3,
+    "weaponDamage": 7,
+    "protectiveArmor": 2
+    },
+    "rewards": {
+    "xp": 38,
+    "currency": {
+    "gold": 36
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q05_rat_hunt_5",
+    "name": "Rat Hunt 5",
+    "creatureId": "sewer_rat",
+    "durationSec": 85,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 90,
+    "ap": 15,
+    "arm": 3,
+    "weaponDamage": 8,
+    "protectiveArmor": 2
+    },
+    "rewards": {
+    "xp": 49,
+    "currency": {
+    "gold": 45
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q06_wolf_culling_1",
+    "name": "Wolf Culling 1",
+    "creatureId": "field_wolf",
+    "durationSec": 55,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 72,
+    "ap": 9,
+    "arm": 2,
+    "weaponDamage": 6,
+    "protectiveArmor": 2
+    },
+    "rewards": {
+    "xp": 31,
+    "currency": {
+    "gold": 16
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q07_wolf_culling_2",
+    "name": "Wolf Culling 2",
+    "creatureId": "field_wolf",
+    "durationSec": 65,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 81,
+    "ap": 11,
+    "arm": 3,
+    "weaponDamage": 7,
+    "protectiveArmor": 3
+    },
+    "rewards": {
+    "xp": 41,
+    "currency": {
+    "gold": 27
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q08_wolf_culling_3",
+    "name": "Wolf Culling 3",
+    "creatureId": "field_wolf",
+    "durationSec": 75,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 90,
+    "ap": 13,
+    "arm": 3,
+    "weaponDamage": 8,
+    "protectiveArmor": 3
+    },
+    "rewards": {
+    "xp": 52,
+    "currency": {
+    "gold": 38
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q09_wolf_culling_4",
+    "name": "Wolf Culling 4",
+    "creatureId": "field_wolf",
+    "durationSec": 85,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 99,
+    "ap": 15,
+    "arm": 4,
+    "weaponDamage": 9,
+    "protectiveArmor": 3
+    },
+    "rewards": {
+    "xp": 64,
+    "currency": {
+    "gold": 49
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q10_wolf_culling_5",
+    "name": "Wolf Culling 5",
+    "creatureId": "field_wolf",
+    "durationSec": 95,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 108,
+    "ap": 17,
+    "arm": 4,
+    "weaponDamage": 10,
+    "protectiveArmor": 3
+    },
+    "rewards": {
+    "xp": 76,
+    "currency": {
+    "gold": 60
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q11_spider_clearance_1",
+    "name": "Spider Clearance 1",
+    "creatureId": "cave_spider",
+    "durationSec": 65,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 84,
+    "ap": 11,
+    "arm": 2,
+    "weaponDamage": 7,
+    "protectiveArmor": 2
+    },
+    "rewards": {
+    "xp": 41,
+    "currency": {
+    "gold": 23
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q12_spider_clearance_2",
+    "name": "Spider Clearance 2",
+    "creatureId": "cave_spider",
+    "durationSec": 75,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 94,
+    "ap": 13,
+    "arm": 3,
+    "weaponDamage": 8,
+    "protectiveArmor": 3
+    },
+    "rewards": {
+    "xp": 52,
+    "currency": {
+    "gold": 36
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q13_spider_clearance_3",
+    "name": "Spider Clearance 3",
+    "creatureId": "cave_spider",
+    "durationSec": 85,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 104,
+    "ap": 15,
+    "arm": 3,
+    "weaponDamage": 9,
+    "protectiveArmor": 3
+    },
+    "rewards": {
+    "xp": 63,
+    "currency": {
+    "gold": 49
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q14_spider_clearance_4",
+    "name": "Spider Clearance 4",
+    "creatureId": "cave_spider",
+    "durationSec": 95,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 114,
+    "ap": 17,
+    "arm": 4,
+    "weaponDamage": 10,
+    "protectiveArmor": 3
+    },
+    "rewards": {
+    "xp": 76,
+    "currency": {
+    "gold": 62
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q15_spider_clearance_5",
+    "name": "Spider Clearance 5",
+    "creatureId": "cave_spider",
+    "durationSec": 105,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 124,
+    "ap": 19,
+    "arm": 4,
+    "weaponDamage": 11,
+    "protectiveArmor": 3
+    },
+    "rewards": {
+    "xp": 89,
+    "currency": {
+    "gold": 75
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q16_roadside_trouble_1",
+    "name": "Roadside Trouble 1",
+    "creatureId": "bandit_thug",
+    "durationSec": 75,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 98,
+    "ap": 13,
+    "arm": 3,
+    "weaponDamage": 9,
+    "protectiveArmor": 3
+    },
+    "rewards": {
+    "xp": 52,
+    "currency": {
+    "gold": 30
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q17_roadside_trouble_2",
+    "name": "Roadside Trouble 2",
+    "creatureId": "bandit_thug",
+    "durationSec": 85,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 109,
+    "ap": 15,
+    "arm": 4,
+    "weaponDamage": 10,
+    "protectiveArmor": 4
+    },
+    "rewards": {
+    "xp": 65,
+    "currency": {
+    "gold": 45
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q18_roadside_trouble_3",
+    "name": "Roadside Trouble 3",
+    "creatureId": "bandit_thug",
+    "durationSec": 95,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 120,
+    "ap": 17,
+    "arm": 4,
+    "weaponDamage": 11,
+    "protectiveArmor": 4
+    },
+    "rewards": {
+    "xp": 80,
+    "currency": {
+    "gold": 60
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q19_roadside_trouble_4",
+    "name": "Roadside Trouble 4",
+    "creatureId": "bandit_thug",
+    "durationSec": 105,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 131,
+    "ap": 19,
+    "arm": 5,
+    "weaponDamage": 12,
+    "protectiveArmor": 4
+    },
+    "rewards": {
+    "xp": 95,
+    "currency": {
+    "gold": 75
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q20_roadside_trouble_5",
+    "name": "Roadside Trouble 5",
+    "creatureId": "bandit_thug",
+    "durationSec": 115,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 142,
+    "ap": 21,
+    "arm": 5,
+    "weaponDamage": 13,
+    "protectiveArmor": 4
+    },
+    "rewards": {
+    "xp": 111,
+    "currency": {
+    "gold": 90
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q21_grave_watch_1",
+    "name": "Grave Watch 1",
+    "creatureId": "skeleton_guard",
+    "durationSec": 85,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 118,
+    "ap": 15,
+    "arm": 4,
+    "weaponDamage": 11,
+    "protectiveArmor": 4
+    },
+    "rewards": {
+    "xp": 88,
+    "currency": {
+    "gold": 38
+    },
+    "lootTableId": "loot_early"
+    }
+    },
+    {
+    "id": "q22_grave_watch_2",
+    "name": "Grave Watch 2",
+    "creatureId": "skeleton_guard",
+    "durationSec": 95,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 131,
+    "ap": 18,
+    "arm": 5,
+    "weaponDamage": 12,
+    "protectiveArmor": 5
+    },
+    "rewards": {
+    "xp": 98,
+    "currency": {
+    "gold": 56
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q23_grave_watch_3",
+    "name": "Grave Watch 3",
+    "creatureId": "skeleton_guard",
+    "durationSec": 105,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 144,
+    "ap": 21,
+    "arm": 5,
+    "weaponDamage": 13,
+    "protectiveArmor": 5
+    },
+    "rewards": {
+    "xp": 108,
+    "currency": {
+    "gold": 74
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q24_grave_watch_4",
+    "name": "Grave Watch 4",
+    "creatureId": "skeleton_guard",
+    "durationSec": 115,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 157,
+    "ap": 24,
+    "arm": 6,
+    "weaponDamage": 14,
+    "protectiveArmor": 5
+    },
+    "rewards": {
+    "xp": 119,
+    "currency": {
+    "gold": 92
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q25_grave_watch_5",
+    "name": "Grave Watch 5",
+    "creatureId": "skeleton_guard",
+    "durationSec": 125,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 170,
+    "ap": 27,
+    "arm": 6,
+    "weaponDamage": 15,
+    "protectiveArmor": 5
+    },
+    "rewards": {
+    "xp": 130,
+    "currency": {
+    "gold": 110
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q26_swamp_patrol_1",
+    "name": "Swamp Patrol 1",
+    "creatureId": "swamp_serpent",
+    "durationSec": 100,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 136,
+    "ap": 18,
+    "arm": 5,
+    "weaponDamage": 13,
+    "protectiveArmor": 5
+    },
+    "rewards": {
+    "xp": 119,
+    "currency": {
+    "gold": 46
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q27_swamp_patrol_2",
+    "name": "Swamp Patrol 2",
+    "creatureId": "swamp_serpent",
+    "durationSec": 110,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 150,
+    "ap": 21,
+    "arm": 6,
+    "weaponDamage": 14,
+    "protectiveArmor": 6
+    },
+    "rewards": {
+    "xp": 132,
+    "currency": {
+    "gold": 67
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q28_swamp_patrol_3",
+    "name": "Swamp Patrol 3",
+    "creatureId": "swamp_serpent",
+    "durationSec": 120,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 164,
+    "ap": 24,
+    "arm": 6,
+    "weaponDamage": 15,
+    "protectiveArmor": 6
+    },
+    "rewards": {
+    "xp": 145,
+    "currency": {
+    "gold": 88
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q29_swamp_patrol_4",
+    "name": "Swamp Patrol 4",
+    "creatureId": "swamp_serpent",
+    "durationSec": 130,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 178,
+    "ap": 27,
+    "arm": 7,
+    "weaponDamage": 16,
+    "protectiveArmor": 6
+    },
+    "rewards": {
+    "xp": 160,
+    "currency": {
+    "gold": 109
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q30_swamp_patrol_5",
+    "name": "Swamp Patrol 5",
+    "creatureId": "swamp_serpent",
+    "durationSec": 140,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 192,
+    "ap": 30,
+    "arm": 7,
+    "weaponDamage": 17,
+    "protectiveArmor": 6
+    },
+    "rewards": {
+    "xp": 175,
+    "currency": {
+    "gold": 130
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q31_orc_breakout_1",
+    "name": "Orc Breakout 1",
+    "creatureId": "orc_brute",
+    "durationSec": 115,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 160,
+    "ap": 21,
+    "arm": 6,
+    "weaponDamage": 15,
+    "protectiveArmor": 6
+    },
+    "rewards": {
+    "xp": 154,
+    "currency": {
+    "gold": 54
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q32_orc_breakout_2",
+    "name": "Orc Breakout 2",
+    "creatureId": "orc_brute",
+    "durationSec": 125,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 176,
+    "ap": 24,
+    "arm": 7,
+    "weaponDamage": 16,
+    "protectiveArmor": 7
+    },
+    "rewards": {
+    "xp": 169,
+    "currency": {
+    "gold": 78
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q33_orc_breakout_3",
+    "name": "Orc Breakout 3",
+    "creatureId": "orc_brute",
+    "durationSec": 135,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 192,
+    "ap": 27,
+    "arm": 7,
+    "weaponDamage": 17,
+    "protectiveArmor": 7
+    },
+    "rewards": {
+    "xp": 184,
+    "currency": {
+    "gold": 102
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q34_orc_breakout_4",
+    "name": "Orc Breakout 4",
+    "creatureId": "orc_brute",
+    "durationSec": 145,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 208,
+    "ap": 30,
+    "arm": 8,
+    "weaponDamage": 18,
+    "protectiveArmor": 7
+    },
+    "rewards": {
+    "xp": 201,
+    "currency": {
+    "gold": 126
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q35_orc_breakout_5",
+    "name": "Orc Breakout 5",
+    "creatureId": "orc_brute",
+    "durationSec": 155,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 224,
+    "ap": 33,
+    "arm": 8,
+    "weaponDamage": 19,
+    "protectiveArmor": 7
+    },
+    "rewards": {
+    "xp": 218,
+    "currency": {
+    "gold": 150
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q36_cult_purge_1",
+    "name": "Cult Purge 1",
+    "creatureId": "cult_adept",
+    "durationSec": 130,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 150,
+    "ap": 22,
+    "arm": 5,
+    "weaponDamage": 14,
+    "protectiveArmor": 5
+    },
+    "rewards": {
+    "xp": 192,
+    "currency": {
+    "gold": 62
+    },
+    "lootTableId": "loot_mid"
+    }
+    },
+    {
+    "id": "q37_cult_purge_2",
+    "name": "Cult Purge 2",
+    "creatureId": "cult_adept",
+    "durationSec": 140,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 167,
+    "ap": 25,
+    "arm": 6,
+    "weaponDamage": 15,
+    "protectiveArmor": 6
+    },
+    "rewards": {
+    "xp": 209,
+    "currency": {
+    "gold": 89
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q38_cult_purge_3",
+    "name": "Cult Purge 3",
+    "creatureId": "cult_adept",
+    "durationSec": 150,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 184,
+    "ap": 28,
+    "arm": 6,
+    "weaponDamage": 16,
+    "protectiveArmor": 6
+    },
+    "rewards": {
+    "xp": 228,
+    "currency": {
+    "gold": 116
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q39_cult_purge_4",
+    "name": "Cult Purge 4",
+    "creatureId": "cult_adept",
+    "durationSec": 160,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 201,
+    "ap": 31,
+    "arm": 7,
+    "weaponDamage": 17,
+    "protectiveArmor": 6
+    },
+    "rewards": {
+    "xp": 247,
+    "currency": {
+    "gold": 143
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q40_cult_purge_5",
+    "name": "Cult Purge 5",
+    "creatureId": "cult_adept",
+    "durationSec": 170,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 218,
+    "ap": 34,
+    "arm": 7,
+    "weaponDamage": 18,
+    "protectiveArmor": 6
+    },
+    "rewards": {
+    "xp": 266,
+    "currency": {
+    "gold": 170
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q41_shadow_chase_1",
+    "name": "Shadow Chase 1",
+    "creatureId": "shadow_hound",
+    "durationSec": 145,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 176,
+    "ap": 25,
+    "arm": 6,
+    "weaponDamage": 17,
+    "protectiveArmor": 6
+    },
+    "rewards": {
+    "xp": 239,
+    "currency": {
+    "gold": 70
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q42_shadow_chase_2",
+    "name": "Shadow Chase 2",
+    "creatureId": "shadow_hound",
+    "durationSec": 155,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 195,
+    "ap": 28,
+    "arm": 7,
+    "weaponDamage": 18,
+    "protectiveArmor": 7
+    },
+    "rewards": {
+    "xp": 258,
+    "currency": {
+    "gold": 100
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q43_shadow_chase_3",
+    "name": "Shadow Chase 3",
+    "creatureId": "shadow_hound",
+    "durationSec": 165,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 214,
+    "ap": 31,
+    "arm": 7,
+    "weaponDamage": 19,
+    "protectiveArmor": 7
+    },
+    "rewards": {
+    "xp": 278,
+    "currency": {
+    "gold": 130
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q44_shadow_chase_4",
+    "name": "Shadow Chase 4",
+    "creatureId": "shadow_hound",
+    "durationSec": 175,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 233,
+    "ap": 34,
+    "arm": 8,
+    "weaponDamage": 20,
+    "protectiveArmor": 7
+    },
+    "rewards": {
+    "xp": 298,
+    "currency": {
+    "gold": 160
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q45_shadow_chase_5",
+    "name": "Shadow Chase 5",
+    "creatureId": "shadow_hound",
+    "durationSec": 180,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 252,
+    "ap": 37,
+    "arm": 8,
+    "weaponDamage": 21,
+    "protectiveArmor": 7
+    },
+    "rewards": {
+    "xp": 318,
+    "currency": {
+    "gold": 190
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q46_drake_assault_1",
+    "name": "Drake Assault 1",
+    "creatureId": "fire_drake",
+    "durationSec": 160,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 220,
+    "ap": 29,
+    "arm": 8,
+    "weaponDamage": 20,
+    "protectiveArmor": 8
+    },
+    "rewards": {
+    "xp": 308,
+    "currency": {
+    "gold": 78
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q47_drake_assault_2",
+    "name": "Drake Assault 2",
+    "creatureId": "fire_drake",
+    "durationSec": 170,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 240,
+    "ap": 32,
+    "arm": 9,
+    "weaponDamage": 21,
+    "protectiveArmor": 9
+    },
+    "rewards": {
+    "xp": 328,
+    "currency": {
+    "gold": 111
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q48_drake_assault_3",
+    "name": "Drake Assault 3",
+    "creatureId": "fire_drake",
+    "durationSec": 180,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 260,
+    "ap": 35,
+    "arm": 9,
+    "weaponDamage": 22,
+    "protectiveArmor": 9
+    },
+    "rewards": {
+    "xp": 348,
+    "currency": {
+    "gold": 144
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q49_drake_assault_4",
+    "name": "Drake Assault 4",
+    "creatureId": "fire_drake",
+    "durationSec": 180,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 280,
+    "ap": 38,
+    "arm": 10,
+    "weaponDamage": 23,
+    "protectiveArmor": 9
+    },
+    "rewards": {
+    "xp": 368,
+    "currency": {
+    "gold": 177
+    },
+    "lootTableId": "loot_late"
+    }
+    },
+    {
+    "id": "q50_drake_assault_5",
+    "name": "Drake Assault 5",
+    "creatureId": "fire_drake",
+    "durationSec": 180,
+    "iconUrl": "",
+    "creatureOverrides": {
+    "hp": 300,
+    "ap": 41,
+    "arm": 10,
+    "weaponDamage": 24,
+    "protectiveArmor": 9
+    },
+    "rewards": {
+    "xp": 388,
+    "currency": {
+    "gold": 210
+    },
+    "lootTableId": "loot_late"
+    }
+    }
+    ],
+    "dungeons": [
+    {
+    "id": "dungeon_bandit_hideout",
+    "name": "Bandit Hideout",
+    "description": "A one-time challenge against the Bandit Captain.",
+    "imageUrl": "",
+    "requiredLevel": 8,
+    "bossCreatureId": "bandit_captain"
+    },
+    {
+    "id": "dungeon_ogre_foundry",
+    "name": "Ogre Foundry",
+    "description": "Defeat the Iron Ogre deep inside the ruined foundry.",
+    "imageUrl": "",
+    "requiredLevel": 18,
+    "bossCreatureId": "iron_ogre"
+    },
+    {
+    "id": "dungeon_dragon_peak",
+    "name": "Dragon Peak",
+    "description": "Face the Ancient Dragon atop the scorched summit.",
+    "imageUrl": "",
+    "requiredLevel": 28,
+    "bossCreatureId": "ancient_dragon"
+    }
+    ],
+    "raids": [
+    {
+    "id": "raid_dragon_siege",
+    "name": "Dragon Siege",
+    "description": "A guild raid against the Ancient Dragon.",
+    "imageUrl": "",
+    "requiredLevel": 25,
+    "bossCreatureId": "ancient_dragon",
+    "requiredCurrencyCost": {
+    "currencyId": "gold",
+    "amount": 5000
+    }
+    }
+    ],
+    "merchant": {
+    "listings": [
+    {
+    "itemId": "rusty_sword",
+    "currencyId": "gold",
+    "price": 45
+    },
+    {
+    "itemId": "iron_sword",
+    "currencyId": "gold",
+    "price": 130
+    },
+    {
+    "itemId": "balanced_dagger",
+    "currencyId": "gold",
+    "price": 125
+    },
+    {
+    "itemId": "hunter_bow",
+    "currencyId": "gold",
+    "price": 320
+    },
+    {
+    "itemId": "oak_wand",
+    "currencyId": "gold",
+    "price": 135
+    },
+    {
+    "itemId": "runed_staff",
+    "currencyId": "gold",
+    "price": 350
+    },
+    {
+    "itemId": "padded_mail",
+    "currencyId": "gold",
+    "price": 60
+    },
+    {
+    "itemId": "scale_mail",
+    "currencyId": "gold",
+    "price": 185
+    },
+    {
+    "itemId": "leather_jerkin",
+    "currencyId": "gold",
+    "price": 55
+    },
+    {
+    "itemId": "shadow_leathers",
+    "currencyId": "gold",
+    "price": 360
+    },
+    {
+    "itemId": "novice_robe",
+    "currencyId": "gold",
+    "price": 50
+    },
+    {
+    "itemId": "sage_wraps",
+    "currencyId": "gold",
+    "price": 170
+    },
+    {
+    "itemId": "knight_blade",
+    "currencyId": "gold",
+    "price": 900
+    },
+    {
+    "itemId": "shadow_dagger",
+    "currencyId": "gold",
+    "price": 860
+    },
+    {
+    "itemId": "ember_rod",
+    "currencyId": "gold",
+    "price": 920
+    }
+    ]
+    },
+    "lootTables": [
+    {
+    "id": "loot_early",
+    "entries": [
+    {
+    "itemId": "rusty_sword",
+    "weight": 10,
+    "conditions": {
+    "classId": "warrior"
+    }
+    },
+    {
+    "itemId": "chipped_dagger",
+    "weight": 10,
+    "conditions": {
+    "classId": "rogue"
+    }
+    },
+    {
+    "itemId": "apprentice_staff",
+    "weight": 10,
+    "conditions": {
+    "classId": "mage"
+    }
+    },
+    {
+    "itemId": "padded_mail",
+    "weight": 8,
+    "conditions": {
+    "classId": "warrior"
+    }
+    },
+    {
+    "itemId": "leather_jerkin",
+    "weight": 8,
+    "conditions": {
+    "classId": "rogue"
+    }
+    },
+    {
+    "itemId": "novice_robe",
+    "weight": 8,
+    "conditions": {
+    "classId": "mage"
+    }
+    }
+    ]
+    },
+    {
+    "id": "loot_mid",
+    "entries": [
+    {
+    "itemId": "iron_sword",
+    "weight": 9,
+    "conditions": {
+    "classId": "warrior"
+    }
+    },
+    {
+    "itemId": "steel_axe",
+    "weight": 4,
+    "conditions": {
+    "classId": "warrior"
+    }
+    },
+    {
+    "itemId": "balanced_dagger",
+    "weight": 9,
+    "conditions": {
+    "classId": "rogue"
+    }
+    },
+    {
+    "itemId": "hunter_bow",
+    "weight": 4,
+    "conditions": {
+    "classId": "rogue"
+    }
+    },
+    {
+    "itemId": "oak_wand",
+    "weight": 9,
+    "conditions": {
+    "classId": "mage"
+    }
+    },
+    {
+    "itemId": "runed_staff",
+    "weight": 4,
+    "conditions": {
+    "classId": "mage"
+    }
+    },
+    {
+    "itemId": "scale_mail",
+    "weight": 7,
+    "conditions": {
+    "classId": "warrior"
+    }
+    },
+    {
+    "itemId": "shadow_leathers",
+    "weight": 7,
+    "conditions": {
+    "classId": "rogue"
+    }
+    },
+    {
+    "itemId": "sage_wraps",
+    "weight": 7,
+    "conditions": {
+    "classId": "mage"
+    }
+    }
+    ]
+    },
+    {
+    "id": "loot_late",
+    "entries": [
+    {
+    "itemId": "knight_blade",
+    "weight": 6,
+    "conditions": {
+    "classId": "warrior"
+    }
+    },
+    {
+    "itemId": "kingbreaker_axe",
+    "weight": 2,
+    "conditions": {
+    "classId": "warrior"
+    }
+    },
+    {
+    "itemId": "shadow_dagger",
+    "weight": 6,
+    "conditions": {
+    "classId": "rogue"
+    }
+    },
+    {
+    "itemId": "windrunner_bow",
+    "weight": 2,
+    "conditions": {
+    "classId": "rogue"
+    }
+    },
+    {
+    "itemId": "ember_rod",
+    "weight": 6,
+    "conditions": {
+    "classId": "mage"
+    }
+    },
+    {
+    "itemId": "archmage_staff",
+    "weight": 2,
+    "conditions": {
+    "classId": "mage"
+    }
+    },
+    {
+    "itemId": "bastion_plate",
+    "weight": 5,
+    "conditions": {
+    "classId": "warrior"
+    }
+    },
+    {
+    "itemId": "ranger_cloak",
+    "weight": 5,
+    "conditions": {
+    "classId": "rogue"
+    }
+    },
+    {
+    "itemId": "mystic_robe",
+    "weight": 5,
+    "conditions": {
+    "classId": "mage"
+    }
+    }
+    ]
+    }
+    ]
+    }

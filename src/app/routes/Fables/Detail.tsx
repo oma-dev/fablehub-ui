@@ -8,9 +8,11 @@ import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import { getFable } from '@features/fables/api'
 import type { Fable } from '@features/fables/api'
+import { useAuth } from '../../../contexts/AuthContext'
 
 const FableDetail = () => {
   const { fableId } = useParams<{ fableId: string }>()
+  const { user } = useAuth()
   const [fable, setFable] = useState<Fable | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -80,6 +82,11 @@ const FableDetail = () => {
     )
   }
 
+  const hasIdleRealm = Boolean(fable.idleRealms?.length || fable.idleRpg)
+  const firstRealmId = fable.idleRealms?.[0]?.id ?? null
+  const isCreator = Boolean(user?.id && fable.creatorId && user.id === fable.creatorId)
+  const canEditPack = Boolean(isCreator && firstRealmId)
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: 4 }}>
       <Container maxWidth="md">
@@ -109,7 +116,7 @@ const FableDetail = () => {
             PvP, groups. Friends playtestable.
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            {(!fable.idleRealms?.length && !fable.idleRpg) && (
+            {isCreator && !hasIdleRealm && (
               <Button
                 variant="contained"
                 color="secondary"
@@ -124,10 +131,20 @@ const FableDetail = () => {
               color="primary"
               component={Link}
               to={`/fables/${fableId}/idle-rpg`}
-              disabled={!fable.idleRealms?.length && !fable.idleRpg}
+              disabled={!hasIdleRealm}
             >
-              {fable.idleRealms?.length || fable.idleRpg ? 'Play Idle RPG' : 'Play (create a realm first)'}
+              {hasIdleRealm ? 'Play Idle RPG' : 'Play (create a realm first)'}
             </Button>
+            {canEditPack && (
+              <Button
+                variant="outlined"
+                color="secondary"
+                component={Link}
+                to={`/fables/${fableId}/idle-rpg/${firstRealmId}/edit`}
+              >
+                Edit Pack
+              </Button>
+            )}
           </Box>
         </Paper>
 
