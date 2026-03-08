@@ -585,10 +585,11 @@ export default function IdleRpgEdit() {
     setLoading(true)
     Promise.all([
       getFable(fableId).catch(() => null),
-      getIdleRpgRealm(fableId, realmId),
+      getIdleRpgRealm(fableId, realmId, { includePack: true }),
     ]).then(([fable, realm]) => {
       if (fable) setFableName(fable.name)
       const pack = realm.pack
+      if (!pack) throw new Error('Realm pack is missing from response')
       setVisibility((realm.visibility as 'private' | 'public') ?? 'private')
       setJoinCode(realm.joinCode ?? '')
       setPlayerCap(realm.playerCap ?? 10)

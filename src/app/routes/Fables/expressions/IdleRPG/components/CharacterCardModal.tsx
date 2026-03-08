@@ -4,13 +4,14 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi'
-import type { PlayStateResponse } from '@features/idle-rpg/api'
+import type { CharacterProfileResponse, IdleRpgPackV1 } from '@features/idle-rpg/api'
 import CharacterPanel from './CharacterPanel'
 
 interface Props {
   open: boolean
   onClose: () => void
-  profile: PlayStateResponse | null
+  profile: CharacterProfileResponse | null
+  pack: IdleRpgPackV1 | null
   loading?: boolean
   error?: string | null
   fableId: string
@@ -27,6 +28,7 @@ export default function CharacterCardModal({
   open,
   onClose,
   profile,
+  pack,
   loading = false,
   error = null,
   fableId,
@@ -71,13 +73,13 @@ export default function CharacterCardModal({
         {error && (
           <Typography color="error">{error}</Typography>
         )}
-        {profile && !loading && (
+        {profile && pack && !loading && (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <CharacterPanel
               fableId={fableId}
               realmId={realmId}
               character={profile.character}
-              pack={profile.pack}
+              pack={pack}
               onCharacterUpdate={() => {}}
               readOnly
             />

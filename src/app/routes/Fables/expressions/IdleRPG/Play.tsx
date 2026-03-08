@@ -45,6 +45,7 @@ import {
   getRealmRoster,
 } from '@features/idle-rpg/api'
 import type {
+  CharacterProfileResponse,
   CharacterState,
   IdleRpgPackV1,
   MailboxMail,
@@ -325,11 +326,11 @@ export default function FableIdleRPG() {
   const [error, setError] = useState<string | null>(null)
   const [realm, setRealm] = useState<IdleRpgRealm | null>(null)
   const [character, setCharacter] = useState<CharacterState | null>(null)
-  const [playState, setPlayState] = useState<{ character: CharacterState; pack: IdleRpgPackV1 } | null>(null)
+  const [playState, setPlayState] = useState<PlayStateResponse | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('tavern')
   const [pendingPvpFight, setPendingPvpFight] = useState<{
     targetCharacterId: string
-    targetProfile: PlayStateResponse
+    targetProfile: CharacterProfileResponse
   } | null>(null)
   const [mailboxUnreadCount, setMailboxUnreadCount] = useState(0)
   const [activeMailAlert, setActiveMailAlert] = useState<MailboxMail | null>(null)
@@ -344,7 +345,7 @@ export default function FableIdleRPG() {
   const [creating, setCreating] = useState(false)
   const [takenHeroClassIds, setTakenHeroClassIds] = useState<Set<string>>(new Set())
 
-  const pack: IdleRpgPackV1 | null = playState?.pack ?? realm?.pack ?? null
+  const pack: IdleRpgPackV1 | null = playState?.pack ?? null
   const displayCharacter = playState?.character ?? character
 
   useEffect(() => {
@@ -371,7 +372,7 @@ export default function FableIdleRPG() {
           setCharClassIndex(0)
           setShowCreateChar(true)
           const heroClassIds = new Set(
-            (selectedRealm.pack?.classes ?? []).filter(c => c.isHeroClass).map(c => c.id),
+            (selectedRealm.classCatalog ?? []).filter(c => c.isHeroClass).map(c => c.id),
           )
           if (heroClassIds.size > 0) {
             try {
@@ -398,14 +399,13 @@ export default function FableIdleRPG() {
     let cancelled = false
     getPlayState(fableId, realm.id, character.id)
       .then((res) => {
-        if (!cancelled) setPlayState({ character: res.character, pack: res.pack })
+        if (!cancelled) setPlayState(res)
       })
       .catch(() => { /* keep existing character/pack */ })
     return () => { cancelled = true }
   }, [fableId, realm?.id, character?.id])
 
-  const createPack = realm?.pack ?? pack
-  const classes = createPack?.classes ?? []
+  const classes = realm?.classCatalog ?? []
   const selectedClass = classes[charClassIndex]
   const selectedClassId = selectedClass?.id ?? ''
   const handleCreateCharacter = async () => {
@@ -428,7 +428,7 @@ export default function FableIdleRPG() {
     setPlayState((prev) => (prev ? { ...prev, character: c } : null))
   }
 
-  const handleRequestPvpFight = (targetCharacterId: string, targetProfile: PlayStateResponse) => {
+  const handleRequestPvpFight = (targetCharacterId: string, targetProfile: CharacterProfileResponse) => {
     setPendingPvpFight({ targetCharacterId, targetProfile })
     setActiveTab('pvp')
   }

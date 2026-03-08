@@ -27,10 +27,10 @@ import {
   pvpFight,
 } from '@features/idle-rpg/api'
 import type {
+  CharacterProfileResponse,
   CharacterState,
   CombatResult,
   IdleRpgPackV1,
-  PlayStateResponse,
   PvpHistoryEntry,
   RealmRosterEntry,
 } from '@features/idle-rpg/api'
@@ -45,7 +45,7 @@ interface Props {
   realmId: string
   character: CharacterState
   pack: IdleRpgPackV1
-  pendingPvpFight?: { targetCharacterId: string; targetProfile: PlayStateResponse } | null
+  pendingPvpFight?: { targetCharacterId: string; targetProfile: CharacterProfileResponse } | null
   onClearPendingPvpFight?: () => void
 }
 
@@ -82,14 +82,14 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
   const [history, setHistory] = useState<PvpHistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null)
-  const [profile, setProfile] = useState<PlayStateResponse | null>(null)
+  const [profile, setProfile] = useState<CharacterProfileResponse | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [fighting, setFighting] = useState(false)
   const [combatResult, setCombatResult] = useState<{
     combat: CombatResult
     victory: boolean
-    targetProfile: PlayStateResponse
+    targetProfile: CharacterProfileResponse
   } | null>(null)
   const [pvpSettlementDialog, setPvpSettlementDialog] = useState<{ title: string; message: string } | null>(null)
   const [cooldownNowMs, setCooldownNowMs] = useState(() => Date.now())
@@ -537,6 +537,7 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
             open={!!selectedCharacterId}
             onClose={handleCloseCard}
             profile={profile}
+            pack={pack}
             loading={profileLoading}
             error={profileError}
             fableId={fableId}

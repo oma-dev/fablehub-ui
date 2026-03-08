@@ -40,6 +40,14 @@ export interface CreateFableBody {
 }
 
 /** One Idle RPG realm (mode instance) for a fable. */
+export interface IdleRpgClassCatalogEntry {
+  id: string
+  name: string
+  description?: string
+  iconUrl?: string
+  isHeroClass?: boolean
+}
+
 export interface IdleRpgRealm {
   id: string
   fableId: string
@@ -47,7 +55,9 @@ export interface IdleRpgRealm {
   visibility: string
   joinCode: string | null
   playerCap: number
-  pack: IdleRpgPackV1
+  classCatalog: IdleRpgClassCatalogEntry[]
+  packVersion: string
+  pack?: IdleRpgPackV1
   createdAt: string
   updatedAt: string
 }
@@ -967,13 +977,26 @@ export function createIdleRpgRealm(fableId: string, body: CreateIdleRpgBody) {
 }
 
 /** GET /fables/:fableId/idle-rpg — list realms for a fable. */
-export function getIdleRpgRealms(fableId: string) {
-  return get<IdleRpgRealm[]>(`/fables/${fableId}/idle-rpg`)
+export function getIdleRpgRealms(
+  fableId: string,
+  options?: { includePack?: boolean },
+) {
+  const query = new URLSearchParams()
+  if (options?.includePack) query.set('includePack', 'true')
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  return get<IdleRpgRealm[]>(`/fables/${fableId}/idle-rpg${suffix}`)
 }
 
 /** GET /fables/:fableId/idle-rpg/:realmId — get one realm. */
-export function getIdleRpgRealm(fableId: string, realmId: string) {
-  return get<IdleRpgRealm>(`/fables/${fableId}/idle-rpg/${realmId}`)
+export function getIdleRpgRealm(
+  fableId: string,
+  realmId: string,
+  options?: { includePack?: boolean },
+) {
+  const query = new URLSearchParams()
+  if (options?.includePack) query.set('includePack', 'true')
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  return get<IdleRpgRealm>(`/fables/${fableId}/idle-rpg/${realmId}${suffix}`)
 }
 
 /** POST /fables/:fableId/idle-rpg/:realmId — update an Idle RPG realm (auth required). */
@@ -1011,7 +1034,7 @@ export function getRealmCharacterPlayState(
   viewerCharacterId: string,
   targetCharacterId: string,
 ) {
-  return get<PlayStateResponse>(
+  return get<CharacterProfileResponse>(
     `${charBase(fableId, realmId)}/${targetCharacterId}/realm-profile?viewerCharacterId=${encodeURIComponent(viewerCharacterId)}`,
   )
 }
@@ -1023,6 +1046,13 @@ export function createCharacter(fableId: string, realmId: string, body: { name: 
 export interface PlayStateResponse {
   character: CharacterState
   pack: IdleRpgPackV1
+  packVersion: string
+  className?: string
+}
+
+export interface CharacterProfileResponse {
+  character: CharacterState
+  packVersion: string
   className?: string
 }
 
@@ -1105,7 +1135,7 @@ export function getGuildMemberPlayState(
   viewerCharacterId: string,
   targetCharacterId: string,
 ) {
-  return get<PlayStateResponse>(
+  return get<CharacterProfileResponse>(
     `${charBase(fableId, realmId)}/${targetCharacterId}/guild-profile?viewerCharacterId=${encodeURIComponent(viewerCharacterId)}`,
   )
 }

@@ -15,7 +15,7 @@ import AddIcon from '@mui/icons-material/Add'
 import GroupsIcon from '@mui/icons-material/Groups'
 import MilitaryTechIcon from '@mui/icons-material/MilitaryTech'
 import { getGroups, getGroup, getGuildChampion, createGroup, joinGroup, getPlayState, getGuildMemberPlayState } from '@features/idle-rpg/api'
-import type { CharacterState, GuildChampion, IdleRpgGroup, IdleRpgPackV1, PlayStateResponse } from '@features/idle-rpg/api'
+import type { CharacterProfileResponse, CharacterState, GuildChampion, IdleRpgGroup, IdleRpgPackV1 } from '@features/idle-rpg/api'
 import GuildChat from '../components/GuildChat'
 import GuildRoster from '../components/GuildRoster'
 import GuildManagement from '../components/GuildManagement'
@@ -40,7 +40,7 @@ interface Props {
   character: CharacterState
   pack: IdleRpgPackV1
   onCharacterUpdate: (c: CharacterState) => void
-  onRequestPvpFight?: (targetCharacterId: string, targetProfile: PlayStateResponse) => void
+  onRequestPvpFight?: (targetCharacterId: string, targetProfile: CharacterProfileResponse) => void
 }
 
 export default function GuildTab({ fableId, realmId, character, pack, onCharacterUpdate, onRequestPvpFight }: Props) {
@@ -56,7 +56,7 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
   const [createError, setCreateError] = useState<string | null>(null)
   const [champion, setChampion] = useState<GuildChampion | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
-  const [selectedMemberProfile, setSelectedMemberProfile] = useState<PlayStateResponse | null>(null)
+  const [selectedMemberProfile, setSelectedMemberProfile] = useState<CharacterProfileResponse | null>(null)
   const [selectedMemberLoading, setSelectedMemberLoading] = useState(false)
   const [selectedMemberError, setSelectedMemberError] = useState<string | null>(null)
   const [cooldownNowMs, setCooldownNowMs] = useState(() => Date.now())
@@ -334,6 +334,7 @@ export default function GuildTab({ fableId, realmId, character, pack, onCharacte
               open={!!selectedMemberId}
               onClose={handleCloseSelectedMember}
               profile={selectedMemberProfile}
+              pack={pack}
               loading={selectedMemberLoading}
               error={selectedMemberError}
               fableId={fableId}
