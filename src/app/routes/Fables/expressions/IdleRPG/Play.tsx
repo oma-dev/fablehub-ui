@@ -491,7 +491,6 @@ export default function FableIdleRPG() {
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', p: 4 }}>
         <Typography color="text.secondary">Missing fable.</Typography>
-        <Button component={Link} to="/fables" variant="contained">Back to Fables</Button>
       </Box>
     )
   }
@@ -508,13 +507,22 @@ export default function FableIdleRPG() {
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', p: 4 }}>
         <Typography color="error" gutterBottom>{error}</Typography>
-        <Button component={Link} to={`/fables/${fableId}`} variant="contained">Back to Fable</Button>
       </Box>
     )
   }
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', minHeight: 0, margin: '0 auto', bgcolor: 'background.default' }}>
+    <Box sx={{
+      
+      display: 'flex', height: '100vh', minHeight: 0, margin: '0 auto', bgcolor: 'background.default',
+      userSelect: 'none',
+        WebkitUserSelect: 'none',
+        '& *': {
+          WebkitUserDrag: 'none',
+          WebkitTapHighlightColor: 'transparent',
+        }
+      
+      }}>
       {/* Character creation dialog */}
       <Dialog open={showCreateChar} disableEscapeKeyDown maxWidth="sm" fullWidth PaperProps={{ sx: { minHeight: 420 } }}>
         <DialogTitle sx={{ textAlign: 'center' }}>Create your character</DialogTitle>
@@ -731,11 +739,6 @@ export default function FableIdleRPG() {
           )})}
         </List>
 
-        <Box sx={{ p: 1.5, borderTop: '1px solid rgba(168,85,247,0.1)' }}>
-          <Button component={Link} to={`/fables/${fableId}`} size="small" fullWidth variant="outlined" color="primary">
-            Back to Fable
-          </Button>
-        </Box>
       </Box>
 
       {/* Right content */}
