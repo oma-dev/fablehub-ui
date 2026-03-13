@@ -32,18 +32,42 @@ import ImpactFrame from '../../routes/Fables/expressions/IdleRPG/components/vfx/
 import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from '../../routes/Fables/expressions/IdleRPG/components/vfx/Projectile'
 import StatusParticleEffect from '../../routes/Fables/expressions/IdleRPG/components/vfx/StatusParticleEffect'
 import WeaponFrame from '../../routes/Fables/expressions/IdleRPG/components/vfx/WeaponFrame'
+import AbilityAnimationEditor, {
+  type AbilityAnimFrames as SharedAbilityAnimFrames,
+  emptyAnimFrames as createEmptyAnimFrames,
+  hydrateAnimFrames as hydrateSharedAnimFrames,
+  buildAnimationFrames as buildSharedAnimationFrames,
+} from '../../routes/Fables/expressions/IdleRPG/components/AbilityAnimationEditor'
+import EffectsEditor, {
+  type EffectFormRow,
+  createEmptyEffectRow,
+  hydrateEffectRows,
+  buildEffectPayload,
+} from '../../routes/Fables/expressions/IdleRPG/components/EffectsEditor'
 import StatusAnimationEditor, {
   type StatusParticleForm,
   createEmptyStatusParticle,
 } from '../../routes/Fables/expressions/IdleRPG/components/StatusAnimationEditor'
 import SoundUploadButton from '../../routes/Fables/expressions/IdleRPG/components/SoundUploadButton'
 import { getFables, getIdleRpgRealm, getIdleRpgRealms, updateIdleRpgRealm } from '@features/idle-rpg/api'
-import type { Ability, Fable, IdleRpgRealm } from '@features/idle-rpg/api'
+import type { Ability, DerivedStatId, DerivedStatModifier, Fable, IdleRpgPackV1, IdleRpgRealm } from '@features/idle-rpg/api'
 import charBackground from '../../../assets/backgrounds/charBackground.png'
 
 const styleIds = [...STYLE_IDS]
 const ALL_IMPACT_STYLES: ImpactStyle[] = ['slash', 'punch', 'flail', 'arrow', 'bolt', 'generic']
 const REACTIVE_TRIGGER_TIMINGS = ['on_incoming_cast', 'on_hit_taken'] as const
+const DEFAULT_MAIN_STAT_IDS = ['STR', 'DEX', 'INT', 'LCK']
+const DERIVED_STATS: Array<{ id: DerivedStatId; label: string }> = [
+  { id: 'max_resource_amount', label: 'Maximum Resource Amount' },
+  { id: 'resource_regeneration', label: 'Resource Regeneration / Turn' },
+  { id: 'max_hp', label: 'Max HP Bonus' },
+  { id: 'hp_regeneration', label: 'HP Regeneration / Turn' },
+  { id: 'avoid_chance', label: 'Avoid Chance (%)' },
+  { id: 'damage_resistance', label: 'Damage Resistance (%)' },
+  { id: 'critical_hit_chance', label: 'Critical Hit Chance (%)' },
+  { id: 'critical_hit_damage', label: 'Critical Hit Damage (%)' },
+  { id: 'cooldown_reduction', label: 'Cooldown Reduction (%)' },
+]
 
 // --- Mirror CombatReplay layout constants for accurate previewing ---
 const SCALE = 1.2
@@ -68,6 +92,42 @@ const DEFAULT_CARD_MOTION_TRANSITION: CardMotionTransition = {
   type: 'tween',
   duration: CARD_RETURN_DURATION_MS / 1000,
   ease: [0.42, 0.0, 0.58, 1.0],
+}
+
+type DerivedModifierForm = {
+  statId: DerivedStatId
+  flat: string
+  percent: string
+}
+
+function emptyDerivedModifier(): DerivedModifierForm {
+  return { statId: 'max_hp', flat: '', percent: '' }
+}
+
+function hydrateDerivedModifiers(mods: DerivedStatModifier[] | undefined): DerivedModifierForm[] {
+  return (mods ?? []).map((mod) => ({
+    statId: mod.statId,
+    flat: mod.flat != null ? String(mod.flat) : '',
+    percent: mod.percent != null ? String(mod.percent) : '',
+  }))
+}
+
+function buildDerivedModifiers(rows: DerivedModifierForm[]): DerivedStatModifier[] {
+  return rows
+    .map((row) => {
+      const out: DerivedStatModifier = { statId: row.statId }
+      if (row.flat.trim() !== '' && !Number.isNaN(Number(row.flat))) out.flat = Number(row.flat)
+      if (row.percent.trim() !== '' && !Number.isNaN(Number(row.percent))) out.percent = Number(row.percent)
+      return out
+    })
+    .filter((row) => row.flat != null || row.percent != null)
+}
+
+function parseTags(input: string): string[] {
+  return input
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean)
 }
 
 function resolveCardMotionEase(acceleration = 0, startSpeed = 0): CardMotionEase {
@@ -797,6 +857,16 @@ function BlockFrameEditor({ frame, idx, onChange, onRemove, resolveUrl }: {
   )
 }
 
+void AddIcon
+void defaultWeaponFrame
+void defaultProjectileFrame
+void defaultImpactFrame
+void defaultBlockFrame
+void WeaponFrameEditor
+void ProjectileFrameEditor
+void ImpactFrameEditor
+void BlockFrameEditor
+
 export default function AnimationTest() {
   const [attackerStyle, setAttackerStyle] = useState(styleIds[0])
   const [defenderStyle, setDefenderStyle] = useState(styleIds[0])
@@ -804,24 +874,17 @@ export default function AnimationTest() {
   const [weaponAnimationUrl, setWeaponAnimationUrl] = useState('https://bg3.wiki/w/images/0/0f/Quarterstaff_Unfaded.png')
   const [weaponProjectileUrl, setWeaponProjectileUrl] = useState('')
   const [weaponImpactUrl, setWeaponImpactUrl] = useState('')
+  const [defenseUrl, setDefenseUrl] = useState('')
+  const [defenseAnimationUrl, setDefenseAnimationUrl] = useState('')
+  const [defenseProjectileUrl, setDefenseProjectileUrl] = useState('')
+  const [defenseImpactUrl, setDefenseImpactUrl] = useState('')
   const [playerPortraitUrl, setPlayerPortraitUrl] = useState('')
   const [creaturePortraitUrl, setCreaturePortraitUrl] = useState('')
   const [trajectoryOverride, setTrajectoryOverride] = useState<'auto' | 'straight' | 'arc'>('auto')
-  const [attackerCardAnimation, setAttackerCardAnimation] = useState<'none' | 'cast' | 'lunge'>('cast')
-  const [targetCardAnimation, setTargetCardAnimation] = useState<'none' | 'hit'>('hit')
-  const [lungeGapPx, setLungeGapPx] = useState(0)
-  const [lungeDelayMs, setLungeDelayMs] = useState(0)
-  const [lungeStartSpeed, setLungeStartSpeed] = useState(0)
-  const [accelerationLunge, setAccelerationLunge] = useState(0)
-  const [accelerationReturn, setAccelerationReturn] = useState(0)
+  const [animFrames, setAnimFrames] = useState<SharedAbilityAnimFrames>(createEmptyAnimFrames())
   const [playing, setPlaying] = useState(false)
   const [logLines, setLogLines] = useState<string[]>([])
 
-  // Array-based frame forms
-  const [weaponFrames, setWeaponFrames] = useState<WeaponFrameForm[]>([defaultWeaponFrame()])
-  const [projectileFrames, setProjectileFrames] = useState<ProjectileFrameForm[]>([defaultProjectileFrame()])
-  const [impactFrames, setImpactFrames] = useState<ImpactFrameForm[]>([defaultImpactFrame()])
-  const [blockFrames, setBlockFrames] = useState<BlockFrameForm[]>([])
   const [simulateBlock, setSimulateBlock] = useState(false)
   const [statusParticles, setStatusParticles] = useState<StatusParticleForm[]>([createEmptyStatusParticle()])
   const [statusHolderSide, setStatusHolderSide] = useState<'player' | 'creature'>('creature')
@@ -870,10 +933,9 @@ export default function AnimationTest() {
   const [resourceCostAmount, setResourceCostAmount] = useState(0)
   const [unlockCost, setUnlockCost] = useState(1)
   const [minLevel, setMinLevel] = useState(1)
-  const [effectKind, setEffectKind] = useState<'damage' | 'heal' | 'apply_status' | 'execute' | 'lifesteal' | 'summon'>('damage')
-  const [effectAmount, setEffectAmount] = useState(0)
-  const [effectPercentage, setEffectPercentage] = useState(0)
-  const [effectLifestealPct, setEffectLifestealPct] = useState(0)
+  const [effects, setEffects] = useState<EffectFormRow[]>([createEmptyEffectRow()])
+  const [requiredItemTagsAny, setRequiredItemTagsAny] = useState('')
+  const [derivedStatModifiers, setDerivedStatModifiers] = useState<DerivedModifierForm[]>([])
   const [reactiveTriggerTiming, setReactiveTriggerTiming] = useState<(typeof REACTIVE_TRIGGER_TIMINGS)[number]>('on_incoming_cast')
   const [reactivePriority, setReactivePriority] = useState(0)
   const [reactiveMaxTriggersPerTurn, setReactiveMaxTriggersPerTurn] = useState(0)
@@ -882,102 +944,35 @@ export default function AnimationTest() {
   const [selectedFableId, setSelectedFableId] = useState('')
   const [realms, setRealms] = useState<IdleRpgRealm[]>([])
   const [selectedRealmId, setSelectedRealmId] = useState('')
+  const [selectedRealmPack, setSelectedRealmPack] = useState<IdleRpgPackV1 | null>(null)
   const [publishingAbility, setPublishingAbility] = useState(false)
   const [publishMessage, setPublishMessage] = useState<string>('')
 
-  const EFFECT_KINDS = ['damage', 'heal', 'apply_status', 'execute', 'lifesteal', 'summon'] as const
   const ABILITY_TYPES: typeof abilityType[] = ['primary', 'regular', 'passive', 'ultimate', 'reactive']
+  const attackerCardAnimation = animFrames.card.attackerAnimation
+  const targetCardAnimation = animFrames.card.targetAnimation
+  const lungeGapPx = Number(animFrames.card.lungeGapPx) || 0
+  const lungeDelayMs = Number(animFrames.card.lungeDelayMs) || 0
+  const lungeStartSpeed = Number(animFrames.card.lungeStartSpeed) || 0
+  const accelerationLunge = Number(animFrames.card.accelerationLunge) || 0
+  const accelerationReturn = Number(animFrames.card.accelerationReturn) || 0
+  const weaponFrames = animFrames.weapon
+  const projectileFrames = animFrames.projectile
+  const impactFrames = animFrames.impact
+  const blockFrames = animFrames.block
+  const realmMainStatIds = (selectedRealmPack?.mainStats ?? [])
+    .map((row) => row.id?.trim())
+    .filter((row): row is string => !!row)
+  const mainStatIds = realmMainStatIds.length > 0 ? realmMainStatIds : DEFAULT_MAIN_STAT_IDS
+  const fallbackMainStatId = mainStatIds[0] ?? 'STR'
 
   const buildAbilityJson = useCallback(() => {
-    const buildFrames = () => {
-      const w = weaponFrames.filter(f => f.enabled).map(f => ({
-        ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
-        ...(f.url.trim() ? { url: f.url.trim() } : {}),
-        ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
-        ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
-        ...(f.fadeInMs !== 200 ? { fadeInMs: f.fadeInMs } : {}),
-        ...(f.lifetimeMs > 0 ? { lifetimeMs: f.lifetimeMs } : {}),
-        startSizePx: f.startSizePx, endSizePx: f.endSizePx,
-        ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
-        ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
-        ...(f.endOffsetX !== f.offsetX ? { endOffsetX: f.endOffsetX } : {}),
-        ...(f.endOffsetY !== f.offsetY ? { endOffsetY: f.endOffsetY } : {}),
-        ...(f.acceleration !== 0 ? { acceleration: f.acceleration } : {}),
-        ...(f.rotationStart !== 0 ? { rotationStart: f.rotationStart } : {}),
-        ...(f.rotationEnd !== f.rotationStart ? { rotationEnd: f.rotationEnd } : {}),
-      }))
-      const p = projectileFrames.filter(f => f.enabled).map(f => ({
-        ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
-        ...(f.url.trim() ? { url: f.url.trim() } : {}),
-        ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
-        ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
-        trajectory: f.trajectory,
-        ...(f.lifetimeMs > 0 ? { lifetimeMs: f.lifetimeMs } : {}),
-        startSizePx: f.startSizePx, endSizePx: f.endSizePx,
-        ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
-        ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
-        ...(f.acceleration !== 0 ? { acceleration: f.acceleration } : {}),
-        ...(f.rotationStart !== 0 ? { rotationStart: f.rotationStart } : {}),
-        ...(f.rotationEnd !== f.rotationStart ? { rotationEnd: f.rotationEnd } : {}),
-      }))
-      const im = impactFrames.filter(f => f.enabled).map(f => ({
-        ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
-        ...(f.url.trim() ? { url: f.url.trim() } : {}),
-        ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
-        ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
-        ...(f.showMs > 0 ? { showMs: f.showMs } : {}),
-        ...(f.vanishMs > 0 ? { vanishMs: f.vanishMs } : {}),
-        ...(f.lifetimeMs > 0 ? { lifetimeMs: f.lifetimeMs } : {}),
-        startSizePx: f.startSizePx, endSizePx: f.endSizePx,
-        ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
-        ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
-        ...(f.endOffsetX !== f.offsetX ? { endOffsetX: f.endOffsetX } : {}),
-        ...(f.endOffsetY !== f.offsetY ? { endOffsetY: f.endOffsetY } : {}),
-        ...(f.acceleration !== 0 ? { acceleration: f.acceleration } : {}),
-        ...(f.rotationStart !== 0 ? { rotationStart: f.rotationStart } : {}),
-        ...(f.rotationEnd !== f.rotationStart ? { rotationEnd: f.rotationEnd } : {}),
-      }))
-      const b = blockFrames.filter(f => f.enabled).map(f => ({
-        ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
-        ...(f.url.trim() ? { url: f.url.trim() } : {}),
-        ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
-        ...(f.delayMs > 0 ? { delayMs: f.delayMs } : {}),
-        ...(f.startBeforeImpactMs > 0 ? { startBeforeImpactMs: f.startBeforeImpactMs } : {}),
-        ...(f.showMs > 0 ? { showMs: f.showMs } : {}),
-        ...(f.vanishMs > 0 ? { vanishMs: f.vanishMs } : {}),
-        ...(f.lifetimeMs > 0 ? { lifetimeMs: f.lifetimeMs } : {}),
-        startSizePx: f.startSizePx, endSizePx: f.endSizePx,
-        ...(f.offsetX !== 0 ? { offsetX: f.offsetX } : {}),
-        ...(f.offsetY !== 0 ? { offsetY: f.offsetY } : {}),
-        ...(f.rotationStart !== 0 ? { rotationStart: f.rotationStart } : {}),
-        ...(f.rotationEnd !== f.rotationStart ? { rotationEnd: f.rotationEnd } : {}),
-      }))
-      const card = {
-        attacker: attackerCardAnimation,
-        target: targetCardAnimation,
-        ...(lungeGapPx !== 0 ? { lungeGapPx } : {}),
-        ...(lungeDelayMs !== 0 ? { lungeDelayMs } : {}),
-        ...(lungeStartSpeed !== 0 ? { lungeStartSpeed } : {}),
-        ...(accelerationLunge !== 0 ? { accelerationLunge } : {}),
-        ...(accelerationReturn !== 0 ? { accelerationReturn } : {}),
-      }
-      const hasDefaultCard =
-        card.attacker === 'cast'
-        && card.target === 'hit'
-        && card.lungeGapPx == null
-        && card.lungeDelayMs == null
-        && card.lungeStartSpeed == null
-        && card.accelerationLunge == null
-        && card.accelerationReturn == null
-      if (!w.length && !p.length && !im.length && !b.length && hasDefaultCard) return undefined
-      return {
-        ...(w.length ? { weapon: w } : {}),
-        ...(p.length ? { projectile: p } : {}),
-        ...(im.length ? { impact: im } : {}),
-        ...(b.length ? { block: b } : {}),
-        ...(hasDefaultCard ? {} : { card }),
-      }
-    }
+    const abilityEffects = buildEffectPayload(effects)
+    const requiredTags = parseTags(requiredItemTagsAny)
+    const requirements: NonNullable<Ability['requirements']> = {}
+    if (minLevel > 1) requirements.minLevel = minLevel
+    if (requiredTags.length > 0) requirements.equippedTagsAny = requiredTags
+    const passiveDerivedModifiers = buildDerivedModifiers(derivedStatModifiers)
     const ability: Ability = {
       id: abilityId.trim() || 'my_ability',
       name: abilityName.trim() || 'My Ability',
@@ -989,13 +984,11 @@ export default function AnimationTest() {
         cost: { cooldownTurns, resourceCost: { resourceId: resourceCostId.trim(), amount: resourceCostAmount } }
       } : {}),
       ...(unlockCost > 0 ? { unlockCost } : {}),
-      ...(minLevel > 1 ? { requirements: { minLevel } } : {}),
-      effects: [{
-        kind: effectKind,
-        ...(effectAmount > 0 ? { amount: effectAmount } : {}),
-        ...(effectPercentage > 0 ? { percentage: effectPercentage } : {}),
-        ...(effectKind === 'lifesteal' && effectLifestealPct > 0 ? { lifestealPercent: effectLifestealPct } : {}),
-      }],
+      ...(Object.keys(requirements).length > 0 ? { requirements } : {}),
+      ...(requiredTags.length > 0 ? { requiredItemTypesAny: requiredTags } : {}),
+      ...(requiredTags.length === 1 ? { requiredItemType: requiredTags[0] } : {}),
+      ...(abilityEffects.length > 0 ? { effects: abilityEffects } : {}),
+      ...(passiveDerivedModifiers.length > 0 ? { derivedStatModifiers: passiveDerivedModifiers } : {}),
     }
     if (abilityType === 'reactive') {
       ability.reactiveConfig = {
@@ -1004,23 +997,27 @@ export default function AnimationTest() {
         ...(reactiveMaxTriggersPerTurn > 0 ? { maxTriggersPerTurn: reactiveMaxTriggersPerTurn } : {}),
       }
     }
-    const frames = buildFrames()
+    const frames = buildSharedAnimationFrames(animFrames)
     if (frames) ability.animationFrames = frames
     return ability
-  }, [abilityId, abilityName, abilityType, abilityDescription, abilityIconUrl, cooldownTurns,
-    resourceCostId, resourceCostAmount, unlockCost, minLevel, effectKind, effectAmount,
-    effectPercentage, effectLifestealPct, reactiveTriggerTiming, reactivePriority, reactiveMaxTriggersPerTurn,
-    weaponFrames,
-    projectileFrames,
-    impactFrames,
-    blockFrames,
-    attackerCardAnimation,
-    targetCardAnimation,
-    lungeGapPx,
-    lungeDelayMs,
-    lungeStartSpeed,
-    accelerationLunge,
-    accelerationReturn,
+  }, [
+    abilityDescription,
+    abilityIconUrl,
+    abilityId,
+    abilityName,
+    abilityType,
+    animFrames,
+    cooldownTurns,
+    derivedStatModifiers,
+    effects,
+    minLevel,
+    reactiveMaxTriggersPerTurn,
+    reactivePriority,
+    reactiveTriggerTiming,
+    requiredItemTagsAny,
+    resourceCostAmount,
+    resourceCostId,
+    unlockCost,
   ])
 
   const handleExportJson = useCallback(() => {
@@ -1042,77 +1039,28 @@ export default function AnimationTest() {
       setResourceCostAmount(data.cost?.resourceCost?.amount ?? 0)
       setUnlockCost(data.unlockCost ?? 0)
       setMinLevel(data.requirements?.minLevel ?? 1)
-      const eff = data.effects?.[0] ?? data.effect
-      if (eff) {
-        setEffectKind(eff.kind ?? 'damage')
-        setEffectAmount(eff.amount ?? 0)
-        setEffectPercentage(eff.percentage ?? 0)
-        setEffectLifestealPct(eff.lifestealPercent ?? 0)
-      }
+      setRequiredItemTagsAny(
+        data.requiredItemTypesAny?.join(', ')
+        ?? data.requirements?.equippedTagsAny?.join(', ')
+        ?? (data.requiredItemType ? String(data.requiredItemType) : ''),
+      )
+      setEffects(hydrateEffectRows(data.effects ?? (data.effect ? [data.effect] : undefined), fallbackMainStatId))
+      setDerivedStatModifiers(hydrateDerivedModifiers(data.derivedStatModifiers))
       if (data.reactiveConfig) {
         setReactiveTriggerTiming((data.reactiveConfig.triggerTiming ?? 'on_incoming_cast') as (typeof REACTIVE_TRIGGER_TIMINGS)[number])
         setReactivePriority(data.reactiveConfig.priority ?? 0)
         setReactiveMaxTriggersPerTurn(data.reactiveConfig.maxTriggersPerTurn ?? 0)
+      } else {
+        setReactiveTriggerTiming('on_incoming_cast')
+        setReactivePriority(0)
+        setReactiveMaxTriggersPerTurn(0)
       }
-      const af = data.animationFrames
-      if (af) {
-        setWeaponFrames((af.weapon ?? []).map((f: any) => ({
-          enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
-          soundUrl: f.soundUrl ?? '',
-          delayMs: f.delayMs ?? 0, fadeInMs: f.fadeInMs ?? 200, lifetimeMs: f.lifetimeMs ?? 0,
-          startSizePx: f.startSizePx ?? f.sizePx ?? 80, endSizePx: f.endSizePx ?? f.sizePx ?? 120,
-          offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
-          endOffsetX: f.endOffsetX ?? f.offsetX ?? 0, endOffsetY: f.endOffsetY ?? f.offsetY ?? 0,
-          acceleration: f.acceleration ?? 0,
-          rotationStart: f.rotationStart ?? 0,
-          rotationEnd: f.rotationEnd ?? f.rotationStart ?? 0,
-        })))
-        setProjectileFrames((af.projectile ?? []).map((f: any) => ({
-          enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
-          soundUrl: f.soundUrl ?? '',
-          delayMs: f.delayMs ?? 0, lifetimeMs: f.lifetimeMs ?? f.speedMs ?? 400,
-          trajectory: f.trajectory ?? 'arc',
-          startSizePx: f.startSizePx ?? f.sizePx ?? 120, endSizePx: f.endSizePx ?? f.sizePx ?? 300,
-          offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
-          acceleration: f.acceleration ?? 0,
-          rotationStart: f.rotationStart ?? 0,
-          rotationEnd: f.rotationEnd ?? f.rotationStart ?? 0,
-        })))
-        setImpactFrames((af.impact ?? []).map((f: any) => ({
-          enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
-          soundUrl: f.soundUrl ?? '',
-          delayMs: f.delayMs ?? 0, showMs: f.showMs ?? 90, vanishMs: f.vanishMs ?? 510,
-          lifetimeMs: f.lifetimeMs ?? 600,
-          startSizePx: f.startSizePx ?? f.sizePx ?? 60, endSizePx: f.endSizePx ?? f.sizePx ?? 140,
-          offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
-          endOffsetX: f.endOffsetX ?? f.offsetX ?? 0, endOffsetY: f.endOffsetY ?? f.offsetY ?? 0,
-          acceleration: f.acceleration ?? 0,
-          rotationStart: f.rotationStart ?? 0,
-          rotationEnd: f.rotationEnd ?? f.rotationStart ?? 0,
-        })))
-        setBlockFrames((af.block ?? []).map((f: any) => ({
-          enabled: true, imageSource: f.imageSource ?? 'url', url: f.url ?? '',
-          soundUrl: f.soundUrl ?? '',
-          delayMs: f.delayMs ?? 0, startBeforeImpactMs: f.startBeforeImpactMs ?? 0,
-          showMs: f.showMs ?? 320, vanishMs: f.vanishMs ?? 480, lifetimeMs: f.lifetimeMs ?? 800,
-          startSizePx: f.startSizePx ?? f.sizePx ?? 100, endSizePx: f.endSizePx ?? f.sizePx ?? 140,
-          offsetX: f.offsetX ?? 0, offsetY: f.offsetY ?? 0,
-          rotationStart: f.rotationStart ?? 0,
-          rotationEnd: f.rotationEnd ?? f.rotationStart ?? 0,
-        })))
-        setAttackerCardAnimation(af.card?.attacker ?? 'cast')
-        setTargetCardAnimation(af.card?.target ?? 'hit')
-        setLungeGapPx(Number(af.card?.lungeGapPx ?? 0))
-        setLungeDelayMs(Number(af.card?.lungeDelayMs ?? 0))
-        setLungeStartSpeed(Number(af.card?.lungeStartSpeed ?? 0))
-        setAccelerationLunge(Number(af.card?.accelerationLunge ?? 0))
-        setAccelerationReturn(Number(af.card?.accelerationReturn ?? 0))
-      }
+      setAnimFrames(hydrateSharedAnimFrames(data.animationFrames))
       setJsonImportText('')
     } catch {
       alert('Invalid JSON')
     }
-  }, [jsonImportText])
+  }, [fallbackMainStatId, jsonImportText])
 
   useEffect(() => {
     let cancelled = false
@@ -1134,6 +1082,7 @@ export default function AnimationTest() {
     if (!selectedFableId) {
       setRealms([])
       setSelectedRealmId('')
+      setSelectedRealmPack(null)
       return
     }
     let cancelled = false
@@ -1154,6 +1103,22 @@ export default function AnimationTest() {
       })
     return () => { cancelled = true }
   }, [selectedFableId])
+
+  useEffect(() => {
+    if (!selectedFableId || !selectedRealmId) {
+      setSelectedRealmPack(null)
+      return
+    }
+    let cancelled = false
+    getIdleRpgRealm(selectedFableId, selectedRealmId, { includePack: true })
+      .then((realm) => {
+        if (!cancelled) setSelectedRealmPack(realm.pack ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedRealmPack(null)
+      })
+    return () => { cancelled = true }
+  }, [selectedFableId, selectedRealmId])
 
   const handleAddAbilityToRealm = useCallback(async () => {
     if (!selectedFableId || !selectedRealmId || publishingAbility) return
@@ -1236,10 +1201,28 @@ export default function AnimationTest() {
     if (source === 'weaponAnimation') return weaponAnimationUrl?.trim() || ''
     if (source === 'weaponProjectile') return weaponProjectileUrl?.trim() || ''
     if (source === 'weaponImpact') return weaponImpactUrl?.trim() || ''
+    if (source === 'defenseIcon') return defenseUrl?.trim() || ''
+    if (source === 'defenseAnimation') return defenseAnimationUrl?.trim() || ''
+    if (source === 'defenseProjectile') return defenseProjectileUrl?.trim() || ''
+    if (source === 'defenseImpact') return defenseImpactUrl?.trim() || ''
     return customUrl?.trim() || ''
-  }, [weaponUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl])
+  }, [
+    defenseAnimationUrl,
+    defenseImpactUrl,
+    defenseProjectileUrl,
+    defenseUrl,
+    weaponAnimationUrl,
+    weaponImpactUrl,
+    weaponProjectileUrl,
+    weaponUrl,
+  ])
 
   const parseStatusNumber = (value: string, fallback: number): number => {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : fallback
+  }
+
+  const parseAnimNumber = (value: string, fallback: number): number => {
     const n = Number(value)
     return Number.isFinite(n) ? n : fallback
   }
@@ -1249,8 +1232,21 @@ export default function AnimationTest() {
     if (particle.imageSource === 'weaponAnimation') return weaponAnimationUrl?.trim() || weaponUrl?.trim() || ''
     if (particle.imageSource === 'weaponProjectile') return weaponProjectileUrl?.trim() || weaponAnimationUrl?.trim() || weaponUrl?.trim() || ''
     if (particle.imageSource === 'weaponImpact') return weaponImpactUrl?.trim() || weaponAnimationUrl?.trim() || weaponUrl?.trim() || ''
+    if (particle.imageSource === 'defenseIcon') return defenseUrl?.trim() || ''
+    if (particle.imageSource === 'defenseAnimation') return defenseAnimationUrl?.trim() || defenseUrl?.trim() || ''
+    if (particle.imageSource === 'defenseProjectile') return defenseProjectileUrl?.trim() || defenseAnimationUrl?.trim() || defenseUrl?.trim() || ''
+    if (particle.imageSource === 'defenseImpact') return defenseImpactUrl?.trim() || defenseAnimationUrl?.trim() || defenseUrl?.trim() || ''
     return particle.url?.trim() || ''
-  }, [weaponAnimationUrl, weaponImpactUrl, weaponProjectileUrl, weaponUrl])
+  }, [
+    defenseAnimationUrl,
+    defenseImpactUrl,
+    defenseProjectileUrl,
+    defenseUrl,
+    weaponAnimationUrl,
+    weaponImpactUrl,
+    weaponProjectileUrl,
+    weaponUrl,
+  ])
 
   const buildStatusParticleEntry = useCallback((
     side: 'player' | 'creature',
@@ -1367,32 +1363,35 @@ export default function AnimationTest() {
     // --- Weapon frames ---
     const activeWeaponForms = weaponFrames.filter(f => f.enabled)
     if (activeWeaponForms.length > 0) {
-      const maxWeaponMs = Math.max(...activeWeaponForms.map(f => f.delayMs + f.fadeInMs))
+      const maxWeaponMs = Math.max(...activeWeaponForms.map((f) => parseAnimNumber(f.delayMs, 0) + parseAnimNumber(f.fadeInMs, 200)))
       activeWeaponForms.forEach(async (f) => {
         const url = resolveFrameUrl(f.imageSource, f.url)
         if (!url) return
-        if (f.delayMs) await sleep(f.delayMs)
+        const delayMs = Math.max(0, parseAnimNumber(f.delayMs, 0))
+        const fadeInMs = Math.max(0, parseAnimNumber(f.fadeInMs, 200))
+        const lifetimeMs = Math.max(0, parseAnimNumber(f.lifetimeMs, 0))
+        if (delayMs) await sleep(delayMs)
         const entry: ActiveWeaponFrameEntry = {
           key: ++vfxKeyRef.current,
           url,
           soundUrl: f.soundUrl?.trim() || undefined,
-          fadeInMs: f.fadeInMs,
-          lifetimeMs: f.lifetimeMs > 0 ? f.lifetimeMs : undefined,
+          fadeInMs,
+          lifetimeMs: lifetimeMs > 0 ? lifetimeMs : undefined,
           sizePx: undefined,
-          startSizePx: f.startSizePx,
-          endSizePx: f.endSizePx,
-          offsetX: isRightSideAttacker ? -f.offsetX : f.offsetX,
-          offsetY: f.offsetY,
-          endOffsetX: isRightSideAttacker ? -f.endOffsetX : f.endOffsetX,
-          endOffsetY: f.endOffsetY,
-          acceleration: f.acceleration,
-          rotationStart: isRightSideAttacker ? -f.rotationStart : f.rotationStart,
-          rotationEnd: isRightSideAttacker ? -f.rotationEnd : f.rotationEnd,
+          startSizePx: parseAnimNumber(f.startSizePx, 80),
+          endSizePx: parseAnimNumber(f.endSizePx, 120),
+          offsetX: isRightSideAttacker ? -parseAnimNumber(f.offsetX, 0) : parseAnimNumber(f.offsetX, 0),
+          offsetY: parseAnimNumber(f.offsetY, 0),
+          endOffsetX: isRightSideAttacker ? -parseAnimNumber(f.endOffsetX, parseAnimNumber(f.offsetX, 0)) : parseAnimNumber(f.endOffsetX, parseAnimNumber(f.offsetX, 0)),
+          endOffsetY: parseAnimNumber(f.endOffsetY, parseAnimNumber(f.offsetY, 0)),
+          acceleration: parseAnimNumber(f.acceleration, 0),
+          rotationStart: isRightSideAttacker ? -parseAnimNumber(f.rotationStart, 0) : parseAnimNumber(f.rotationStart, 0),
+          rotationEnd: isRightSideAttacker ? -parseAnimNumber(f.rotationEnd, parseAnimNumber(f.rotationStart, 0)) : parseAnimNumber(f.rotationEnd, parseAnimNumber(f.rotationStart, 0)),
           mirrored: isRightSideAttacker,
         }
         setAttackerWeapon(prev => [...prev, entry])
-        if (f.lifetimeMs > 0) {
-          await sleep(f.lifetimeMs + 100)
+        if (lifetimeMs > 0) {
+          await sleep(lifetimeMs + 100)
           setAttackerWeapon(prev => prev.filter(e => e.key !== entry.key))
         }
       })
@@ -1407,10 +1406,12 @@ export default function AnimationTest() {
       const srcRef = side === 'player' ? playerPortraitRef : creaturePortraitRef
       const tgtRef = side === 'player' ? creaturePortraitRef : playerPortraitRef
       const tgtPos = getPortraitPos(tgtRef)
-      const maxProjMs = Math.max(...activeProjForms.map(f => f.delayMs + f.lifetimeMs))
+      const maxProjMs = Math.max(...activeProjForms.map((f) => parseAnimNumber(f.delayMs, 0) + parseAnimNumber(f.lifetimeMs, 400)))
       log(`  Projectile frames: ${activeProjForms.length}`)
       activeProjForms.forEach(async (f) => {
-        if (f.delayMs) await sleep(f.delayMs)
+        const delayMs = Math.max(0, parseAnimNumber(f.delayMs, 0))
+        const lifetimeMs = Math.max(0, parseAnimNumber(f.lifetimeMs, 400))
+        if (delayMs) await sleep(delayMs)
         const srcPos = getPortraitPos(srcRef)
         const url = resolveFrameUrl(f.imageSource, f.url)
         const key = ++vfxKeyRef.current
@@ -1419,21 +1420,24 @@ export default function AnimationTest() {
           direction: dir,
           imageUrl: url || null,
           soundUrl: f.soundUrl?.trim() || undefined,
-          from: { x: srcPos.x + (isRightSideAttacker ? -f.offsetX : f.offsetX), y: srcPos.y + f.offsetY },
+          from: {
+            x: srcPos.x + (isRightSideAttacker ? -parseAnimNumber(f.offsetX, 0) : parseAnimNumber(f.offsetX, 0)),
+            y: srcPos.y + parseAnimNumber(f.offsetY, 0),
+          },
           to: tgtPos,
           trajectory: f.trajectory,
-          durationMs: f.lifetimeMs,
-          startSizePx: f.startSizePx,
-          endSizePx: f.endSizePx,
-          acceleration: f.acceleration,
-          rotationStart: isRightSideAttacker ? -f.rotationStart : f.rotationStart,
-          rotationEnd: isRightSideAttacker ? -f.rotationEnd : f.rotationEnd,
+          durationMs: lifetimeMs,
+          startSizePx: parseAnimNumber(f.startSizePx, 120),
+          endSizePx: parseAnimNumber(f.endSizePx, 300),
+          acceleration: parseAnimNumber(f.acceleration, 0),
+          rotationStart: isRightSideAttacker ? -parseAnimNumber(f.rotationStart, 0) : parseAnimNumber(f.rotationStart, 0),
+          rotationEnd: isRightSideAttacker ? -parseAnimNumber(f.rotationEnd, parseAnimNumber(f.rotationStart, 0)) : parseAnimNumber(f.rotationEnd, parseAnimNumber(f.rotationStart, 0)),
           mirrored: isRightSideAttacker,
           color: anim.impactColor,
           show: true,
         }
         setActiveProjectiles(prev => [...prev, entry])
-        await sleep(f.lifetimeMs)
+        await sleep(lifetimeMs)
         setActiveProjectiles(prev => prev.map(p => p.key === key ? { ...p, show: false } : p))
         setTimeout(() => setActiveProjectiles(prev => prev.filter(p => p.key !== key)), 400)
       })
@@ -1474,25 +1478,26 @@ export default function AnimationTest() {
     if (isBlocked) {
       const activeBlockForms = blockFrames.filter(f => f.enabled)
       if (activeBlockForms.length > 0) {
-        const maxBlockMs = Math.max(...activeBlockForms.map(f => f.delayMs + f.showMs + f.vanishMs))
+        const maxBlockMs = Math.max(...activeBlockForms.map((f) => parseAnimNumber(f.delayMs, 0) + parseAnimNumber(f.showMs, 320) + parseAnimNumber(f.vanishMs, 480)))
         log(`  Block frames: ${activeBlockForms.length}`)
         activeBlockForms.forEach(async (f) => {
           const url = resolveFrameUrl(f.imageSource, f.url)
           if (!url) return
-          if (f.delayMs) await sleep(f.delayMs)
+          const delayMs = Math.max(0, parseAnimNumber(f.delayMs, 0))
+          if (delayMs) await sleep(delayMs)
           const entry: ActiveBlockFrameEntry = {
             key: ++vfxKeyRef.current,
             side: defenderSide,
             url,
             soundUrl: f.soundUrl?.trim() || undefined,
-            showMs: f.showMs,
-            vanishMs: f.vanishMs,
-            startSizePx: f.startSizePx,
-            endSizePx: f.endSizePx,
-            offsetX: isRightSideDefender ? -f.offsetX : f.offsetX,
-            offsetY: f.offsetY,
-            rotationStart: isRightSideDefender ? -f.rotationStart : f.rotationStart,
-            rotationEnd: isRightSideDefender ? -f.rotationEnd : f.rotationEnd,
+            showMs: parseAnimNumber(f.showMs, 320),
+            vanishMs: parseAnimNumber(f.vanishMs, 480),
+            startSizePx: parseAnimNumber(f.startSizePx, 100),
+            endSizePx: parseAnimNumber(f.endSizePx, 140),
+            offsetX: isRightSideDefender ? -parseAnimNumber(f.offsetX, 0) : parseAnimNumber(f.offsetX, 0),
+            offsetY: parseAnimNumber(f.offsetY, 0),
+            rotationStart: isRightSideDefender ? -parseAnimNumber(f.rotationStart, 0) : parseAnimNumber(f.rotationStart, 0),
+            rotationEnd: isRightSideDefender ? -parseAnimNumber(f.rotationEnd, parseAnimNumber(f.rotationStart, 0)) : parseAnimNumber(f.rotationEnd, parseAnimNumber(f.rotationStart, 0)),
             mirrored: isRightSideDefender,
           }
           setActiveBlockFrames(prev => [...prev, entry])
@@ -1507,27 +1512,28 @@ export default function AnimationTest() {
       // --- Impact frames (normal hit) ---
       const activeImpactForms = impactFrames.filter(f => f.enabled)
       if (activeImpactForms.length > 0) {
-        const maxImpactMs = Math.max(...activeImpactForms.map(f => f.delayMs + f.showMs + f.vanishMs))
+        const maxImpactMs = Math.max(...activeImpactForms.map((f) => parseAnimNumber(f.delayMs, 0) + parseAnimNumber(f.showMs, 90) + parseAnimNumber(f.vanishMs, 510)))
         log(`  Impact frames: ${activeImpactForms.length}`)
         activeImpactForms.forEach(async (f) => {
           const url = resolveFrameUrl(f.imageSource, f.url)
           if (!url) return
-          if (f.delayMs) await sleep(f.delayMs)
+          const delayMs = Math.max(0, parseAnimNumber(f.delayMs, 0))
+          if (delayMs) await sleep(delayMs)
           const entry: ActiveImpactFrameEntry = {
             key: ++vfxKeyRef.current,
             url,
             soundUrl: f.soundUrl?.trim() || undefined,
-            showMs: f.showMs,
-            vanishMs: f.vanishMs,
-            startSizePx: f.startSizePx,
-            endSizePx: f.endSizePx,
-            offsetX: isRightSideDefender ? -f.offsetX : f.offsetX,
-            offsetY: f.offsetY,
-            endOffsetX: isRightSideDefender ? -f.endOffsetX : f.endOffsetX,
-            endOffsetY: f.endOffsetY,
-            acceleration: f.acceleration,
-            rotationStart: isRightSideDefender ? -f.rotationStart : f.rotationStart,
-            rotationEnd: isRightSideDefender ? -f.rotationEnd : f.rotationEnd,
+            showMs: parseAnimNumber(f.showMs, 90),
+            vanishMs: parseAnimNumber(f.vanishMs, 510),
+            startSizePx: parseAnimNumber(f.startSizePx, 60),
+            endSizePx: parseAnimNumber(f.endSizePx, 140),
+            offsetX: isRightSideDefender ? -parseAnimNumber(f.offsetX, 0) : parseAnimNumber(f.offsetX, 0),
+            offsetY: parseAnimNumber(f.offsetY, 0),
+            endOffsetX: isRightSideDefender ? -parseAnimNumber(f.endOffsetX, parseAnimNumber(f.offsetX, 0)) : parseAnimNumber(f.endOffsetX, parseAnimNumber(f.offsetX, 0)),
+            endOffsetY: parseAnimNumber(f.endOffsetY, parseAnimNumber(f.offsetY, 0)),
+            acceleration: parseAnimNumber(f.acceleration, 0),
+            rotationStart: isRightSideDefender ? -parseAnimNumber(f.rotationStart, 0) : parseAnimNumber(f.rotationStart, 0),
+            rotationEnd: isRightSideDefender ? -parseAnimNumber(f.rotationEnd, parseAnimNumber(f.rotationStart, 0)) : parseAnimNumber(f.rotationEnd, parseAnimNumber(f.rotationStart, 0)),
             mirrored: isRightSideDefender,
           }
           setTargetImpactFrames(prev => [...prev, entry])
@@ -1657,26 +1663,6 @@ export default function AnimationTest() {
           <Chip size="small" label={`projectile: ${attackerAnim.projectile ?? 'none'}`} color={attackerAnim.projectile ? 'success' : 'default'} variant="outlined" />
           <Chip size="small" label="impact: generic" sx={{ borderColor: attackerAnim.impactColor, color: attackerAnim.impactColor }} variant="outlined" />
         </Box>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>Caster card</InputLabel>
-          <Select value={attackerCardAnimation} label="Caster card" onChange={(e) => setAttackerCardAnimation(e.target.value as 'none' | 'cast' | 'lunge')}>
-            <MenuItem value="none">None</MenuItem>
-            <MenuItem value="cast">Cast</MenuItem>
-            <MenuItem value="lunge">Lunge</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>Target card</InputLabel>
-          <Select value={targetCardAnimation} label="Target card" onChange={(e) => setTargetCardAnimation(e.target.value as 'none' | 'hit')}>
-            <MenuItem value="none">None</MenuItem>
-            <MenuItem value="hit">Hit</MenuItem>
-          </Select>
-        </FormControl>
-        <NumField label="Lunge gap (px)" value={lungeGapPx} onChange={setLungeGapPx} min={-300} max={400} step={5} />
-        <NumField label="Lunge delay (ms)" value={lungeDelayMs} onChange={setLungeDelayMs} min={0} max={3000} step={10} />
-        <NumField label="Lunge start speed" value={lungeStartSpeed} onChange={setLungeStartSpeed} min={-100} max={100} step={1} />
-        <NumField label="Lunge accel" value={accelerationLunge} onChange={setAccelerationLunge} min={-100} max={100} step={1} />
-        <NumField label="Return accel" value={accelerationReturn} onChange={setAccelerationReturn} min={-100} max={100} step={1} />
       </Paper>
 
       {/* Portrait URLs */}
@@ -1691,12 +1677,16 @@ export default function AnimationTest() {
         )}
       </Paper>
 
-      {/* Weapon URLs */}
+      {/* Equipment URLs */}
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <TextField size="small" label="Weapon icon URL" value={weaponUrl} onChange={(e) => setWeaponUrl(e.target.value)} sx={{ minWidth: 280, flex: 1 }} helperText='Used when frame uses "Weapon icon".' />
         <TextField size="small" label="Weapon animation URL" value={weaponAnimationUrl} onChange={(e) => setWeaponAnimationUrl(e.target.value)} sx={{ minWidth: 280, flex: 1 }} helperText='Tip must face up. Used by "Weapon animation".' />
         <TextField size="small" label="Weapon projectile URL" value={weaponProjectileUrl} onChange={(e) => setWeaponProjectileUrl(e.target.value)} sx={{ minWidth: 260, flex: 1 }} />
         <TextField size="small" label="Weapon impact URL" value={weaponImpactUrl} onChange={(e) => setWeaponImpactUrl(e.target.value)} sx={{ minWidth: 260, flex: 1 }} />
+        <TextField size="small" label="Defense icon URL" value={defenseUrl} onChange={(e) => setDefenseUrl(e.target.value)} sx={{ minWidth: 280, flex: 1 }} helperText='Used when frame uses "Defense icon".' />
+        <TextField size="small" label="Defense animation URL" value={defenseAnimationUrl} onChange={(e) => setDefenseAnimationUrl(e.target.value)} sx={{ minWidth: 280, flex: 1 }} helperText='Used by "Defense animation".' />
+        <TextField size="small" label="Defense projectile URL" value={defenseProjectileUrl} onChange={(e) => setDefenseProjectileUrl(e.target.value)} sx={{ minWidth: 260, flex: 1 }} />
+        <TextField size="small" label="Defense impact URL" value={defenseImpactUrl} onChange={(e) => setDefenseImpactUrl(e.target.value)} sx={{ minWidth: 260, flex: 1 }} />
         <FormControl size="small" sx={{ minWidth: 160 }}>
           <InputLabel>Fallback trajectory</InputLabel>
           <Select value={trajectoryOverride} label="Fallback trajectory" onChange={(e) => setTrajectoryOverride(e.target.value as 'auto' | 'straight' | 'arc')}>
@@ -1705,113 +1695,38 @@ export default function AnimationTest() {
             <MenuItem value="arc">Arc</MenuItem>
           </Select>
         </FormControl>
-        {(weaponUrl || weaponAnimationUrl || weaponProjectileUrl || weaponImpactUrl) && (
+        {(weaponUrl || weaponAnimationUrl || weaponProjectileUrl || weaponImpactUrl || defenseUrl || defenseAnimationUrl || defenseProjectileUrl || defenseImpactUrl) && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, flexWrap: 'wrap' }}>
             {weaponUrl && <><img src={weaponUrl} alt="icon" style={{ width: 32, height: 32, objectFit: 'contain' }} /><Typography variant="caption" color="text.secondary">Icon</Typography></>}
             {weaponAnimationUrl && weaponAnimationUrl !== weaponUrl && <><img src={weaponAnimationUrl} alt="anim" style={{ width: 32, height: 32, objectFit: 'contain' }} /><Typography variant="caption" color="text.secondary">Anim</Typography></>}
             {weaponProjectileUrl && <><img src={weaponProjectileUrl} alt="proj" style={{ width: 32, height: 32, objectFit: 'contain' }} /><Typography variant="caption" color="text.secondary">Projectile</Typography></>}
             {weaponImpactUrl && <><img src={weaponImpactUrl} alt="impact" style={{ width: 32, height: 32, objectFit: 'contain' }} /><Typography variant="caption" color="text.secondary">Impact</Typography></>}
+            {defenseUrl && <><img src={defenseUrl} alt="defense icon" style={{ width: 32, height: 32, objectFit: 'contain' }} /><Typography variant="caption" color="text.secondary">Defense Icon</Typography></>}
+            {defenseAnimationUrl && defenseAnimationUrl !== defenseUrl && <><img src={defenseAnimationUrl} alt="defense anim" style={{ width: 32, height: 32, objectFit: 'contain' }} /><Typography variant="caption" color="text.secondary">Defense Anim</Typography></>}
+            {defenseProjectileUrl && <><img src={defenseProjectileUrl} alt="defense projectile" style={{ width: 32, height: 32, objectFit: 'contain' }} /><Typography variant="caption" color="text.secondary">Defense Projectile</Typography></>}
+            {defenseImpactUrl && <><img src={defenseImpactUrl} alt="defense impact" style={{ width: 32, height: 32, objectFit: 'contain' }} /><Typography variant="caption" color="text.secondary">Defense Impact</Typography></>}
           </Box>
         )}
       </Paper>
 
-      {/* Animation Frames — multi-particle editors */}
+      {/* Animation Frames */}
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <Box>
           <Typography variant="subtitle1" fontWeight={700}>Animation Frames</Typography>
           <Typography variant="body2" color="text.secondary">
-            Add multiple particles per phase. All particles in each phase fire concurrently (each with its own delay). Offset X/Y shifts position from portrait center.
+            This uses the same frame schema and serializer as create/edit, so imported ability JSON round-trips without animation drift.
           </Typography>
         </Box>
-
-        {/* Weapon frames */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="subtitle2" fontWeight={700} color="text.secondary">① Weapon (pops at caster)</Typography>
-            <Button size="small" startIcon={<AddIcon />} onClick={() => setWeaponFrames(prev => [...prev, defaultWeaponFrame()])}>Add</Button>
-          </Box>
-          {weaponFrames.map((f, i) => (
-            <WeaponFrameEditor
-              key={i}
-              frame={f}
-              idx={i}
-              onChange={(updated) => setWeaponFrames(prev => prev.map((x, j) => j === i ? updated : x))}
-              onRemove={() => setWeaponFrames(prev => prev.filter((_, j) => j !== i))}
-              resolveUrl={resolveFrameUrl}
-            />
-          ))}
-          {weaponFrames.length === 0 && <Typography variant="body2" color="text.disabled" sx={{ ml: 1 }}>No weapon frames. Click Add to create one.</Typography>}
-        </Box>
-
-        {/* Projectile frames */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="subtitle2" fontWeight={700} color="text.secondary">② Projectile (caster → target)</Typography>
-            <Button size="small" startIcon={<AddIcon />} onClick={() => setProjectileFrames(prev => [...prev, defaultProjectileFrame()])}>Add</Button>
-          </Box>
-          {attackerCardAnimation === 'lunge' ? (
-            <Typography variant="body2" color="warning.main" sx={{ ml: 1 }}>
-              Projectile frames are ignored while caster card animation is set to lunge.
-            </Typography>
-          ) : (
-            <>
-              {projectileFrames.map((f, i) => (
-                <ProjectileFrameEditor
-                  key={i}
-                  frame={f}
-                  idx={i}
-                  onChange={(updated) => setProjectileFrames(prev => prev.map((x, j) => j === i ? updated : x))}
-                  onRemove={() => setProjectileFrames(prev => prev.filter((_, j) => j !== i))}
-                  resolveUrl={resolveFrameUrl}
-                />
-              ))}
-              {projectileFrames.length === 0 && <Typography variant="body2" color="text.disabled" sx={{ ml: 1 }}>No projectile frames. Click Add to create one.</Typography>}
-            </>
-          )}
-        </Box>
-
-        {/* Impact frames */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="subtitle2" fontWeight={700} color="text.secondary">③ Impact (pops at target)</Typography>
-            <Button size="small" startIcon={<AddIcon />} onClick={() => setImpactFrames(prev => [...prev, defaultImpactFrame()])}>Add</Button>
-          </Box>
-          {impactFrames.map((f, i) => (
-            <ImpactFrameEditor
-              key={i}
-              frame={f}
-              idx={i}
-              onChange={(updated) => setImpactFrames(prev => prev.map((x, j) => j === i ? updated : x))}
-              onRemove={() => setImpactFrames(prev => prev.filter((_, j) => j !== i))}
-              resolveUrl={resolveFrameUrl}
-            />
-          ))}
-          {impactFrames.length === 0 && <Typography variant="body2" color="text.disabled" sx={{ ml: 1 }}>No impact frames. Click Add to create one.</Typography>}
-        </Box>
-
-        {/* Block frames */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="subtitle2" fontWeight={700} color="text.secondary">④ Block (pops at defender border)</Typography>
-            <Button size="small" startIcon={<AddIcon />} onClick={() => setBlockFrames(prev => [...prev, defaultBlockFrame()])}>Add</Button>
-          </Box>
-          {blockFrames.map((f, i) => (
-            <BlockFrameEditor
-              key={i}
-              frame={f}
-              idx={i}
-              onChange={(updated) => setBlockFrames(prev => prev.map((x, j) => j === i ? updated : x))}
-              onRemove={() => setBlockFrames(prev => prev.filter((_, j) => j !== i))}
-              resolveUrl={resolveFrameUrl}
-            />
-          ))}
-          {blockFrames.length === 0 && <Typography variant="body2" color="text.disabled" sx={{ ml: 1 }}>No block frames. Click Add to create one.</Typography>}
-          <FormControlLabel
-            control={<Checkbox checked={simulateBlock} onChange={(e) => setSimulateBlock(e.target.checked)} size="small" />}
-            label={<Typography variant="body2">Simulate block on next attack</Typography>}
-            sx={{ ml: 0.5 }}
-          />
-        </Box>
+        <AbilityAnimationEditor
+          animFrames={animFrames}
+          onChange={setAnimFrames}
+          isReactive={abilityType === 'reactive'}
+        />
+        <FormControlLabel
+          control={<Checkbox checked={simulateBlock} onChange={(e) => setSimulateBlock(e.target.checked)} size="small" />}
+          label={<Typography variant="body2">Simulate avoid/block on next attack</Typography>}
+          sx={{ ml: 0.5 }}
+        />
       </Paper>
 
       {/* Status animation test */}
@@ -1861,22 +1776,68 @@ export default function AnimationTest() {
           <NumField label="Cost amount" value={resourceCostAmount} onChange={(v) => setResourceCostAmount(Math.max(0, v))} min={0} max={999} step={1} />
           <NumField label="Unlock cost (AP)" value={unlockCost} onChange={(v) => setUnlockCost(Math.max(0, v))} min={0} max={20} step={1} />
           <NumField label="Min level" value={minLevel} onChange={(v) => setMinLevel(Math.max(1, v))} min={1} max={99} step={1} />
+          <TextField
+            size="small"
+            label="Required item tags (any)"
+            value={requiredItemTagsAny}
+            onChange={(e) => setRequiredItemTagsAny(e.target.value)}
+            placeholder="weapon:sword, weapon:axe"
+            helperText="Ability usable when any equipped item has one of these tags"
+            sx={{ minWidth: 320, flex: 1 }}
+          />
         </Box>
         <Divider />
-        <Typography variant="subtitle2" fontWeight={600} color="text.secondary">Effect</Typography>
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-          <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel>Effect kind</InputLabel>
-            <Select value={effectKind} label="Effect kind" onChange={(e) => setEffectKind(e.target.value as typeof effectKind)}>
-              {EFFECT_KINDS.map(k => <MenuItem key={k} value={k}>{k}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <NumField label="Amount" value={effectAmount} onChange={(v) => setEffectAmount(Math.max(0, v))} min={0} max={9999} step={1} width={110} />
-          <NumField label="Percentage" value={effectPercentage} onChange={(v) => setEffectPercentage(Math.max(0, v))} min={0} max={100} step={1} width={110} />
-          {effectKind === 'lifesteal' && (
-            <NumField label="Lifesteal %" value={effectLifestealPct} onChange={(v) => setEffectLifestealPct(Math.max(0, v))} min={0} max={100} step={1} width={110} />
-          )}
-        </Box>
+        <Typography variant="subtitle2" fontWeight={600} color="text.secondary">Effects</Typography>
+        <EffectsEditor
+          effects={effects}
+          onChange={setEffects}
+          mainStatIds={mainStatIds}
+          fallbackMainStatId={fallbackMainStatId}
+          statusEffectOptions={(selectedRealmPack?.statusEffects ?? []).map((status) => ({ id: status.id, name: status.name }))}
+          creatureOptions={(selectedRealmPack?.creatures ?? []).map((creature) => ({ id: creature.id, name: creature.name }))}
+        />
+        {abilityType === 'passive' && (
+          <>
+            <Divider />
+            <Typography variant="subtitle2" fontWeight={600} color="text.secondary">Passive Derived Stat Modifiers</Typography>
+            {derivedStatModifiers.map((mod, index) => (
+              <Box key={index} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                <FormControl size="small" sx={{ minWidth: 240 }}>
+                  <InputLabel>Derived stat</InputLabel>
+                  <Select
+                    value={mod.statId}
+                    label="Derived stat"
+                    onChange={(e) => setDerivedStatModifiers((prev) => prev.map((entry, entryIndex) => entryIndex === index ? { ...entry, statId: e.target.value as DerivedStatId } : entry))}
+                  >
+                    {DERIVED_STATS.map((stat) => <MenuItem key={stat.id} value={stat.id}>{stat.label}</MenuItem>)}
+                  </Select>
+                </FormControl>
+                <TextField
+                  size="small"
+                  label="Flat"
+                  type="number"
+                  value={mod.flat}
+                  onChange={(e) => setDerivedStatModifiers((prev) => prev.map((entry, entryIndex) => entryIndex === index ? { ...entry, flat: e.target.value } : entry))}
+                  sx={{ width: 110 }}
+                />
+                <TextField
+                  size="small"
+                  label="Percent"
+                  type="number"
+                  value={mod.percent}
+                  onChange={(e) => setDerivedStatModifiers((prev) => prev.map((entry, entryIndex) => entryIndex === index ? { ...entry, percent: e.target.value } : entry))}
+                  sx={{ width: 110 }}
+                />
+                <IconButton size="small" color="error" onClick={() => setDerivedStatModifiers((prev) => prev.filter((_, entryIndex) => entryIndex !== index))}>
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            ))}
+            <Button variant="outlined" size="small" onClick={() => setDerivedStatModifiers((prev) => [...prev, emptyDerivedModifier()])}>
+              Add passive modifier
+            </Button>
+          </>
+        )}
         {abilityType === 'reactive' && (
           <>
             <Divider />
