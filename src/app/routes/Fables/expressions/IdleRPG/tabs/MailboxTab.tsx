@@ -223,6 +223,8 @@ export default function MailboxTab({
       if (!left || !right) return null
       const leftWeapon = left.weaponItemId ? pack.items.find((i) => i.id === left.weaponItemId) : undefined
       const rightWeapon = right.weaponItemId ? pack.items.find((i) => i.id === right.weaponItemId) : undefined
+      const leftDefense = left.defenseItemId ? pack.items.find((i) => i.id === left.defenseItemId) : undefined
+      const rightDefense = right.defenseItemId ? pack.items.find((i) => i.id === right.defenseItemId) : undefined
       const leftClass = left.classId ? pack.classes.find((c) => c.id === left.classId) : undefined
       const rightClass = right.classId ? pack.classes.find((c) => c.id === right.classId) : undefined
       const leftPrimary = leftClass ? pack.abilities?.find((a) => a.id === leftClass.primaryAttackId && a.abilityType === 'primary') : undefined
@@ -230,8 +232,28 @@ export default function MailboxTab({
       const abilityAnimations: Record<string, any> = {}
       for (const ability of (pack.abilities ?? [])) {
         if (!ability.animationFrames) continue
-        const leftResolved = resolveAnimationFrames(ability.animationFrames, leftWeapon?.iconUrl, leftWeapon?.animationUrl, leftWeapon?.projectileUrl, leftWeapon?.impactUrl)
-        const rightResolved = resolveAnimationFrames(ability.animationFrames, rightWeapon?.iconUrl, rightWeapon?.animationUrl, rightWeapon?.projectileUrl, rightWeapon?.impactUrl)
+        const leftResolved = resolveAnimationFrames(
+          ability.animationFrames,
+          leftWeapon?.iconUrl,
+          leftWeapon?.animationUrl,
+          leftWeapon?.projectileUrl,
+          leftWeapon?.impactUrl,
+          leftDefense?.iconUrl,
+          leftDefense?.animationUrl,
+          leftDefense?.projectileUrl,
+          leftDefense?.impactUrl,
+        )
+        const rightResolved = resolveAnimationFrames(
+          ability.animationFrames,
+          rightWeapon?.iconUrl,
+          rightWeapon?.animationUrl,
+          rightWeapon?.projectileUrl,
+          rightWeapon?.impactUrl,
+          rightDefense?.iconUrl,
+          rightDefense?.animationUrl,
+          rightDefense?.projectileUrl,
+          rightDefense?.impactUrl,
+        )
         if (leftResolved || rightResolved) abilityAnimations[ability.id] = leftResolved ?? rightResolved
       }
       return (
@@ -259,7 +281,24 @@ export default function MailboxTab({
             arm: left.arm,
             portraitUrl: left.portraitUrl ?? leftClass?.iconUrl,
             weaponUrl: leftWeapon?.iconUrl,
-            animationFrames: resolveAnimationFrames(leftPrimary?.animationFrames, leftWeapon?.iconUrl, leftWeapon?.animationUrl, leftWeapon?.projectileUrl, leftWeapon?.impactUrl),
+            weaponAnimationUrl: leftWeapon?.animationUrl,
+            weaponProjectileUrl: leftWeapon?.projectileUrl,
+            weaponImpactUrl: leftWeapon?.impactUrl,
+            defenseUrl: leftDefense?.iconUrl,
+            defenseAnimationUrl: leftDefense?.animationUrl,
+            defenseProjectileUrl: leftDefense?.projectileUrl,
+            defenseImpactUrl: leftDefense?.impactUrl,
+            animationFrames: resolveAnimationFrames(
+              leftPrimary?.animationFrames,
+              leftWeapon?.iconUrl,
+              leftWeapon?.animationUrl,
+              leftWeapon?.projectileUrl,
+              leftWeapon?.impactUrl,
+              leftDefense?.iconUrl,
+              leftDefense?.animationUrl,
+              leftDefense?.projectileUrl,
+              leftDefense?.impactUrl,
+            ),
             resource: resolveCharacterResource(pack, left.classId),
           }}
           creature={{
@@ -270,7 +309,24 @@ export default function MailboxTab({
             arm: right.arm,
             portraitUrl: right.portraitUrl ?? rightClass?.iconUrl,
             weaponUrl: rightWeapon?.iconUrl,
-            animationFrames: resolveAnimationFrames(rightPrimary?.animationFrames, rightWeapon?.iconUrl, rightWeapon?.animationUrl, rightWeapon?.projectileUrl, rightWeapon?.impactUrl),
+            weaponAnimationUrl: rightWeapon?.animationUrl,
+            weaponProjectileUrl: rightWeapon?.projectileUrl,
+            weaponImpactUrl: rightWeapon?.impactUrl,
+            defenseUrl: rightDefense?.iconUrl,
+            defenseAnimationUrl: rightDefense?.animationUrl,
+            defenseProjectileUrl: rightDefense?.projectileUrl,
+            defenseImpactUrl: rightDefense?.impactUrl,
+            animationFrames: resolveAnimationFrames(
+              rightPrimary?.animationFrames,
+              rightWeapon?.iconUrl,
+              rightWeapon?.animationUrl,
+              rightWeapon?.projectileUrl,
+              rightWeapon?.impactUrl,
+              rightDefense?.iconUrl,
+              rightDefense?.animationUrl,
+              rightDefense?.projectileUrl,
+              rightDefense?.impactUrl,
+            ),
             resource: resolveCharacterResource(pack, right.classId),
           }}
           victory={replay.combat.winnerId === left.id}
@@ -293,13 +349,24 @@ export default function MailboxTab({
     const player = replay.player
     const boss = replay.boss
     const playerWeapon = player.weaponItemId ? pack.items.find((i) => i.id === player.weaponItemId) : undefined
+    const playerDefense = player.defenseItemId ? pack.items.find((i) => i.id === player.defenseItemId) : undefined
     const playerClass = player.classId ? pack.classes.find((c) => c.id === player.classId) : undefined
     const primary = playerClass ? pack.abilities?.find((a) => a.id === playerClass.primaryAttackId && a.abilityType === 'primary') : undefined
     const bossTemplate = boss.creatureId ? pack.creatures.find((c) => c.id === boss.creatureId) : undefined
     const abilityAnimations: Record<string, any> = {}
     for (const ability of (pack.abilities ?? [])) {
       if (!ability.animationFrames) continue
-      const resolved = resolveAnimationFrames(ability.animationFrames, playerWeapon?.iconUrl, playerWeapon?.animationUrl, playerWeapon?.projectileUrl, playerWeapon?.impactUrl)
+      const resolved = resolveAnimationFrames(
+        ability.animationFrames,
+        playerWeapon?.iconUrl,
+        playerWeapon?.animationUrl,
+        playerWeapon?.projectileUrl,
+        playerWeapon?.impactUrl,
+        playerDefense?.iconUrl,
+        playerDefense?.animationUrl,
+        playerDefense?.projectileUrl,
+        playerDefense?.impactUrl,
+      )
       if (resolved) abilityAnimations[ability.id] = resolved
     }
     return (
@@ -331,7 +398,24 @@ export default function MailboxTab({
           arm: player.arm,
           portraitUrl: player.portraitUrl ?? playerClass?.iconUrl,
           weaponUrl: playerWeapon?.iconUrl,
-          animationFrames: resolveAnimationFrames(primary?.animationFrames, playerWeapon?.iconUrl, playerWeapon?.animationUrl, playerWeapon?.projectileUrl, playerWeapon?.impactUrl),
+          weaponAnimationUrl: playerWeapon?.animationUrl,
+          weaponProjectileUrl: playerWeapon?.projectileUrl,
+          weaponImpactUrl: playerWeapon?.impactUrl,
+          defenseUrl: playerDefense?.iconUrl,
+          defenseAnimationUrl: playerDefense?.animationUrl,
+          defenseProjectileUrl: playerDefense?.projectileUrl,
+          defenseImpactUrl: playerDefense?.impactUrl,
+          animationFrames: resolveAnimationFrames(
+            primary?.animationFrames,
+            playerWeapon?.iconUrl,
+            playerWeapon?.animationUrl,
+            playerWeapon?.projectileUrl,
+            playerWeapon?.impactUrl,
+            playerDefense?.iconUrl,
+            playerDefense?.animationUrl,
+            playerDefense?.projectileUrl,
+            playerDefense?.impactUrl,
+          ),
           resource: resolveCharacterResource(pack, player.classId),
         }}
         creature={{

@@ -71,6 +71,7 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
   const cls = pack.classes.find((c) => c.id === character.classId)
   const combatStats = useMemo(() => computePlayerCombatStats(character, pack), [character, pack])
   const baseHp = combatStats.maxHp
+  const displayHp = Math.max(0, Math.ceil(baseHp))
   const baseArm = combatStats.arm
 
   const xpTable = pack.rules.xpTable ?? {}
@@ -227,7 +228,7 @@ function SidebarCharacterCard({ character, pack }: { character: CharacterState; 
 
       {/* Combat stats row */}
       <Box sx={{ display: 'flex', gap: 1.5, width: '100%', maxWidth: 340, justifyContent: 'center' }}>
-        <StatBadge icon={<FavoriteIcon sx={{ fontSize: 16 }} />} label="HP" value={baseHp} color="#ef4444" tooltip="Hit Points" />
+        <StatBadge icon={<FavoriteIcon sx={{ fontSize: 16 }} />} label="HP" value={displayHp} color="#ef4444" tooltip="Hit Points" />
         <StatBadge icon={<ShieldIcon sx={{ fontSize: 16 }} />} label="ARM" value={baseArm} color="#6366f1" tooltip="Armor" />
       </Box>
 

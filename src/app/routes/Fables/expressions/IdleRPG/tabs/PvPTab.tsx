@@ -319,17 +319,61 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
         const targetCls = pack.classes.find((c) => c.id === combatResult.targetProfile.character.classId)
         const targetWeaponId = combatResult.targetProfile.character.equipment?.attack_source
         const targetWeaponDef = targetWeaponId ? pack.items.find((i) => i.id === targetWeaponId) : undefined
+        const defenseItemId = character.equipment?.defense_layer
+        const defenseDef = defenseItemId ? pack.items.find((i) => i.id === defenseItemId) : undefined
+        const targetDefenseId = combatResult.targetProfile.character.equipment?.defense_layer
+        const targetDefenseDef = targetDefenseId ? pack.items.find((i) => i.id === targetDefenseId) : undefined
         const playerAbility = pack.abilities?.find((a) => a.id === cls?.primaryAttackId && a.abilityType === 'primary')
         const targetAbility = pack.abilities?.find((a) => a.id === targetCls?.primaryAttackId && a.abilityType === 'primary')
-        const playerResolvedFrames = resolveAnimationFrames(playerAbility?.animationFrames, weaponDef?.iconUrl, weaponDef?.animationUrl, weaponDef?.projectileUrl, weaponDef?.impactUrl)
-        const creatureResolvedFrames = resolveAnimationFrames(targetAbility?.animationFrames, targetWeaponDef?.iconUrl, targetWeaponDef?.animationUrl, targetWeaponDef?.projectileUrl, targetWeaponDef?.impactUrl)
+        const playerResolvedFrames = resolveAnimationFrames(
+          playerAbility?.animationFrames,
+          weaponDef?.iconUrl,
+          weaponDef?.animationUrl,
+          weaponDef?.projectileUrl,
+          weaponDef?.impactUrl,
+          defenseDef?.iconUrl,
+          defenseDef?.animationUrl,
+          defenseDef?.projectileUrl,
+          defenseDef?.impactUrl,
+        )
+        const creatureResolvedFrames = resolveAnimationFrames(
+          targetAbility?.animationFrames,
+          targetWeaponDef?.iconUrl,
+          targetWeaponDef?.animationUrl,
+          targetWeaponDef?.projectileUrl,
+          targetWeaponDef?.impactUrl,
+          targetDefenseDef?.iconUrl,
+          targetDefenseDef?.animationUrl,
+          targetDefenseDef?.projectileUrl,
+          targetDefenseDef?.impactUrl,
+        )
         const playerResource = resolveCharacterResource(pack, character.classId)
         const targetResource = resolveCharacterResource(pack, combatResult.targetProfile.character.classId)
         const abilityAnimations: Record<string, any> = {}
         for (const ab of (pack.abilities ?? [])) {
           if (ab.animationFrames) {
-            const r1 = resolveAnimationFrames(ab.animationFrames, weaponDef?.iconUrl, weaponDef?.animationUrl, weaponDef?.projectileUrl, weaponDef?.impactUrl)
-            const r2 = resolveAnimationFrames(ab.animationFrames, targetWeaponDef?.iconUrl, targetWeaponDef?.animationUrl, targetWeaponDef?.projectileUrl, targetWeaponDef?.impactUrl)
+            const r1 = resolveAnimationFrames(
+              ab.animationFrames,
+              weaponDef?.iconUrl,
+              weaponDef?.animationUrl,
+              weaponDef?.projectileUrl,
+              weaponDef?.impactUrl,
+              defenseDef?.iconUrl,
+              defenseDef?.animationUrl,
+              defenseDef?.projectileUrl,
+              defenseDef?.impactUrl,
+            )
+            const r2 = resolveAnimationFrames(
+              ab.animationFrames,
+              targetWeaponDef?.iconUrl,
+              targetWeaponDef?.animationUrl,
+              targetWeaponDef?.projectileUrl,
+              targetWeaponDef?.impactUrl,
+              targetDefenseDef?.iconUrl,
+              targetDefenseDef?.animationUrl,
+              targetDefenseDef?.projectileUrl,
+              targetDefenseDef?.impactUrl,
+            )
             if (r1 || r2) abilityAnimations[ab.id] = r1 ?? r2
           }
         }
@@ -364,6 +408,13 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
                 arm: playerStats.arm,
                 portraitUrl: character.portraitUrl ?? cls?.iconUrl,
                 weaponUrl: weaponDef?.iconUrl,
+                weaponAnimationUrl: weaponDef?.animationUrl,
+                weaponProjectileUrl: weaponDef?.projectileUrl,
+                weaponImpactUrl: weaponDef?.impactUrl,
+                defenseUrl: defenseDef?.iconUrl,
+                defenseAnimationUrl: defenseDef?.animationUrl,
+                defenseProjectileUrl: defenseDef?.projectileUrl,
+                defenseImpactUrl: defenseDef?.impactUrl,
                 animationFrames: playerResolvedFrames ?? playerAbility?.animationFrames,
                 resource: playerResource,
               }}
@@ -375,6 +426,13 @@ export default function PvPTab({ fableId, realmId, character, pack, pendingPvpFi
                 arm: targetStats.arm,
                 portraitUrl: combatResult.targetProfile.character.portraitUrl ?? targetCls?.iconUrl,
                 weaponUrl: targetWeaponDef?.iconUrl,
+                weaponAnimationUrl: targetWeaponDef?.animationUrl,
+                weaponProjectileUrl: targetWeaponDef?.projectileUrl,
+                weaponImpactUrl: targetWeaponDef?.impactUrl,
+                defenseUrl: targetDefenseDef?.iconUrl,
+                defenseAnimationUrl: targetDefenseDef?.animationUrl,
+                defenseProjectileUrl: targetDefenseDef?.projectileUrl,
+                defenseImpactUrl: targetDefenseDef?.impactUrl,
                 animationFrames: creatureResolvedFrames ?? targetAbility?.animationFrames,
                 resource: targetResource,
               }}

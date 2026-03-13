@@ -19,6 +19,10 @@ const IMAGE_SOURCE_OPTIONS: Array<{ value: AnimationFrameImageSource; label: str
   { value: 'weaponAnimation', label: 'Weapon animation' },
   { value: 'weaponProjectile', label: 'Weapon projectile' },
   { value: 'weaponImpact', label: 'Weapon impact' },
+  { value: 'defenseIcon', label: 'Defense icon' },
+  { value: 'defenseAnimation', label: 'Defense animation' },
+  { value: 'defenseProjectile', label: 'Defense projectile' },
+  { value: 'defenseImpact', label: 'Defense impact' },
 ]
 
 export type StatusParticleForm = {

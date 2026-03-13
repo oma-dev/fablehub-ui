@@ -608,13 +608,19 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
         const cls = pack.classes.find((c) => c.id === character.classId)
         const weaponItemId = character.equipment?.['attack_source']
         const weaponDef = weaponItemId ? pack.items.find((i) => i.id === weaponItemId) : undefined
+        const defenseItemId = character.equipment?.['defense_layer']
+        const defenseDef = defenseItemId ? pack.items.find((i) => i.id === defenseItemId) : undefined
         const primaryAbility = pack.abilities?.find((a) => a.id === cls?.primaryAttackId && a.abilityType === 'primary')
         const resolvedFrames = resolveAnimationFrames(
           primaryAbility?.animationFrames,
           weaponDef?.iconUrl,
           weaponDef?.animationUrl,
           weaponDef?.projectileUrl,
-          weaponDef?.impactUrl
+          weaponDef?.impactUrl,
+          defenseDef?.iconUrl,
+          defenseDef?.animationUrl,
+          defenseDef?.projectileUrl,
+          defenseDef?.impactUrl,
         )
         const playerStats = computePlayerCombatStats(character, pack)
         const playerResource = resolveCharacterResource(pack, character.classId)
@@ -622,8 +628,18 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
         const abilityAnimations: Record<string, any> = {}
         for (const ab of (pack.abilities ?? [])) {
           if (ab.animationFrames) {
-            const resolved = resolveAnimationFrames(ab.animationFrames, weaponDef?.iconUrl, weaponDef?.animationUrl, weaponDef?.projectileUrl, weaponDef?.impactUrl)
-            if (resolved) abilityAnimations[ab.id] = resolved
+            const resolvedWithDefense = resolveAnimationFrames(
+              ab.animationFrames,
+              weaponDef?.iconUrl,
+              weaponDef?.animationUrl,
+              weaponDef?.projectileUrl,
+              weaponDef?.impactUrl,
+              defenseDef?.iconUrl,
+              defenseDef?.animationUrl,
+              defenseDef?.projectileUrl,
+              defenseDef?.impactUrl,
+            )
+            if (resolvedWithDefense) abilityAnimations[ab.id] = resolvedWithDefense
           }
         }
         const statusAnimations: Record<string, any> = {}
@@ -657,6 +673,13 @@ export default function TavernTab({ fableId, realmId, character, pack, onCharact
                 arm: playerStats.arm,
                 portraitUrl: character.portraitUrl ?? cls?.iconUrl,
                 weaponUrl: weaponDef?.iconUrl,
+                weaponAnimationUrl: weaponDef?.animationUrl,
+                weaponProjectileUrl: weaponDef?.projectileUrl,
+                weaponImpactUrl: weaponDef?.impactUrl,
+                defenseUrl: defenseDef?.iconUrl,
+                defenseAnimationUrl: defenseDef?.animationUrl,
+                defenseProjectileUrl: defenseDef?.projectileUrl,
+                defenseImpactUrl: defenseDef?.impactUrl,
                 animationFrames: resolvedFrames ?? primaryAbility?.animationFrames,
                 resource: playerResource,
               }}

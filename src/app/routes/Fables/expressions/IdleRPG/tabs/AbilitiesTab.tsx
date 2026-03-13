@@ -60,7 +60,18 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
   const equippedIds = character.equippedAbilityIds ?? []
   const equippedSet = new Set(equippedIds)
   const abilityMap = new Map((pack.abilities ?? []).map((a) => [a.id, a]))
+  const itemMap = new Map((pack.items ?? []).map((item) => [item.id, item]))
   const resourceMap = new Map((pack.resources ?? []).map((r) => [r.id, r]))
+  const equippedItemTags = new Set<string>()
+  for (const itemId of Object.values(character.equipment ?? {})) {
+    if (!itemId) continue
+    const item = itemMap.get(itemId)
+    if (!item) continue
+    for (const tag of item.tags ?? []) {
+      const normalized = String(tag ?? '').trim()
+      if (normalized) equippedItemTags.add(normalized)
+    }
+  }
 
   const cls = pack.classes.find((c) => c.id === character.classId)
   const classDefaultAbilityIds = (cls?.defaultAbilityIds ?? []).filter((id) => !!abilityMap.get(id))
@@ -104,6 +115,32 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
     .filter((a): a is Ability => !!a && a.abilityType !== 'primary')
 
   const slotsAvailable = removableEquippedIds.length < currentSlotCount
+
+  const normalizeTagList = (value: unknown): string[] => {
+    if (!Array.isArray(value)) return []
+    return value
+      .map((entry) => String(entry ?? '').trim())
+      .filter((entry) => entry.length > 0)
+  }
+
+  const getAbilityRequiredTagsAny = (ability: Ability): string[] => {
+    const nested = normalizeTagList(ability.requirements?.equippedTagsAny ?? [])
+    const directMany = normalizeTagList(ability.requiredItemTypesAny)
+    const directSingle = typeof ability.requiredItemType === 'string'
+      ? normalizeTagList([ability.requiredItemType])
+      : []
+    return Array.from(new Set([...nested, ...directMany, ...directSingle]))
+  }
+
+  const getEquipmentDeficiencyReason = (ability: Ability | undefined): string | null => {
+    if (!ability) return null
+    const requiredTagsAny = getAbilityRequiredTagsAny(ability)
+    if (requiredTagsAny.length === 0) return null
+    const hasAnyRequiredTag = requiredTagsAny.some((tag) => equippedItemTags.has(tag))
+    if (hasAnyRequiredTag) return null
+    if (requiredTagsAny.length === 1) return `Requires ${requiredTagsAny[0]}, unusable`
+    return `Requires ${requiredTagsAny.join(' or ')}, unusable`
+  }
 
   const handleUnlock = async (abilityId: string) => {
     setError(null)
@@ -260,32 +297,48 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
           <Divider />
 
           <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.4 }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 1,
-                borderColor: 'rgba(245,158,11,0.5)',
-                bgcolor: alpha('#f59e0b', 0.07),
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-              }}
-            >
-              {renderAbilityAvatar(primaryAbility, 52, 'primary')}
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fbbf24', fontWeight: 800 }}>
-                  Primary Attack
-                </Typography>
-                <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
-                  {primaryAbility?.name ?? 'Primary'}
-                </Typography>
-                {primaryAbility?.effects?.[0] && (
-                  <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.58)' }}>
-                    {describeEffect(primaryAbility.effects[0])}
-                  </Typography>
-                )}
-              </Box>
-            </Paper>
+            {(() => {
+              const equipmentDeficiencyReason = getEquipmentDeficiencyReason(primaryAbility)
+              const content = (
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1,
+                    borderColor: 'rgba(245,158,11,0.5)',
+                    bgcolor: alpha('#f59e0b', 0.07),
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                  }}
+                >
+                  {renderAbilityAvatar(primaryAbility, 52, 'primary')}
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fbbf24', fontWeight: 800 }}>
+                      Primary Attack
+                    </Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
+                      {primaryAbility?.name ?? 'Primary'}
+                    </Typography>
+                    {primaryAbility?.effects?.[0] && (
+                      <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.58)' }}>
+                        {describeEffect(primaryAbility.effects[0])}
+                      </Typography>
+                    )}
+                    {equipmentDeficiencyReason && (
+                      <Typography sx={{ fontSize: 10.5, color: '#fca5a5', mt: 0.2 }}>
+                        Unusable with current equipment
+                      </Typography>
+                    )}
+                  </Box>
+                </Paper>
+              )
+              if (!equipmentDeficiencyReason) return content
+              return (
+                <Tooltip title={equipmentDeficiencyReason} arrow>
+                  <Box>{content}</Box>
+                </Tooltip>
+              )
+            })()}
 
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 1 }}>
               {Array.from({ length: maxPossibleSlots }, (_, i) => {
@@ -320,15 +373,16 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                 }
 
                 if (equipped) {
-                  return (
+                  const equipmentDeficiencyReason = getEquipmentDeficiencyReason(equipped)
+                  const content = (
                     <Paper
                       key={`slot-${i}`}
                       variant="outlined"
                       sx={{
                         minHeight: 118,
                         p: 0.8,
-                        borderColor: 'rgba(168,85,247,0.55)',
-                        bgcolor: alpha('#a855f7', 0.12),
+                        borderColor: equipmentDeficiencyReason ? 'rgba(239,68,68,0.65)' : 'rgba(168,85,247,0.55)',
+                        bgcolor: equipmentDeficiencyReason ? alpha('#ef4444', 0.14) : alpha('#a855f7', 0.12),
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -341,6 +395,11 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                       <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: '#f8fafc', lineHeight: 1.1, textAlign: 'center' }}>
                         {equipped.name}
                       </Typography>
+                      {equipmentDeficiencyReason && (
+                        <Typography sx={{ fontSize: 9.5, color: '#fca5a5', textAlign: 'center', lineHeight: 1.1 }}>
+                          Unusable
+                        </Typography>
+                      )}
                       <IconButton
                         size="small"
                         onClick={() => handleUnequip(equipped.id)}
@@ -358,6 +417,12 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                         <CloseIcon sx={{ fontSize: 12, color: '#fff' }} />
                       </IconButton>
                     </Paper>
+                  )
+                  if (!equipmentDeficiencyReason) return content
+                  return (
+                    <Tooltip key={`slot-${i}`} title={equipmentDeficiencyReason} arrow>
+                      <Box>{content}</Box>
+                    </Tooltip>
                   )
                 }
 
@@ -423,14 +488,15 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                   {unlockedNotEquipped.map((ability) => {
                     const isUltimate = ability.abilityType === 'ultimate'
                     const effectText = ability.effects?.[0] ? describeEffect(ability.effects[0]) : ''
-                    return (
+                    const equipmentDeficiencyReason = getEquipmentDeficiencyReason(ability)
+                    const content = (
                       <Paper
                         key={ability.id}
                         variant="outlined"
                         sx={{
                           p: 0.8,
-                          borderColor: 'rgba(168,85,247,0.28)',
-                          bgcolor: alpha('#a855f7', 0.06),
+                          borderColor: equipmentDeficiencyReason ? 'rgba(239,68,68,0.45)' : 'rgba(168,85,247,0.28)',
+                          bgcolor: equipmentDeficiencyReason ? alpha('#ef4444', 0.08) : alpha('#a855f7', 0.06),
                           display: 'flex',
                           alignItems: 'center',
                           gap: 0.85,
@@ -446,6 +512,11 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                               {effectText}
                             </Typography>
                           )}
+                          {equipmentDeficiencyReason && (
+                            <Typography sx={{ fontSize: 10, color: '#fca5a5', lineHeight: 1.2 }}>
+                              Unusable with current equipment
+                            </Typography>
+                          )}
                         </Box>
                         <Button
                           size="small"
@@ -457,6 +528,12 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                           {equipping ? '...' : 'Equip'}
                         </Button>
                       </Paper>
+                    )
+                    if (!equipmentDeficiencyReason) return content
+                    return (
+                      <Tooltip key={ability.id} title={equipmentDeficiencyReason} arrow>
+                        <Box>{content}</Box>
+                      </Tooltip>
                     )
                   })}
                 </Box>
@@ -490,6 +567,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
               classAbilities.map((ability) => {
                 const isUnlocked = unlockedIds.has(ability.id)
                 const isEquipped = equippedSet.has(ability.id)
+                const equipmentDeficiencyReason = getEquipmentDeficiencyReason(ability)
                 const minLevel = ability.requirements?.minLevel ?? 0
                 const levelMet = character.level >= minLevel
                 const cost = ability.unlockCost ?? 1
@@ -505,7 +583,7 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                 else if (levelMet) status = 'unlockable'
                 else status = 'locked'
 
-                return (
+                const content = (
                   <Paper
                     key={ability.id}
                     variant="outlined"
@@ -515,16 +593,20 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                       gridTemplateColumns: 'auto minmax(0,1fr) auto',
                       gap: 1,
                       alignItems: 'center',
-                      borderColor: isEquipped
-                        ? 'rgba(168,85,247,0.55)'
-                        : isUltimate
-                          ? alpha('#fbbf24', 0.36)
-                          : 'rgba(148,163,184,0.24)',
-                      bgcolor: isEquipped
-                        ? alpha('#a855f7', 0.13)
-                        : status === 'locked'
-                          ? 'rgba(255,255,255,0.03)'
-                          : 'rgba(255,255,255,0.045)',
+                      borderColor: equipmentDeficiencyReason
+                        ? 'rgba(239,68,68,0.5)'
+                        : isEquipped
+                          ? 'rgba(168,85,247,0.55)'
+                          : isUltimate
+                            ? alpha('#fbbf24', 0.36)
+                            : 'rgba(148,163,184,0.24)',
+                      bgcolor: equipmentDeficiencyReason
+                        ? alpha('#ef4444', 0.09)
+                        : isEquipped
+                          ? alpha('#a855f7', 0.13)
+                          : status === 'locked'
+                            ? 'rgba(255,255,255,0.03)'
+                            : 'rgba(255,255,255,0.045)',
                       opacity: status === 'locked' ? 0.62 : 1,
                     }}
                   >
@@ -554,6 +636,13 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                             label="Equipped"
                             size="small"
                             sx={{ height: 18, fontSize: 9, fontWeight: 700, bgcolor: alpha('#a855f7', 0.2), color: '#d8b4fe' }}
+                          />
+                        )}
+                        {equipmentDeficiencyReason && (
+                          <Chip
+                            label="Unusable"
+                            size="small"
+                            sx={{ height: 18, fontSize: 9, fontWeight: 700, bgcolor: alpha('#ef4444', 0.2), color: '#fca5a5' }}
                           />
                         )}
                       </Box>
@@ -636,6 +725,12 @@ export default function AbilitiesTab({ fableId, realmId, character, pack, onChar
                       )}
                     </Box>
                   </Paper>
+                )
+                if (!equipmentDeficiencyReason) return content
+                return (
+                  <Tooltip key={ability.id} title={equipmentDeficiencyReason} arrow>
+                    <Box>{content}</Box>
+                  </Tooltip>
                 )
               })
             )}

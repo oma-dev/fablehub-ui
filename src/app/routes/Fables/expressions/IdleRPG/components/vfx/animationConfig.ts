@@ -3,8 +3,17 @@
  * Keeps straight/arc projectile motion logic; other VFX come from optional frame URLs.
  */
 
-/** Source for frame image: custom URL or resolve from equipped weapon at runtime. */
-export type AnimationFrameImageSource = 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact'
+/** Source for frame image: custom URL or resolve from equipped gear at runtime. */
+export type AnimationFrameImageSource =
+  | 'url'
+  | 'weaponIcon'
+  | 'weaponAnimation'
+  | 'weaponProjectile'
+  | 'weaponImpact'
+  | 'defenseIcon'
+  | 'defenseAnimation'
+  | 'defenseProjectile'
+  | 'defenseImpact'
 
 /** Optional weapon frame (pops at caster, fades in, then vanishes after lifetimeMs). */
 export interface AnimationWeaponFrame {
@@ -264,13 +273,17 @@ export function getAttackAnimationConfig(
   return { ...fallback, frames: null }
 }
 
-/** Resolve a single frame's image URL from imageSource + weapon URLs. */
+/** Resolve a single frame's image URL from imageSource + equipped weapon/defense URLs. */
 function resolveFrameUrl(
   frame: { url?: string; imageSource?: AnimationFrameImageSource } | undefined,
   weaponIconUrl: string | null | undefined,
   weaponAnimationUrl: string | null | undefined,
   weaponProjectileUrl: string | null | undefined,
-  weaponImpactUrl: string | null | undefined
+  weaponImpactUrl: string | null | undefined,
+  defenseIconUrl?: string | null,
+  defenseAnimationUrl?: string | null,
+  defenseProjectileUrl?: string | null,
+  defenseImpactUrl?: string | null,
 ): string | null {
   if (!frame) return null
   const src = frame.imageSource ?? 'url'
@@ -278,11 +291,15 @@ function resolveFrameUrl(
   if (src === 'weaponAnimation') return weaponAnimationUrl ?? null
   if (src === 'weaponProjectile') return weaponProjectileUrl ?? null
   if (src === 'weaponImpact') return weaponImpactUrl ?? null
+  if (src === 'defenseIcon') return defenseIconUrl ?? null
+  if (src === 'defenseAnimation') return defenseAnimationUrl ?? null
+  if (src === 'defenseProjectile') return defenseProjectileUrl ?? null
+  if (src === 'defenseImpact') return defenseImpactUrl ?? null
   return (frame.url?.trim()) ? frame.url.trim() : null
 }
 
 /**
- * Resolve ability animation frames with equipped weapon URLs.
+ * Resolve ability animation frames with equipped weapon/defense URLs.
  * Call before passing to CombatReplay so playback only reads resolved URLs.
  */
 export function resolveAnimationFrames(
@@ -290,7 +307,11 @@ export function resolveAnimationFrames(
   weaponIconUrl: string | null | undefined,
   weaponAnimationUrl: string | null | undefined,
   weaponProjectileUrl?: string | null,
-  weaponImpactUrl?: string | null
+  weaponImpactUrl?: string | null,
+  defenseIconUrl?: string | null,
+  defenseAnimationUrl?: string | null,
+  defenseProjectileUrl?: string | null,
+  defenseImpactUrl?: string | null,
 ): AnimationFrames | null {
   if (!frames) return null
   const result: AnimationFrames = {}
@@ -301,7 +322,17 @@ export function resolveAnimationFrames(
 
   if (frames.weapon?.length) {
     const resolved = frames.weapon.flatMap((f) => {
-      const url = resolveFrameUrl(f, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
+      const url = resolveFrameUrl(
+        f,
+        weaponIconUrl,
+        weaponAnimationUrl,
+        weaponProjectileUrl,
+        weaponImpactUrl,
+        defenseIconUrl,
+        defenseAnimationUrl,
+        defenseProjectileUrl,
+        defenseImpactUrl,
+      )
       if (url) return [{ ...f, url }]
       if (f.url?.trim()) return [{ ...f }]
       return []
@@ -311,7 +342,17 @@ export function resolveAnimationFrames(
 
   if (frames.projectile?.length) {
     const resolved = frames.projectile.flatMap((f) => {
-      const url = resolveFrameUrl(f, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
+      const url = resolveFrameUrl(
+        f,
+        weaponIconUrl,
+        weaponAnimationUrl,
+        weaponProjectileUrl,
+        weaponImpactUrl,
+        defenseIconUrl,
+        defenseAnimationUrl,
+        defenseProjectileUrl,
+        defenseImpactUrl,
+      )
       if (url) return [{ ...f, url }]
       if (f.url?.trim()) return [{ ...f }]
       return []
@@ -321,7 +362,17 @@ export function resolveAnimationFrames(
 
   if (frames.impact?.length) {
     const resolved = frames.impact.flatMap((f) => {
-      const url = resolveFrameUrl(f, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
+      const url = resolveFrameUrl(
+        f,
+        weaponIconUrl,
+        weaponAnimationUrl,
+        weaponProjectileUrl,
+        weaponImpactUrl,
+        defenseIconUrl,
+        defenseAnimationUrl,
+        defenseProjectileUrl,
+        defenseImpactUrl,
+      )
       if (url) return [{ ...f, url }]
       if (f.url?.trim()) return [{ ...f }]
       return []
@@ -331,7 +382,17 @@ export function resolveAnimationFrames(
 
   if (frames.block?.length) {
     const resolved = frames.block.flatMap((f) => {
-      const url = resolveFrameUrl(f, weaponIconUrl, weaponAnimationUrl, weaponProjectileUrl, weaponImpactUrl)
+      const url = resolveFrameUrl(
+        f,
+        weaponIconUrl,
+        weaponAnimationUrl,
+        weaponProjectileUrl,
+        weaponImpactUrl,
+        defenseIconUrl,
+        defenseAnimationUrl,
+        defenseProjectileUrl,
+        defenseImpactUrl,
+      )
       if (url) return [{ ...f, url }]
       if (f.url?.trim()) return [{ ...f }]
       return []

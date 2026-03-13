@@ -6,6 +6,7 @@ import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import type {
   ActiveStatusEffect,
+  AnimationFrameImageSource,
   AnimationFrames,
   CombatEventType,
   CombatResult,
@@ -52,6 +53,20 @@ interface CombatantInfo {
   styleId?: string
   /** Weapon icon URL for portrait overlay and fallback projectile image when ability has no frame URL. */
   weaponUrl?: string | null
+  /** Optional weapon animation image URL. */
+  weaponAnimationUrl?: string | null
+  /** Optional weapon projectile image URL. */
+  weaponProjectileUrl?: string | null
+  /** Optional weapon impact image URL. */
+  weaponImpactUrl?: string | null
+  /** Optional defense item icon URL. */
+  defenseUrl?: string | null
+  /** Optional defense item animation image URL. */
+  defenseAnimationUrl?: string | null
+  /** Optional defense item projectile image URL. */
+  defenseProjectileUrl?: string | null
+  /** Optional defense item impact image URL. */
+  defenseImpactUrl?: string | null
   /** Pre-resolved animation frames (Ability + weapon URLs already resolved by caller). */
   animationFrames?: AnimationFrames | null
   /** Optional resource (mana, rage, etc.) to display below HP bar. */
@@ -811,14 +826,23 @@ export default function CombatReplay({
 
   const resolveStatusParticleUrl = useCallback((
     side: 'player' | 'creature',
-    imageSource?: 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact',
+    imageSource?: AnimationFrameImageSource,
     url?: string,
   ): string => {
     const source = imageSource ?? 'url'
     if (source === 'url') return url?.trim() ?? ''
     const frontId = side === 'player' ? playerFrontId : creatureFrontId
-    const weaponUrl = combatantInfoByIdRef.current[frontId]?.weaponUrl
-    return weaponUrl?.trim() ?? ''
+    const frontInfo = combatantInfoByIdRef.current[frontId]
+    if (!frontInfo) return ''
+    if (source === 'weaponIcon') return frontInfo.weaponUrl?.trim() ?? ''
+    if (source === 'weaponAnimation') return frontInfo.weaponAnimationUrl?.trim() ?? ''
+    if (source === 'weaponProjectile') return frontInfo.weaponProjectileUrl?.trim() ?? ''
+    if (source === 'weaponImpact') return frontInfo.weaponImpactUrl?.trim() ?? ''
+    if (source === 'defenseIcon') return frontInfo.defenseUrl?.trim() ?? ''
+    if (source === 'defenseAnimation') return frontInfo.defenseAnimationUrl?.trim() ?? ''
+    if (source === 'defenseProjectile') return frontInfo.defenseProjectileUrl?.trim() ?? ''
+    if (source === 'defenseImpact') return frontInfo.defenseImpactUrl?.trim() ?? ''
+    return ''
   }, [playerFrontId, creatureFrontId])
 
   const buildStatusParticleEntry = useCallback((
@@ -829,7 +853,7 @@ export default function CombatReplay({
       soundVolumePercent?: number
       soundFadeInMs?: number
       soundFadeOutMs?: number
-      imageSource?: 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact'
+      imageSource?: AnimationFrameImageSource
       delayMs?: number
       lifetimeMs?: number
       sizePx?: number
@@ -946,7 +970,7 @@ export default function CombatReplay({
       soundVolumePercent?: number
       soundFadeInMs?: number
       soundFadeOutMs?: number
-      imageSource?: 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact'
+      imageSource?: AnimationFrameImageSource
       delayMs?: number
       lifetimeMs?: number
       sizePx?: number

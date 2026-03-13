@@ -128,6 +128,7 @@ type ResourceForm = { id: string; name: string; description: string; colorHex: s
 type AbilityForm = {
   id: string; name: string; abilityType: Ability['abilityType']; description: string; iconUrl: string
   cooldownTurns: string; resourceCostId: string; resourceCostAmount: string; unlockCost: string; minLevel: string
+  requiredItemTagsAny: string
   effects: EffectFormRow[]
   derivedStatModifiers: DerivedModifierForm[]
   animFrames: AbilityAnimFrames
@@ -200,7 +201,7 @@ const emptyXp = (): XpEntry => ({ level: '', xp: '' })
 const emptyResource = (): ResourceForm => ({ id: '', name: '', description: '', colorHex: '#3b82f6', isGenerative: false, max: '100', regenPerTurn: '5', gainOnHit: '0' })
 const emptyAbility = (): AbilityForm => ({
   id: '', name: '', abilityType: 'regular', description: '', iconUrl: '',
-  cooldownTurns: '0', resourceCostId: '', resourceCostAmount: '0', unlockCost: '1', minLevel: '1',
+  cooldownTurns: '0', resourceCostId: '', resourceCostAmount: '0', unlockCost: '1', minLevel: '1', requiredItemTagsAny: '',
   effects: [createEmptyEffectRow()],
   derivedStatModifiers: [],
   animFrames: emptyAnimFrames(),
@@ -405,6 +406,11 @@ function hydrateAbilities(pack: IdleRpgPackV1, fallbackMainStatId: string): Abil
     resourceCostAmount: String((a as any).cost?.resourceCost?.amount ?? 0),
     unlockCost: String((a as any).unlockCost ?? 1),
     minLevel: String((a as any).requirements?.minLevel ?? 1),
+    requiredItemTagsAny: (
+      (a as any).requiredItemTypesAny?.join(', ')
+      ?? (a as any).requirements?.equippedTagsAny?.join(', ')
+      ?? ((a as any).requiredItemType ? String((a as any).requiredItemType) : '')
+    ),
     effects: hydrateEffectRows((a as any).effects, fallbackMainStatId),
     derivedStatModifiers: hydrateDerivedModifiers((a as any).derivedStatModifiers),
     animFrames: hydrateAnimFrames(a.animationFrames),
@@ -582,6 +588,7 @@ export default function IdleRpgEdit() {
   const [playerCap, setPlayerCap] = useState(10)
   const [maxLevel, setMaxLevel] = useState(10)
   const [combatPresetId, setCombatPresetId] = useState('combat_v1_simple')
+  const [defaultAbilityId, setDefaultAbilityId] = useState('')
   const [mainStats, setMainStats] = useState<MainStatForm[]>(DEFAULT_MAIN_STATS.map((s) => ({ id: s.id, name: s.name, description: s.description ?? '' })))
   const [derivedStats, setDerivedStats] = useState<DerivedStatForm[]>(DERIVED_STATS.map((d) => emptyDerivedStat(d.id)))
   const [xpEntries, setXpEntries] = useState<XpEntry[]>([])
@@ -626,6 +633,7 @@ export default function IdleRpgEdit() {
       setPlayerCap(realm.playerCap ?? 10)
       setMaxLevel(pack.rules.maxLevel ?? 10)
       setCombatPresetId(pack.rules.combatPresetId ?? 'combat_v1_simple')
+      setDefaultAbilityId((pack.rules as any).defaultAbilityId ?? '')
       const xpTable = pack.rules.xpTable ?? {}
       setXpEntries(
         Object.entries(xpTable)
@@ -743,6 +751,10 @@ export default function IdleRpgEdit() {
       .map((a) => {
         const derivedStatModifiers = buildDerivedModifiers(a.derivedStatModifiers)
         const abilityEffects = buildEffectPayload(a.effects)
+        const requiredItemTypesAny = parseTags(a.requiredItemTagsAny)
+        const requirements: NonNullable<Ability['requirements']> = {}
+        if (Number(a.minLevel) > 1) requirements.minLevel = Number(a.minLevel)
+        if (requiredItemTypesAny.length > 0) requirements.equippedTagsAny = requiredItemTypesAny
         const def: Ability = {
           id: a.id.trim(),
           name: a.name.trim(),
@@ -756,7 +768,9 @@ export default function IdleRpgEdit() {
           ...(a.unlockCost.trim() !== '' && !Number.isNaN(Number(a.unlockCost)) && Number(a.unlockCost) >= 0
             ? { unlockCost: Number(a.unlockCost) }
             : {}),
-          ...(Number(a.minLevel) > 1 ? { requirements: { minLevel: Number(a.minLevel) } } : {}),
+          ...(Object.keys(requirements).length > 0 ? { requirements } : {}),
+          ...(requiredItemTypesAny.length > 0 ? { requiredItemTypesAny } : {}),
+          ...(requiredItemTypesAny.length === 1 ? { requiredItemType: requiredItemTypesAny[0] } : {}),
           ...(abilityEffects.length > 0 ? { effects: abilityEffects } : {}),
           ...(derivedStatModifiers.length > 0 ? { derivedStatModifiers } : {}),
         }
@@ -1080,6 +1094,7 @@ export default function IdleRpgEdit() {
       ...(Object.keys(derivedStatsMap).length > 0 ? { derivedStats: derivedStatsMap } : {}),
       rules: {
         maxLevel, xpTable, combatPresetId, statPointsPerLevel,
+        ...(defaultAbilityId.trim() ? { defaultAbilityId: defaultAbilityId.trim() } : {}),
         ...(Number(abilityPointsPerLevel) > 0 ? { abilityPointsPerLevel: Number(abilityPointsPerLevel) } : {}),
         ...(Object.keys(parsedAbilitySlots).length > 0 ? { abilitySlotsByLevel: parsedAbilitySlots } : {}),
         ...(
@@ -1122,6 +1137,7 @@ export default function IdleRpgEdit() {
         const xpTable = pack.rules.xpTable ?? {}
         setMaxLevel(pack.rules.maxLevel ?? 10)
         setCombatPresetId((pack.rules as any).combatPresetId ?? 'combat_v1_simple')
+        setDefaultAbilityId((pack.rules as any).defaultAbilityId ?? '')
         setXpEntries(
           Object.entries(xpTable)
             .filter(([lvl]) => lvl !== '1')
@@ -1295,6 +1311,14 @@ export default function IdleRpgEdit() {
               <TextField label="Max level" type="number" size="small" value={maxLevel} onChange={(e) => setMaxLevel(Number(e.target.value) || 1)} sx={{ mr: 2, width: 120 }} inputProps={{ min: 1 }} />
               <TextField label="Stat points per level" type="number" size="small" value={statPointsPerLevel} onChange={(e) => setStatPointsPerLevel(Number(e.target.value) || 0)} sx={{ mr: 2, width: 140 }} inputProps={{ min: 0 }} />
               <TextField label="Combat preset ID" size="small" value={combatPresetId} onChange={(e) => setCombatPresetId(e.target.value)} sx={{ width: 220 }} />
+              <TextField
+                label="Default ability ID"
+                size="small"
+                value={defaultAbilityId}
+                onChange={(e) => setDefaultAbilityId(e.target.value)}
+                sx={{ width: 220 }}
+                helperText="Fallback when requirements fail"
+              />
               <Box sx={{ display: 'flex', gap: 2, mt: 2, flexWrap: 'wrap' }}>
                 <TextField label="Ability points/level" type="number" size="small" value={abilityPointsPerLevel} onChange={(e) => setAbilityPointsPerLevel(e.target.value)} sx={{ width: 160 }} inputProps={{ min: 0 }} />
                 <TextField label="Ability slots by level" size="small" value={abilitySlotsByLevel} onChange={(e) => setAbilitySlotsByLevel(e.target.value)} placeholder="1:1,5:2,10:3" sx={{ width: 220 }} helperText="level:slots, comma-separated" />
@@ -1631,6 +1655,15 @@ export default function IdleRpgEdit() {
                     <TextField size="small" label="Cost amount" type="number" value={a.resourceCostAmount} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, resourceCostAmount: e.target.value } : x))} sx={{ width: 100 }} />
                     <TextField size="small" label="Unlock cost (Ability pts)" type="number" value={a.unlockCost} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, unlockCost: e.target.value } : x))} sx={{ width: 150 }} />
                     <TextField size="small" label="Min level" type="number" value={a.minLevel} onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, minLevel: e.target.value } : x))} sx={{ width: 90 }} />
+                    <TextField
+                      size="small"
+                      label="Required item tags (any)"
+                      value={a.requiredItemTagsAny}
+                      onChange={(e) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, requiredItemTagsAny: e.target.value } : x))}
+                      placeholder="weapon:sword, weapon:axe"
+                      helperText="Ability usable when any equipped item has one of these tags"
+                      sx={{ minWidth: 280 }}
+                    />
                     <EffectsEditor
                       effects={a.effects}
                       onChange={(next) => setAbilities((p) => p.map((x, j) => j === i ? { ...x, effects: next } : x))}

@@ -63,8 +63,17 @@ export interface IdleRpgRealm {
   updatedAt: string
 }
 
-/** Source for frame image: custom URL or resolve from equipped weapon at runtime. */
-export type AnimationFrameImageSource = 'url' | 'weaponIcon' | 'weaponAnimation' | 'weaponProjectile' | 'weaponImpact'
+/** Source for frame image: custom URL or resolve from equipped gear at runtime. */
+export type AnimationFrameImageSource =
+  | 'url'
+  | 'weaponIcon'
+  | 'weaponAnimation'
+  | 'weaponProjectile'
+  | 'weaponImpact'
+  | 'defenseIcon'
+  | 'defenseAnimation'
+  | 'defenseProjectile'
+  | 'defenseImpact'
 
 /** Optional weapon frame: pops at caster portrait center, fades in, then vanishes after lifetimeMs. */
 export interface AnimationWeaponFrame {
@@ -436,6 +445,8 @@ export interface Ability {
   name: string
   description?: string
   abilityType: 'primary' | 'regular' | 'passive' | 'ultimate' | 'reactive'
+  requiredItemType?: string
+  requiredItemTypesAny?: string[]
   effects?: Effect[]
   /** @deprecated Use effects[] instead. */
   effect?: unknown
@@ -464,6 +475,7 @@ export interface IdleRpgPackV1 {
     maxLevel: number
     xpTable: Record<string, number>
     combatPresetId: string
+    defaultAbilityId?: string
     statPointsPerLevel?: number
     abilityPointsPerLevel?: number
     abilitySlotsByLevel?: Record<number, number>
@@ -727,6 +739,7 @@ export interface ReplayCombatantSnapshot {
   creatureId?: string
   portraitUrl?: string | null
   weaponItemId?: string | null
+  defenseItemId?: string | null
 }
 
 export interface PvpMailReplayPayload {

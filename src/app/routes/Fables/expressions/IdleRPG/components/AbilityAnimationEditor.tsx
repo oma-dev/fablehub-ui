@@ -20,6 +20,10 @@ const IMAGE_SOURCE_OPTIONS: { value: AnimationFrameImageSource; label: string }[
   { value: 'weaponAnimation', label: 'Weapon animation' },
   { value: 'weaponProjectile', label: 'Weapon projectile' },
   { value: 'weaponImpact', label: 'Weapon impact' },
+  { value: 'defenseIcon', label: 'Defense icon' },
+  { value: 'defenseAnimation', label: 'Defense animation' },
+  { value: 'defenseProjectile', label: 'Defense projectile' },
+  { value: 'defenseImpact', label: 'Defense impact' },
 ]
 
 export interface AnimFrameForm {
@@ -182,7 +186,7 @@ function parseSoundVolumePercent(value: string): number {
 }
 
 export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | undefined {
-  const weapon = af.weapon.filter(f => f.enabled && f.url.trim()).map(f => ({
+  const weapon = af.weapon.filter(f => f.enabled && (f.imageSource !== 'url' || !!f.url.trim())).map(f => ({
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
     ...(f.url.trim() ? { url: f.url.trim() } : {}),
     ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
@@ -202,7 +206,7 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     ...(Number(f.rotationStart) !== 0 ? { rotationStart: Number(f.rotationStart) } : {}),
     ...(Number(f.rotationEnd) !== Number(f.rotationStart) ? { rotationEnd: Number(f.rotationEnd) } : {}),
   }))
-  const projectile = af.projectile.filter(f => f.enabled && f.url.trim()).map(f => ({
+  const projectile = af.projectile.filter(f => f.enabled && (f.imageSource !== 'url' || !!f.url.trim())).map(f => ({
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
     ...(f.url.trim() ? { url: f.url.trim() } : {}),
     ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
@@ -220,7 +224,7 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     ...(Number(f.rotationStart) !== 0 ? { rotationStart: Number(f.rotationStart) } : {}),
     ...(Number(f.rotationEnd) !== Number(f.rotationStart) ? { rotationEnd: Number(f.rotationEnd) } : {}),
   }))
-  const impact = af.impact.filter(f => f.enabled && f.url.trim()).map(f => ({
+  const impact = af.impact.filter(f => f.enabled && (f.imageSource !== 'url' || !!f.url.trim())).map(f => ({
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
     ...(f.url.trim() ? { url: f.url.trim() } : {}),
     ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),
@@ -241,7 +245,7 @@ export function buildAnimationFrames(af: AbilityAnimFrames): AnimationFrames | u
     ...(Number(f.rotationStart) !== 0 ? { rotationStart: Number(f.rotationStart) } : {}),
     ...(Number(f.rotationEnd) !== Number(f.rotationStart) ? { rotationEnd: Number(f.rotationEnd) } : {}),
   }))
-  const block = af.block.filter(f => f.enabled && f.url.trim()).map(f => ({
+  const block = af.block.filter(f => f.enabled && (f.imageSource !== 'url' || !!f.url.trim())).map(f => ({
     ...(f.imageSource !== 'url' ? { imageSource: f.imageSource } : {}),
     ...(f.url.trim() ? { url: f.url.trim() } : {}),
     ...(f.soundUrl.trim() ? { soundUrl: f.soundUrl.trim() } : {}),

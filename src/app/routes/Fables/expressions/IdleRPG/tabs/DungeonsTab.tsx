@@ -111,6 +111,8 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
   const cls = pack.classes.find((c) => c.id === character.classId)
   const weaponItemId = character.equipment?.['attack_source']
   const weaponDef = weaponItemId ? pack.items.find((i) => i.id === weaponItemId) : undefined
+  const defenseItemId = character.equipment?.['defense_layer']
+  const defenseDef = defenseItemId ? pack.items.find((i) => i.id === defenseItemId) : undefined
   const primaryAbility = pack.abilities?.find((a) => a.id === cls?.primaryAttackId && a.abilityType === 'primary')
   const resolvedFrames = resolveAnimationFrames(
     primaryAbility?.animationFrames,
@@ -118,13 +120,27 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
     weaponDef?.animationUrl,
     weaponDef?.projectileUrl,
     weaponDef?.impactUrl,
+    defenseDef?.iconUrl,
+    defenseDef?.animationUrl,
+    defenseDef?.projectileUrl,
+    defenseDef?.impactUrl,
   )
   const playerStats = computePlayerCombatStats(character, pack)
   const playerResource = resolveCharacterResource(pack, character.classId)
   const abilityAnimations: Record<string, any> = {}
   for (const ab of (pack.abilities ?? [])) {
     if (ab.animationFrames) {
-      const r = resolveAnimationFrames(ab.animationFrames, weaponDef?.iconUrl, weaponDef?.animationUrl, weaponDef?.projectileUrl, weaponDef?.impactUrl)
+      const r = resolveAnimationFrames(
+        ab.animationFrames,
+        weaponDef?.iconUrl,
+        weaponDef?.animationUrl,
+        weaponDef?.projectileUrl,
+        weaponDef?.impactUrl,
+        defenseDef?.iconUrl,
+        defenseDef?.animationUrl,
+        defenseDef?.projectileUrl,
+        defenseDef?.impactUrl,
+      )
       if (r) abilityAnimations[ab.id] = r
     }
   }
@@ -493,7 +509,7 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
                               border: '1px solid rgba(239,68,68,0.3)',
                             }}
                           >
-                            HP {boss.hp}
+                            HP {Math.max(0, Math.ceil(boss.hp ?? 0))}
                           </Box>
                           <Box
                             component="span"
@@ -609,6 +625,13 @@ export default function DungeonsTab({ fableId, realmId, character, pack, onChara
               arm: playerStats.arm,
               portraitUrl: character.portraitUrl ?? cls?.iconUrl,
               weaponUrl: weaponDef?.iconUrl,
+              weaponAnimationUrl: weaponDef?.animationUrl,
+              weaponProjectileUrl: weaponDef?.projectileUrl,
+              weaponImpactUrl: weaponDef?.impactUrl,
+              defenseUrl: defenseDef?.iconUrl,
+              defenseAnimationUrl: defenseDef?.animationUrl,
+              defenseProjectileUrl: defenseDef?.projectileUrl,
+              defenseImpactUrl: defenseDef?.impactUrl,
               animationFrames: resolvedFrames ?? primaryAbility?.animationFrames,
               resource: playerResource,
             }}

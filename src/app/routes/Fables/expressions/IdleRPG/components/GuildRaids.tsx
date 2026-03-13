@@ -121,7 +121,7 @@ export default function GuildRaids({ fableId, realmId, groupId, group, character
               <Box>
                 <Typography variant="body2" fontWeight={600}>{raidCall.boss.name}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Lv.{raidCall.boss.level} | HP {raidCall.boss.hp} | AP {raidCall.boss.ap} | ARM {raidCall.boss.arm}
+                  Lv.{raidCall.boss.level} | HP {Math.max(0, Math.ceil(raidCall.boss.hp ?? 0))} | AP {raidCall.boss.ap} | ARM {raidCall.boss.arm}
                 </Typography>
               </Box>
             </Box>

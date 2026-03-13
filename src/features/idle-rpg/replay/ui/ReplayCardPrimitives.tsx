@@ -32,6 +32,11 @@ const STATUS_EFFECT_COLORS: Record<string, string> = {
   debuff: '#ef5350',
 }
 
+function formatBarValue(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.ceil(value))
+}
+
 export function ReplayPortrait({
   url,
   weaponUrl: _weaponUrl,
@@ -89,7 +94,10 @@ export function ReplayHpBar({
   heightPx,
   radius,
 }: ReplayBarProps) {
-  const pct = Math.max(0, Math.min(100, (current / max) * 100))
+  const safeMax = max > 0 ? max : 1
+  const pct = Math.max(0, Math.min(100, (current / safeMax) * 100))
+  const displayCurrent = formatBarValue(current)
+  const displayMax = formatBarValue(max)
   const gradient = pct > 50
     ? 'linear-gradient(90deg, #4ade80, #22c55e)'
     : pct > 25
@@ -104,7 +112,7 @@ export function ReplayHpBar({
           {label}
         </Typography>
         <Typography variant="caption" fontWeight={700} sx={{ fontSize: fontSizePx }}>
-          {current} / {max}
+          {displayCurrent} / {displayMax}
         </Typography>
       </Box>
       <LinearProgress
@@ -137,7 +145,10 @@ export function ReplayResourceBar({
   radius,
   colorHex = '#ffffff',
 }: ReplayBarProps) {
-  const pct = Math.max(0, Math.min(100, (current / max) * 100))
+  const safeMax = max > 0 ? max : 1
+  const pct = Math.max(0, Math.min(100, (current / safeMax) * 100))
+  const displayCurrent = formatBarValue(current)
+  const displayMax = formatBarValue(max)
   const color = colorHex.startsWith('#') ? colorHex : `#${colorHex}`
 
   return (
@@ -147,7 +158,7 @@ export function ReplayResourceBar({
           {label}
         </Typography>
         <Typography variant="caption" fontWeight={700} sx={{ fontSize: fontSizePx }}>
-          {current} / {max}
+          {displayCurrent} / {displayMax}
         </Typography>
       </Box>
       <LinearProgress
