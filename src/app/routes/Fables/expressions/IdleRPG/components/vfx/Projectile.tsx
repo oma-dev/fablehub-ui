@@ -2,6 +2,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { ProjectileType } from './animationConfig'
 import { getAccelerationEase } from './motionEasing'
 import { useParticleSound } from './playParticleSound'
+import {
+  getEquippedItemGlowBackdropStyle,
+  getEquippedItemGlowImageFilter,
+  type EquippedItemGlowVariant,
+} from './equippedItemGlow'
 
 export interface ProjectilePos {
   x: number
@@ -13,6 +18,8 @@ interface Props {
   color: string
   direction: 'left-to-right' | 'right-to-left'
   id: string | number
+  glowVariant?: EquippedItemGlowVariant
+  glowColorHex?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
@@ -61,6 +68,8 @@ function tipRotation(direction: 'left-to-right' | 'right-to-left') {
 function WeaponProjectile({
   direction,
   weaponUrl,
+  glowVariant,
+  glowColorHex,
   trajectory,
   id,
   from,
@@ -76,6 +85,8 @@ function WeaponProjectile({
 }: {
   direction: 'left-to-right' | 'right-to-left'
   weaponUrl: string
+  glowVariant?: EquippedItemGlowVariant
+  glowColorHex?: string
   trajectory: 'straight' | 'arc'
   id: string | number
   from: ProjectilePos
@@ -99,12 +110,30 @@ function WeaponProjectile({
   const size = animateSize ? endSize : singleSize
   const flightDuration = trajectory === 'arc' ? duration : durationSec
   const motionEase = getAccelerationEase(acceleration)
+  const glowBackdropStyle = getEquippedItemGlowBackdropStyle(glowVariant, glowColorHex)
+  const imageFilter = getEquippedItemGlowImageFilter(glowVariant, glowColorHex, 'soft')
 
   const imgStyle = {
     objectFit: 'contain' as const,
-    filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))',
+    filter: imageFilter,
     transform: mirrored ? 'scaleX(-1)' : undefined,
   }
+  const renderImage = () => (
+    <>
+      {glowBackdropStyle && <div aria-hidden style={glowBackdropStyle} />}
+      <img
+        src={weaponUrl}
+        alt=""
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          width: '100%',
+          height: '100%',
+          ...imgStyle,
+        }}
+      />
+    </>
+  )
   const imgEl = (
     animateSize
       ? (
@@ -112,12 +141,25 @@ function WeaponProjectile({
           initial={{ width: startSize, height: startSize }}
           animate={{ width: endSize, height: endSize }}
           transition={{ duration: flightDuration, ease: 'easeInOut' }}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          <img src={weaponUrl} alt="" style={{ width: '100%', height: '100%', ...imgStyle }} />
+          {renderImage()}
         </motion.div>
         )
-      : <img src={weaponUrl} alt="" style={{ width: size, height: size, ...imgStyle }} />
+      : (
+        <div
+          style={{
+            position: 'relative',
+            width: size,
+            height: size,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {renderImage()}
+        </div>
+        )
   )
 
   if (trajectory === 'arc') {
@@ -232,6 +274,8 @@ export default function Projectile({
   color,
   direction,
   id,
+  glowVariant,
+  glowColorHex,
   soundUrl,
   soundVolumePercent,
   soundFadeInMs = 0,
@@ -263,6 +307,8 @@ export default function Projectile({
             <WeaponProjectile
               direction={direction}
               weaponUrl={weaponUrl}
+              glowVariant={glowVariant}
+              glowColorHex={glowColorHex}
               trajectory={trajectory ?? 'straight'}
               id={id}
               from={start}

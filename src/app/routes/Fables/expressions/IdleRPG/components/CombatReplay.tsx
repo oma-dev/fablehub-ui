@@ -26,6 +26,7 @@ import { groupCombatTurnEvents } from '@features/idle-rpg/replay/runtime'
 import { getAttackAnimationConfig, type AttackAnimationConfig, type AnimationBlockFrame } from './vfx/animationConfig'
 import BlockFrame from './vfx/BlockFrame'
 import DamageNumber from './vfx/DamageNumber'
+import { getEquippedItemGlowVariant, type EquippedItemGlowVariant } from './vfx/equippedItemGlow'
 import ImpactEffect from './vfx/ImpactEffect'
 import ImpactFrame from './vfx/ImpactFrame'
 import Projectile, { PROJECTILE_SPEED, type ProjectilePos } from './vfx/Projectile'
@@ -53,6 +54,8 @@ interface CombatantInfo {
   styleId?: string
   /** Weapon icon URL for portrait overlay and fallback projectile image when ability has no frame URL. */
   weaponUrl?: string | null
+  /** Optional equipped weapon color used by item-based VFX glow. */
+  weaponColorHex?: string | null
   /** Optional weapon animation image URL. */
   weaponAnimationUrl?: string | null
   /** Optional weapon projectile image URL. */
@@ -61,6 +64,8 @@ interface CombatantInfo {
   weaponImpactUrl?: string | null
   /** Optional defense item icon URL. */
   defenseUrl?: string | null
+  /** Optional equipped defense item color used by item-based VFX glow. */
+  defenseColorHex?: string | null
   /** Optional defense item animation image URL. */
   defenseAnimationUrl?: string | null
   /** Optional defense item projectile image URL. */
@@ -203,6 +208,8 @@ interface ActiveWeaponFrame {
   key: number
   side: 'player' | 'creature'
   url: string
+  glowVariant?: EquippedItemGlowVariant
+  glowColorHex?: string
   soundUrl?: string
   soundVolumePercent?: number
   soundFadeInMs?: number
@@ -226,6 +233,8 @@ interface ActiveProjectileEntry {
   key: number
   direction: 'left-to-right' | 'right-to-left'
   imageUrl: string | null
+  glowVariant?: EquippedItemGlowVariant
+  glowColorHex?: string
   soundUrl?: string
   soundVolumePercent?: number
   soundFadeInMs?: number
@@ -249,6 +258,8 @@ interface ActiveImpactFrame {
   key: number
   side: 'player' | 'creature'
   url: string
+  glowVariant?: EquippedItemGlowVariant
+  glowColorHex?: string
   soundUrl?: string
   soundVolumePercent?: number
   soundFadeInMs?: number
@@ -271,6 +282,8 @@ interface ActiveBlockFrameEntry {
   key: number
   side: 'player' | 'creature'
   url: string
+  glowVariant?: EquippedItemGlowVariant
+  glowColorHex?: string
   soundUrl?: string
   soundVolumePercent?: number
   soundFadeInMs?: number
@@ -907,6 +920,18 @@ export default function CombatReplay({
     }
   }, [resolveStatusParticleUrl])
 
+  const resolveEquippedGlowColor = useCallback((
+    side: 'player' | 'creature',
+    glowVariant?: EquippedItemGlowVariant,
+  ): string | undefined => {
+    if (!glowVariant) return undefined
+    const frontId = side === 'player' ? playerFrontId : creatureFrontId
+    const frontInfo = combatantInfoByIdRef.current[frontId]
+    if (!frontInfo) return undefined
+    if (glowVariant === 'weapon') return frontInfo.weaponColorHex?.trim() || undefined
+    return frontInfo.defenseColorHex?.trim() || undefined
+  }, [playerFrontId, creatureFrontId])
+
   const syncLoopStatusParticles = useCallback((nextPlayerEffects: ActiveStatusEffect[], nextCreatureEffects: ActiveStatusEffect[]) => {
     const desired: Array<{ identity: string; entry: Omit<ActiveStatusParticleEntry, 'key' | 'identity'> }> = []
     const appendForSide = (side: 'player' | 'creature', effects: ActiveStatusEffect[]) => {
@@ -1136,10 +1161,13 @@ export default function CombatReplay({
       const maxWeaponMs = Math.max(...weaponFrames.map(f => (f.delayMs ?? 0) + (f.fadeInMs ?? 200)))
       weaponFrames.forEach(async (f) => {
         if (f.delayMs) await sleep(f.delayMs)
+        const glowVariant = getEquippedItemGlowVariant(f.imageSource)
         const entry: ActiveWeaponFrame = {
           key: ++vfxKeyRef.current,
           side: attackerSide,
           url: f.url!.trim(),
+          glowVariant,
+          glowColorHex: resolveEquippedGlowColor(attackerSide, glowVariant),
           soundUrl: f.soundUrl?.trim() || undefined,
           soundVolumePercent: f.soundVolumePercent ?? 100,
           soundFadeInMs: f.soundFadeInMs ?? 0,
@@ -1179,7 +1207,7 @@ export default function CombatReplay({
       const tgtRef = attackerSide === 'player' ? creaturePortraitRef : playerPortraitRef
       const tgtPos = getPortraitPos(tgtRef)
       const attackerFrontId = getFrontIdForSide(attackerSide)
-      const weaponUrlFallback = combatantInfoByIdRef.current[attackerFrontId]?.weaponUrl
+      const weaponUrlFallback = combatantInfoByIdRef.current[attackerFrontId]?.weaponUrl?.trim() || null
       const dir = attackerSide === 'player' ? 'left-to-right' as const : 'right-to-left' as const
       const defaultFlight = (anim.projectile === 'arc' ? PROJECTILE_SPEED * 1.25 : PROJECTILE_SPEED) * 1000 + 50
       const resolveFlightMs = (f: typeof projFrames[0]) => f.lifetimeMs ?? f.speedMs ?? defaultFlight
@@ -1189,10 +1217,15 @@ export default function CombatReplay({
         const srcPos = getPortraitPos(srcRef)
         const key = ++vfxKeyRef.current
         const flightMs = resolveFlightMs(f)
+        const resolvedImageUrl = f.url?.trim() || weaponUrlFallback || null
+        const usesWeaponFallback = !f.url?.trim() && !!weaponUrlFallback
+        const glowVariant = getEquippedItemGlowVariant(f.imageSource) ?? (usesWeaponFallback ? 'weapon' : undefined)
         const entry: ActiveProjectileEntry = {
           key,
           direction: dir,
-          imageUrl: f.url?.trim() ?? weaponUrlFallback ?? null,
+          imageUrl: resolvedImageUrl,
+          glowVariant,
+          glowColorHex: resolveEquippedGlowColor(attackerSide, glowVariant),
           soundUrl: f.soundUrl?.trim() || undefined,
           soundVolumePercent: f.soundVolumePercent ?? 100,
           soundFadeInMs: f.soundFadeInMs ?? 0,
@@ -1253,10 +1286,13 @@ export default function CombatReplay({
         blockAnimFrames.forEach(async (f) => {
           if (f.delayMs) await sleep(f.delayMs)
           const { showMs, vanishMs } = resolveBlockTiming(f)
+          const glowVariant = getEquippedItemGlowVariant(f.imageSource)
           const entry: ActiveBlockFrameEntry = {
             key: ++vfxKeyRef.current,
             side: defenderSide,
             url: f.url!.trim(),
+            glowVariant,
+            glowColorHex: resolveEquippedGlowColor(defenderSide, glowVariant),
             soundUrl: f.soundUrl?.trim() || undefined,
             soundVolumePercent: f.soundVolumePercent ?? 100,
             soundFadeInMs: f.soundFadeInMs ?? 0,
@@ -1330,10 +1366,13 @@ export default function CombatReplay({
       impactFrames.forEach(async (f) => {
         if (f.delayMs) await sleep(f.delayMs)
         const { showMs, vanishMs } = resolveImpactTiming(f)
+        const glowVariant = getEquippedItemGlowVariant(f.imageSource)
         const entry: ActiveImpactFrame = {
           key: ++vfxKeyRef.current,
           side: attackerSide === 'player' ? 'creature' : 'player',
           url: f.url!.trim(),
+          glowVariant,
+          glowColorHex: resolveEquippedGlowColor(attackerSide, glowVariant),
           soundUrl: f.soundUrl?.trim() || undefined,
           soundVolumePercent: hasCriticalDamage ? (f.soundVolumePercent ?? 100) * 2 : (f.soundVolumePercent ?? 100),
           soundFadeInMs: f.soundFadeInMs ?? 0,
@@ -1828,6 +1867,8 @@ export default function CombatReplay({
               soundFadeInMs={p.soundFadeInMs}
               soundFadeOutMs={p.soundFadeOutMs}
               weaponUrl={p.imageUrl}
+              glowVariant={p.glowVariant}
+              glowColorHex={p.glowColorHex}
               mirrored={p.mirrored}
               trajectory={p.trajectory}
               durationMs={p.durationMs}
@@ -2018,11 +2059,11 @@ export default function CombatReplay({
                 />
               ))}
               {activeWeaponFrames.filter(f => f.side === 'player').map(f => (
-                <WeaponFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
+                <WeaponFrame key={f.key} show url={f.url} glowVariant={f.glowVariant} glowColorHex={f.glowColorHex} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
               ))}
               {showPlayerImpact && activeImpactFrames.filter(f => f.side === 'player').length > 0
                 ? activeImpactFrames.filter(f => f.side === 'player').map(f => (
-                  <ImpactFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
+                  <ImpactFrame key={f.key} show url={f.url} glowVariant={f.glowVariant} glowColorHex={f.glowColorHex} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
                 ))
                 : (showPlayerImpact && showPlayerGenericImpact ? (
                   <ImpactEffect
@@ -2073,7 +2114,7 @@ export default function CombatReplay({
               ))}
             </Box>
               {activeBlockFrames.filter(f => f.side === 'player').map(f => (
-                <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} side="player" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
+                <BlockFrame key={f.key} show url={f.url} glowVariant={f.glowVariant} glowColorHex={f.glowColorHex} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} side="player" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored={false} id={f.key} />
               ))}
             </Paper>
             </motion.div>
@@ -2272,11 +2313,11 @@ export default function CombatReplay({
                 />
               ))}
               {activeWeaponFrames.filter(f => f.side === 'creature').map(f => (
-                <WeaponFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+                <WeaponFrame key={f.key} show url={f.url} glowVariant={f.glowVariant} glowColorHex={f.glowColorHex} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} fadeInMs={f.fadeInMs} lifetimeMs={f.lifetimeMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
               ))}
               {showCreatureImpact && activeImpactFrames.filter(f => f.side === 'creature').length > 0
                 ? activeImpactFrames.filter(f => f.side === 'creature').map(f => (
-                  <ImpactFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+                  <ImpactFrame key={f.key} show url={f.url} glowVariant={f.glowVariant} glowColorHex={f.glowColorHex} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} endOffsetX={f.endOffsetX} endOffsetY={f.endOffsetY} acceleration={f.acceleration} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
                 ))
                 : (showCreatureImpact && showCreatureGenericImpact ? (
                   <ImpactEffect
@@ -2327,7 +2368,7 @@ export default function CombatReplay({
               ))}
             </Box>
               {activeBlockFrames.filter(f => f.side === 'creature').map(f => (
-                <BlockFrame key={f.key} show url={f.url} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
+                <BlockFrame key={f.key} show url={f.url} glowVariant={f.glowVariant} glowColorHex={f.glowColorHex} soundUrl={f.soundUrl} soundVolumePercent={f.soundVolumePercent} soundFadeInMs={f.soundFadeInMs} soundFadeOutMs={f.soundFadeOutMs} side="creature" showMs={f.showMs} vanishMs={f.vanishMs} sizePx={f.sizePx} startSizePx={f.startSizePx} endSizePx={f.endSizePx} offsetX={f.offsetX} offsetY={f.offsetY} rotationStart={f.rotationStart} rotationEnd={f.rotationEnd} mirrored id={f.key} />
               ))}
             </Paper>
             </motion.div>

@@ -1,5 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParticleSound } from './playParticleSound'
+import {
+  getEquippedItemGlowBackdropStyle,
+  getEquippedItemGlowImageFilter,
+  type EquippedItemGlowVariant,
+} from './equippedItemGlow'
 
 const DEFAULT_SIZE = 140
 const VFX_Z_INDEX = 2500
@@ -7,6 +12,8 @@ const VFX_Z_INDEX = 2500
 interface Props {
   show: boolean
   url: string
+  glowVariant?: EquippedItemGlowVariant
+  glowColorHex?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
@@ -38,6 +45,8 @@ interface Props {
 export default function BlockFrame({
   show,
   url,
+  glowVariant,
+  glowColorHex,
   soundUrl,
   soundVolumePercent,
   soundFadeInMs = 0,
@@ -65,6 +74,8 @@ export default function BlockFrame({
   const initialScale = startSize / baseSize
   const finalScale = endSize / baseSize
   const finalRotation = rotationEnd ?? rotationStart
+  const glowBackdropStyle = getEquippedItemGlowBackdropStyle(glowVariant, glowColorHex)
+  const imageFilter = getEquippedItemGlowImageFilter(glowVariant, glowColorHex, 'strong')
 
   return (
     <AnimatePresence>
@@ -102,14 +113,17 @@ export default function BlockFrame({
             justifyContent: 'center',
           }}
         >
+          {glowBackdropStyle && <div aria-hidden style={glowBackdropStyle} />}
           <img
             src={url}
             alt=""
             style={{
+              position: 'relative',
+              zIndex: 1,
               width: '100%',
               height: '100%',
               objectFit: 'contain',
-              filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
+              filter: imageFilter,
               transform: mirrored ? 'scaleX(-1)' : undefined,
             }}
           />

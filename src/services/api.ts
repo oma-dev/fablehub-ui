@@ -593,6 +593,7 @@ export interface ItemTemplate {
   rarity: number
   slot: string
   tags: string[]
+  colorHex?: string
   mainStatBonuses?: Record<string, number>
   derivedStatModifiers?: DerivedStatModifier[]
   weaponDamage?: number

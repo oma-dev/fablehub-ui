@@ -309,7 +309,7 @@ type CreatureForm = {
 type ItemForm = {
   id: string; name: string; rarity: string; slot: string; tags: string; stats: string
   mainStatBonuses: MainStatValueForm[]; weaponDamage: string; protectiveArmor: string; derivedStatModifiers: DerivedModifierForm[]
-  iconUrl: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string; sellValue: string
+  iconUrl: string; colorHex: string; animationUrl: string; projectileUrl: string; impactUrl: string; priceCurrencyId: string; priceAmount: string; sellValue: string
 }
 type QuestForm = {
   id: string
@@ -382,7 +382,7 @@ const emptyCreature = (): CreatureForm => ({
 const emptyItem = (): ItemForm => ({
   id: '', name: '', rarity: 'common', slot: 'attack_source', tags: '', stats: '',
   mainStatBonuses: [], weaponDamage: '', protectiveArmor: '', derivedStatModifiers: [],
-  iconUrl: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '', sellValue: '',
+  iconUrl: '', colorHex: '', animationUrl: '', projectileUrl: '', impactUrl: '', priceCurrencyId: '', priceAmount: '', sellValue: '',
 })
 const emptyQuest = (): QuestForm => ({
   id: '',
@@ -600,7 +600,7 @@ export default function IdleRpgCreate() {
       weaponDamage: (i as any).weaponDamage != null ? String((i as any).weaponDamage) : '',
       protectiveArmor: (i as any).protectiveArmor != null ? String((i as any).protectiveArmor) : '',
       derivedStatModifiers: hydrateDerivedModifiers((i as any).derivedStatModifiers),
-      iconUrl: i.iconUrl ?? '', animationUrl: i.animationUrl ?? '',
+      iconUrl: i.iconUrl ?? '', colorHex: (i as any).colorHex ?? '', animationUrl: i.animationUrl ?? '',
       projectileUrl: i.projectileUrl ?? '', impactUrl: i.impactUrl ?? '',
       priceCurrencyId: i.price?.currencyId ?? '',
       priceAmount: i.price?.amount != null ? String(i.price.amount) : '',
@@ -750,6 +750,7 @@ export default function IdleRpgCreate() {
     })))
     setItems(ex.items.map((i) => ({
       ...i,
+      colorHex: (i as any).colorHex ?? '',
       mainStatBonuses: [],
       weaponDamage: '',
       protectiveArmor: '',
@@ -974,6 +975,7 @@ export default function IdleRpgCreate() {
           ...(i.protectiveArmor.trim() !== '' && !Number.isNaN(Number(i.protectiveArmor)) ? { protectiveArmor: Number(i.protectiveArmor) } : {}),
           ...(itemDerivedStatModifiers.length > 0 ? { derivedStatModifiers: itemDerivedStatModifiers } : {}),
           ...(i.iconUrl.trim() ? { iconUrl: i.iconUrl.trim() } : {}),
+          ...(i.colorHex.trim() ? { colorHex: i.colorHex.trim() } : {}),
           ...(i.animationUrl.trim() ? { animationUrl: i.animationUrl.trim() } : {}),
           ...(i.projectileUrl.trim() ? { projectileUrl: i.projectileUrl.trim() } : {}),
           ...(i.impactUrl.trim() ? { impactUrl: i.impactUrl.trim() } : {}),
@@ -2139,6 +2141,7 @@ export default function IdleRpgCreate() {
                   <TextField size="small" label="Weapon damage" type="number" value={item.weaponDamage} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, weaponDamage: e.target.value } : x))} sx={{ width: 120 }} />
                   <TextField size="small" label="Protective armor" type="number" value={item.protectiveArmor} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, protectiveArmor: e.target.value } : x))} sx={{ width: 130 }} />
                   <TextField size="small" label="Icon URL" value={item.iconUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, iconUrl: e.target.value } : x))} sx={{ width: 120 }} />
+                  <TextField size="small" label="Color Hex" value={item.colorHex} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, colorHex: e.target.value } : x))} placeholder="#60a5fa" sx={{ width: 100 }} />
                   <TextField size="small" label="Animation URL (weapon tip-up)" value={item.animationUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, animationUrl: e.target.value } : x))} placeholder="for projectile frame" sx={{ width: 140 }} />
                   <TextField size="small" label="Projectile URL" value={item.projectileUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, projectileUrl: e.target.value } : x))} placeholder="custom projectile" sx={{ width: 120 }} />
                   <TextField size="small" label="Impact URL" value={item.impactUrl} onChange={(e) => setItems((p) => p.map((x, j) => j === i ? { ...x, impactUrl: e.target.value } : x))} placeholder="custom impact" sx={{ width: 120 }} />

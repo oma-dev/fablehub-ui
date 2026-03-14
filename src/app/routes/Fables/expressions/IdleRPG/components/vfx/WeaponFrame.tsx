@@ -1,6 +1,11 @@
 import { motion, AnimatePresence, type TargetAndTransition } from 'framer-motion'
 import { getAccelerationEase } from './motionEasing'
 import { useParticleSound } from './playParticleSound'
+import {
+  getEquippedItemGlowBackdropStyle,
+  getEquippedItemGlowImageFilter,
+  type EquippedItemGlowVariant,
+} from './equippedItemGlow'
 
 const DEFAULT_SIZE = 120
 const DEFAULT_FADE_IN_MS = 200
@@ -9,6 +14,8 @@ const VFX_Z_INDEX = 2100
 interface Props {
   show: boolean
   url: string
+  glowVariant?: EquippedItemGlowVariant
+  glowColorHex?: string
   /** Optional sound URL played when this particle starts. */
   soundUrl?: string
   /** Optional sound volume in percent (0-100). Default 100. */
@@ -52,6 +59,8 @@ interface Props {
 
 export default function WeaponFrame({
   show, url,
+  glowVariant,
+  glowColorHex,
   soundUrl,
   soundVolumePercent,
   soundFadeInMs = 0,
@@ -80,6 +89,8 @@ export default function WeaponFrame({
   const deltaY = targetOffsetY - offsetY
   const motionEase = getAccelerationEase(acceleration)
   const finalRotation = rotationEnd ?? rotationStart
+  const glowBackdropStyle = getEquippedItemGlowBackdropStyle(glowVariant, glowColorHex)
+  const imageFilter = getEquippedItemGlowImageFilter(glowVariant, glowColorHex, 'medium')
 
   // When lifetimeMs is given, animate the complete lifecycle as one keyframe sequence.
   // Fade-out uses the same duration as fade-in (symmetric), capped to leave at least
@@ -143,14 +154,17 @@ export default function WeaponFrame({
             justifyContent: 'center',
           }}
         >
+          {glowBackdropStyle && <div aria-hidden style={glowBackdropStyle} />}
           <img
             src={url}
             alt=""
             style={{
+              position: 'relative',
+              zIndex: 1,
               width: '100%',
               height: '100%',
               objectFit: 'contain',
-              filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.4))',
+              filter: imageFilter,
               transform: mirrored ? 'scaleX(-1)' : undefined,
             }}
           />
