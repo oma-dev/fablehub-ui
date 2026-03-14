@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, Navigate, useLocation } from 'react-router-dom'
 import Badge from '@mui/material/Badge'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -62,6 +62,7 @@ import AbilitiesTab from './tabs/AbilitiesTab'
 import MailboxTab from './tabs/MailboxTab'
 import { computePlayerCombatStats } from './utils/combatStats'
 import charBackground from '../../../../../assets/backgrounds/charBackground.png'
+import { useAuth } from '../../../../../contexts/AuthContext'
 
 /* ------------------------------------------------------------------ */
 /*  Sidebar Character Card                                            */
@@ -323,6 +324,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 export default function FableIdleRPG() {
   const { fableId } = useParams<{ fableId: string }>()
+  const location = useLocation()
+  const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [realm, setRealm] = useState<IdleRpgRealm | null>(null)
@@ -351,7 +354,7 @@ export default function FableIdleRPG() {
   const displayCharacter = playState?.character ?? character
 
   useEffect(() => {
-    if (!fableId) return
+    if (!fableId || authLoading || !user) return
     let cancelled = false
     ;(async () => {
       try {
@@ -393,7 +396,7 @@ export default function FableIdleRPG() {
       }
     })()
     return () => { cancelled = true }
-  }, [fableId])
+  }, [fableId, authLoading, user])
 
   // Fetch play state (character + pack with fresh merchant) when we have a character
   useEffect(() => {
@@ -519,6 +522,19 @@ export default function FableIdleRPG() {
         <Typography color="text.secondary">Missing fable.</Typography>
       </Box>
     )
+  }
+
+  if (authLoading) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    )
+  }
+
+  if (!user) {
+    const redirect = encodeURIComponent(`${location.pathname}${location.search}`)
+    return <Navigate to={`/login?redirect=${redirect}`} replace />
   }
 
   if (loading) {

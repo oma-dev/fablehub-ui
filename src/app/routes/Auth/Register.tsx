@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Container from '@mui/material/Container'
@@ -9,11 +9,17 @@ import { supabase } from '../../../lib/supabase'
 
 const Register = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const redirectTo = (() => {
+    const redirect = new URLSearchParams(location.search).get('redirect')
+    if (!redirect || !redirect.startsWith('/') || redirect.startsWith('//')) return '/'
+    return redirect
+  })()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,7 +41,7 @@ const Register = () => {
       })
       if (authError) throw authError
       if (data.session) {
-        navigate('/', { replace: true })
+        navigate(redirectTo, { replace: true })
       } else {
         setSuccess(true)
         setError(
@@ -106,7 +112,7 @@ const Register = () => {
             >
               {submitting ? 'Creating account…' : 'Register'}
             </Button>
-            <Button component={Link} to="/login" variant="outlined" color="primary">
+            <Button component={Link} to={redirectTo === '/' ? '/login' : `/login?redirect=${encodeURIComponent(redirectTo)}`} variant="outlined" color="primary">
               Log in
             </Button>
           </Box>
